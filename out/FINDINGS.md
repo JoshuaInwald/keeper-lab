@@ -37,6 +37,8 @@ in `LAB_NOTEBOOK.md`.
 29. [Depth-vs-stars, redone with share of production](#29-depth-vs-stars-redone-with-share-of-production-the-hypothesized-cleanup-only-half-worked)
 30. [The headline ±38% uncertainty band was computed around the wrong point estimates](#30-the-headline-38-uncertainty-band-was-computed-around-the-wrong-point-estimates)
 31. [A second, live copy of the same season-set bug: `teams_per_category`](#31-a-second-live-copy-of-the-same-season-set-bug-teams_per_category)
+32. [General review of the modules the earlier fixes didn't touch](#32-general-review-of-the-modules-the-earlier-fixes-didnt-touch)
+33. [Extension eligibility was applied to codes "2" and "3", not just "1"](#33-extension-eligibility-was-applied-to-codes-2-and-3-not-just-1)
 
 </details>
 
@@ -1494,3 +1496,47 @@ from "extended to a salary that happens to equal the FA price" requires a
 transaction date, which is the same missing-transaction-log blocker as §27
 and §11 of `out/LAB_NOTEBOOK.md`. Documented here so it's a known,
 findable gap rather than a silent one if it ever does trigger.
+
+## 33. Extension eligibility was applied to codes "2" and "3", not just "1"
+
+Josh flagged this directly: asked me to confirm the extension-option code
+against his own description of the rule, which turned out not to match
+what was implemented. The constitution is explicit and singular on this —
+there is exactly one extension clause: *"Players **about to enter the final
+year** of their contract eligibility can be retained for additional
+seasons."* That phrase means one thing: a player with exactly one year of
+guaranteed control left (contract code `"1"`). A player with two or three
+years left (`"2"`, `"3"`) is not about to enter his final year — he has one
+or two full seasons of guaranteed control before that question is even
+live.
+
+`klab/keeper.py::multiyear_surplus`'s `live` branch (the extension-pricing
+path for non-`F` contracts) didn't check this. It applied the same
+extension-option computation to every non-`F` contract uniformly — codes
+`"1"`, `"2"`, and `"3"` all got priced as if the owner could extend them
+right now. Confirmed on the current board: **9 players with 2-3 years of
+already-guaranteed control were carrying a phantom extension option**,
+$25.60 combined — Spencer Torkelson ($1 salary) +$7.20, Konnor Griffin
+($20) +$5.43, Hunter Greene +$3.96, Chandler Simpson +$3.77, Bryan Woo
++$2.29, Sal Stewart +$1.66, Tarik Skubal +$0.94, Jac Caglianone +$0.04,
+A.J. Ewing +$0.32.
+
+**The math itself was correct where it applied** — for a genuine code-`"1"`
+player, extending 1 year does give 2 total years of control (the 1 already
+owed plus 1 extension year) and extending 2 years gives 3 total, exactly as
+described in the constitution's worked example and confirmed line-by-line
+against the discount exponents used (`years.clip(lower=0) + k`, which
+correctly picks up right where the already-owed year's discount left off).
+The bug was purely eligibility: `is_final` correctly distinguished `F` from
+everything else, but "everything else" needed a second split — `years == 1`
+eligible, `years ∈ {2, 3}` not — and didn't have one.
+
+**Fixed**: `ext`/`ext_yrs` are now built starting from an all-zero baseline,
+with `F` rows filled from the `final` candidates and only `years == 1` rows
+filled from the `live` candidates. Reran the full pipeline: exactly the
+same 9 players change, `extension_option` goes to exactly `0.0` for all of
+them, **zero keep/cut flips** — every one of the 9 was already a clear keep
+on the corrected number, this was overstated surplus on players who didn't
+need it to justify keeping them, not a flip-changing error. Verified with
+`node app/verify.mjs` (Node installed this session specifically to run
+it): `PASS` on all 25 quantities, `PASS` on console errors across every tab.

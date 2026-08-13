@@ -282,6 +282,26 @@ def test_extension_years_is_zero_where_the_option_is_worthless():
     assert out["extension_option"].iloc[0] == pytest.approx(0.0)
 
 
+def test_extension_only_eligible_with_one_year_of_control_left():
+    """The constitution's only extension clause is for a player 'about to
+    enter the final year of his contract eligibility' -- code 1, one year of
+    control left. Codes 2 and 3 still have guaranteed seasons before that's
+    live, and must report zero extension option regardless of how good the
+    2028 line is (out/FINDINGS.md #33 -- 9 players carried a phantom
+    extension option here before this was fixed)."""
+    from klab.keeper import multiyear_surplus
+    sal = pd.Series([10.0, 10.0, 10.0])
+    v27 = pd.Series([30.0, 30.0, 30.0])
+    v28 = pd.Series([40.0, 40.0, 40.0])          # clearly clears any extension cost
+    years = pd.Series([1, 2, 3])
+    out = multiyear_surplus(v27, v28, sal, years, sal)
+    assert out["extension_option"].iloc[0] > 0, "code 1 should be extension-eligible"
+    assert out["extension_option"].iloc[1] == pytest.approx(0.0), "code 2 is not eligible yet"
+    assert out["extension_option"].iloc[2] == pytest.approx(0.0), "code 3 is not eligible yet"
+    assert out["extension_years"].iloc[1] == 0
+    assert out["extension_years"].iloc[2] == 0
+
+
 def test_app_payload_has_no_column_collisions_and_no_nans():
     """The exported payload is what the browser sees. A silent column collision
     (ros PA vs projected PA) shipped a null into the player card once."""

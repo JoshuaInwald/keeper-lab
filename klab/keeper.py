@@ -279,8 +279,17 @@ def multiyear_surplus(value_2027: pd.Series, value_2028: pd.Series,
             final.append((v - y1, n_yrs))
         final_val, final_yrs = _best(final)
 
-        ext = final_val.where(is_final, live_val)
-        ext_yrs = final_yrs.where(is_final, live_yrs)
+        # CORRECTED 2026-08-13 (out/FINDINGS.md #33): the constitution grants
+        # the extension only to a player "about to enter the final year of
+        # his contract eligibility" -- i.e. code "1" (one year of guaranteed
+        # control left), not codes "2" or "3", which still have a season or
+        # two of guaranteed control before the extension question is even
+        # live. This used to apply `live_val` to every non-F contract
+        # uniformly, handing a phantom extension option to players two or
+        # three years from needing one.
+        extend_eligible = (~is_final) & years.eq(1)
+        ext = pd.Series(0.0, index=total.index).mask(is_final, final_val).mask(extend_eligible, live_val)
+        ext_yrs = pd.Series(0, index=total.index).mask(is_final, final_yrs).mask(extend_eligible, live_yrs)
 
     return pd.DataFrame({
         "surplus_y2027": y1,

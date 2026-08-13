@@ -20,6 +20,7 @@ alternatives were tried and rejected for reasons that are not obvious.
 11. [Rejected: median of the full free-agent pool as a survivorship-free replacement estimate](#11-rejected-median-of-the-full-free-agent-pool-as-a-survivorship-free-replacement-estimate-2026-08-13)
 12. [BB and H reliability were copy-pasted from WHIP](#12-bb-and-h-reliability-were-copy-pasted-from-whip-2026-08-13)
 13. [Fixing #26 didn't fix all of #26](#13-fixing-26-didnt-fix-all-of-26-2026-08-13)
+14. [Extension eligibility applied to the wrong contract codes — caught by Josh, not by review](#14-extension-eligibility-applied-to-the-wrong-contract-codes--caught-by-josh-not-by-review-2026-08-13)
 
 </details>
 
@@ -524,3 +525,37 @@ right) instead of copy-pasting straight from a fresh script's output is what
 surfaced this. Worth remembering next time a doc update feels like a
 formality — it's also a free audit if you make yourself actually run the
 thing instead of remembering the number from three fixes ago.
+
+## 14. Extension eligibility applied to the wrong contract codes — caught by Josh, not by review (2026-08-13)
+
+Worth being direct about how this one was found, because it's different
+from #10, #12, #13: those were caught by re-deriving a number from scratch
+and diffing it against what shipped. This one was caught because Josh
+described the extension rule in his own words, in enough detail to be
+checkable, and asked for a line-by-line confirmation against the code
+rather than taking a prior summary on faith. Two full review passes this
+session (the general code review that produced #32, and everything before
+it) read `klab/keeper.py::multiyear_surplus` and didn't catch that the
+`live` extension-pricing branch applies to contract codes `"1"`, `"2"`, and
+`"3"` uniformly, when the constitution's only extension clause restricts it
+to a player "about to enter the final year" — code `"1"` alone.
+
+**Why review missed it:** the function's own docstring and inline comments
+describe the F-vs-live split in detail and are *correct* about that split
+(`F` gets `final` candidates, everything else gets `live` candidates) — the
+bug is one level down, in an eligibility check the comments don't mention
+needing at all. Nothing about "everything else" being further split by
+`years == 1` was flagged anywhere as a thing to check, so a review reading
+top-to-bottom for internal consistency had no reason to ask the question.
+The invariant tests didn't catch it either, for the usual reason: a $25.60
+phantom extension option spread across 9 players is a valid-looking number,
+not an invalid one.
+
+**Lesson, stated plainly:** re-deriving numbers from scratch (the method
+behind #10/#12/#13/#30/#31) catches drift between a stored value and a
+fresh computation. It does not catch a rule that was **implemented with the
+wrong scope** from the start, where the computation was internally
+consistent the whole time. The defense for that class of bug is exactly
+what happened here — a domain expert (the actual commissioner-level
+knowledge of the rule) checking the code against their own understanding,
+not the code checking itself. Neither method substitutes for the other.
