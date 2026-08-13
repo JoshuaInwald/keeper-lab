@@ -230,7 +230,7 @@ wrong. **A fixed point exists and is not solved for.**
 
 ### 6.8 Small-n runs through everything
 
-20 team-seasons for denominators (±16%), 5 auctions for the exchange rate
+30 team-seasons for most denominators, 17-20 for ERA/WHIP/SV (±34%), 5 auctions for the exchange rate
 (split-halves disagreeing threefold), 38 closers for the saves finding, 5
 seasons for the trend extrapolation. Every headline rests on tens, not
 thousands. The model is careful about this in the sense that it measures and

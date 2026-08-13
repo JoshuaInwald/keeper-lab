@@ -23,9 +23,12 @@ The naive estimate is the spread of team totals in one season across ten teams.
 That is a standard deviation from n=10 — hopelessly noisy.
 
 **What we do instead — pooled relative dispersion.** Divide every team's
-category total by that season's league mean, which puts 2024 and 2025 on the
-same scale despite different offensive environments. Pool the normalised
-values. Now dispersion is estimated off 20 team-seasons instead of 10. Multiply
+category total by that season's league mean, which puts different seasons on
+the same scale despite different offensive environments. Pool the normalised
+values across 2024–26. Now dispersion is estimated off 30 team-seasons
+instead of 10 for most categories (20 for ERA/WHIP, 17 for SV, which exclude
+the in-progress 2026 season — a partial season measurably inflates their
+dispersion; `config.PARTIAL_EXCLUDE_CATS`, `out/FINDINGS.md` #26). Multiply
 back by the target season's expected level to get units.
 
 Then convert dispersion to a standings-point denominator using `c_n`, the
@@ -39,10 +42,10 @@ makes it an 8-team field, so the constant changes from 3.078 to 2.847. That is
 an **+18.9% correction to the SV denominator**, and it was a real bug for a
 while.
 
-Current denominators (units per standings point): R 39.4 · HR 15.4 · RBI 38.7 ·
-SB 20.4 · AVG .0023 · W 3.79 · SV 6.57 · K 59.1 · ERA .0431 · WHIP .0108.
+Current denominators (units per standings point): R 33.8 · HR 13.8 · RBI 33.8 ·
+SB 17.1 · AVG .0023 · W 3.67 · SV 6.57 · K 52.6 · ERA .0431 · WHIP .0108.
 
-Read one: **one extra home run is worth 1/15.4 = 0.065 standings points.**
+Read one: **one extra home run is worth 1/13.8 = 0.072 standings points.**
 
 ## 1.2 Rate stats need a marginal, not an average
 
@@ -64,7 +67,7 @@ This engine does something else. It regresses **realised roto production on the
 price actually paid, in this league**, across 677 purchases and five auctions:
 
 ```
-roto_points = 3.51 + 0.132 × $     →     $7.56 per roto point
+roto_points = 3.98 + 0.109 × $     →     $9.17 per roto point
 ```
 
 Busts, injuries, guys who never played — all stay in the sample at the price
@@ -73,9 +76,9 @@ would return if everyone stayed healthy.
 
 Two things fall out for free:
 
-- **The intercept is a replacement-level estimate.** A $0 player returned 3.51
+- **The intercept is a replacement-level estimate.** A $0 player returned 3.98
   roto points. Computed a completely different way — the 230th-best projection,
-  one per active roster slot — replacement is 4.14. Those two numbers were
+  one per active roster slot — replacement is 4.78. Those two numbers were
   never fitted to agree. Their agreement is the single strongest validation in
   the project.
 - **Attenuation bias is handled by direction.** Price is measured with error
@@ -87,9 +90,9 @@ Two things fall out for free:
 
 ## 1.4 Two dollar scales, and why you need both
 
-- **Auction scale ($10.08/pt).** Opportunity cost. What the league's own
+- **Auction scale ($9.17/pt).** Opportunity cost. What the league's own
   bidding says a roto point costs. Use it to judge whether a *price* was good.
-- **Redraft scale ($6.66/pt).** Budget normalisation: the top 230 players'
+- **Redraft scale ($6.29/pt).** Budget normalisation: the top 230 players'
   values are forced to sum to exactly $2,600 (10 teams × $260). Use it to
   compare *players*, because it is the only scale under which the values add up
   to the money that actually exists.
@@ -241,7 +244,7 @@ treats it as nearly invisible — the biggest known gap.
 
 ## 2.5 Honest error bars
 
-Bootstrap, 2,000 resamples of the pooled team-seasons: **±38% per category.**
+Bootstrap, 2,000 resamples of the pooled team-seasons: **±34% per category.**
 The analytic ±16% is optimistic. That is wider than most of the knobs the model
 argues about, and it should be read alongside every dollar figure. 88% of
 keep/cut calls survive all six modelling variants — the decisions are more
@@ -322,7 +325,7 @@ Three independent checks, none of which was fitted to agree with the others:
 | check | result |
 |---|---|
 | current rosters → 2026 standings | Spearman **0.842**; predicted leader finished 1st |
-| replacement level, two routes | 4.14 (projection) vs 3.51 (auction intercept) |
+| replacement level, two routes | 4.78 (projection) vs 3.98 (auction intercept) |
 | budget identity | top 230 sum to exactly **$2,600** |
 | external: CBS's own roto rank | **0.893** (the residual is CBS including OBP) |
 
@@ -394,7 +397,7 @@ for it and expect it to break when CBS changes their HTML.
 
 Ranked by value-per-effort:
 
-1. **Uncertainty bands.** The ±38% is currently prose in the footer. It should
+1. **Uncertainty bands.** The ±34% is currently prose in the footer. It should
    be a range on every dollar figure. Half a session, and it is the single most
    credible thing to show an interviewer — it says "I know what my numbers are
    worth."
@@ -483,7 +486,7 @@ $20–100/month minimum and a permanent maintenance obligation. Not this project
 
 For a job interview, **rung 2 plus the public repo is strictly better than a
 live app**. What gets you hired is `FINDINGS.md` and `LAB_NOTEBOOK.md` — the
-retractions, the ±38% error bar, the two independent replacement-level
+retractions, the ±34% error bar, the two independent replacement-level
 estimates. A hiring manager reads five minutes of that and knows more about how
 you think than any dashboard could tell them.
 

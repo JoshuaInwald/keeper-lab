@@ -39,7 +39,10 @@ exist. Salaries come from a parsed file whose provenance I cannot verify.
 2. Divide each team total by its own season's league mean → a unitless
    relative value.
 3. Pool those across the fitting seasons and take the standard deviation →
-   `σ_rel`. Estimated on **2024–25** (20 team-seasons). **[MOD `DENOM_SEASONS`]
+   `σ_rel`. Estimated on **2024–26** (30 team-seasons for most categories;
+   20 for ERA/WHIP, 17 for SV, which exclude the in-progress 2026 season —
+   see `config.PARTIAL_EXCLUDE_CATS`, `out/FINDINGS.md` #26/#31).
+   **[MOD `DENOM_SEASONS`]
    [JUDGE, highest impact: 17 keeper decisions flip if widened to 2022–25]**
 4. Convert to units:
    `denominator = σ_rel × (2027 league level) × c_n / (n − 1)`

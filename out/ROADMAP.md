@@ -49,10 +49,10 @@ denominator window, exchange-rate window, blend weights, PT floor, discount
 rate. Output is one table. Without it the app displays point estimates from a
 model with six live forks.
 
-**1.2 Uncertainty bands (0.5 session).** The honest error bar is ±16% per
-category from n=20 team-seasons. Propagate it to dollar values and show a
-range, not a point. This is also the single most credible thing to show an
-interviewer.
+**1.2 Uncertainty bands (0.5 session).** The honest error bar is ±34%
+(bootstrapped) per category from n=30 team-seasons (20 for ERA/WHIP, 17 for
+SV). Propagate it to dollar values and show a range, not a point. This is
+also the single most credible thing to show an interviewer.
 
 **1.3 Positional replacement — investigate, don't assume (0.5 session).**
 External review flagged its absence as a first-order gap. The published
@@ -168,7 +168,7 @@ Done: sensitivity harness (1.1), inflation display (3.1), waiver-value settings
 (3.3, three anchored levels), positional-adjustment investigation (1.3, tested
 and left off), the app.
 
-1. **Uncertainty bands (1.2)** — the ±38% error bar is in the footer as prose;
+1. **Uncertainty bands (1.2)** — the ±34% error bar is in the footer as prose;
    it should be a range on every dollar figure. Half a session, and it is the
    single most credible thing to show an interviewer.
 2. **Projection-basis selector (2.2)** — ship three payloads, let the user

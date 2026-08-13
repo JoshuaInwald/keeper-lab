@@ -49,6 +49,11 @@ Tell me which of the three, and it is a one-line fix either way.
 
 ## A2. Reliability weights — you were right to ask, and the code already does it
 
+**Refit 2026-08-13, see `out/FINDINGS.md` #28.** Eight of ten values held
+exactly; BB and H had been copy-pasted from WHIP's reliability (0.237
+instead of their own 0.463/0.359) — a real bug, now fixed, with a
+regression test added so it can't silently recur.
+
 You asked whether reliability is player-year1 vs player-year2 correlation, and
 whether it needs a playing-time adjustment because PT varies independently of
 talent.
@@ -89,6 +94,16 @@ underlying rate stats were fine.
 
 ## A4. Replacement level — your instinct that it needs more validation is correct
 
+**Revisited 2026-08-13, see `out/FINDINGS.md` #27.** The clean test named
+below is still blocked — confirmed directly, not just assumed, that no
+transaction-log data exists. Ran the best feasible alternative instead: an
+internal-consistency check against the full free-agent pool (only 24 of
+1,714 project above the current estimate, and the pool's shape has no gap
+or cliff near it). The numbers below have also since moved with `out/FINDINGS.md`
+#26/#31's denominator fixes — current live values are 3.98 (intercept) and
+4.78 (230th projection); the table below is what this round of Q&A actually
+saw and is left as-is for that record.
+
 Three estimates of "what a free player is worth," from independent data:
 
 | route | value | what it is |
@@ -119,6 +134,21 @@ knob — the three settings are 230th / 300th / 5.04. Flipping it to "high" show
 you how much the answer moves.
 
 ## A5. The 2026 calibration question — you are right, and here's the wrinkle
+
+**Partially resolved 2026-08-13, see `out/FINDINGS.md` #26.** The "include
+2026" proposal below is now implemented — but as raw partial *actual*
+standings data (no ROS projections blended in), not the "70% actual + 30%
+projected, scaled to full season" construction this section describes. That
+matters: the compression-bias worry below is specifically about projected
+data pulling dispersion down, and it doesn't apply to what got built, since
+nothing here is projected. What #26 tested instead was whether a partial
+*real* season is over- or under-dispersed per category (it's over-dispersed
+for ERA/WHIP/SV, not under — the opposite direction from this section's
+worry, and the reason those three specifically get excluded rather than
+scaled). **The specific experiment proposed two paragraphs down — reconstruct
+2024/2025 at 70% complete and compare to their own realised full season —
+was not run.** It would still be worth doing, since it's a cleaner test of
+compression specifically and #26 doesn't fully substitute for it.
 
 **Confirmed: denominators are fit on 2024 and 2025 only. 20 team-seasons.**
 `DENOM_SEASONS = [2024, 2025]`. That was your call earlier in the project
@@ -163,6 +193,14 @@ makes that validation mildly circular. Not fatal — different quantities — bu
 it should be noted in the write-up if we do it.
 
 ## A6. z-score thresholds — agreed, with one caveat
+
+**Partially done 2026-08-13, see `out/FINDINGS.md` #29.** The share-of-
+production test described two paragraphs down was run. It's not the clean
+win predicted: share is a *weaker* predictor than raw counts at both z≥1 and
+z≥2, though a *stronger* one for "share below average." The threshold move
+(1.5/0.5 instead of 2.0/1.0) described in this paragraph was **not** done —
+only the counts-vs-share axis was tested, not the threshold axis. Both were
+proposed together below; only one got done.
 
 You want stars at z ≥ 1.5 and depth at z ≥ 0.5 rather than 2.0 and 1.0. Fair,
 and it's a one-line change in `scripts/zscores.py`.
@@ -649,3 +687,10 @@ In your stated order:
 
 A1 is the only one that could invalidate a headline number. It's also free to
 resolve — you just have to read the rule.
+
+**Status as of 2026-08-13:** A1 resolved (`config.NON_EXTENDABLE_NAMES`,
+also see `out/FINDINGS.md` §24). A5 partially done (#26) — the raw-2026
+version shipped, the compression-specific experiment described in A5's body
+did not run. A6 partially done (#29) — production shares tested, threshold
+move not. Items 1 (uncertainty bands in the app) and 2 (projection-basis
+dropdown) are still not done.
