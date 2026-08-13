@@ -68,9 +68,11 @@ That buys three things a generic calculator cannot give you:
 
 1. **Denominators** — how many units of a category buy one standings point.
    Team totals are normalised by their season's league mean and pooled, so
-   dispersion is estimated off 20 team-seasons instead of 10.
+   dispersion is estimated off 30 team-seasons instead of 10 (20 for
+   ERA/WHIP/SV, which are excluded for the in-progress season — see
+   `config.PARTIAL_EXCLUDE_CATS`).
 2. **Exchange rate** — regress realised roto points on price paid.
-   `roto_points = 3.42 + 0.132 × $`, i.e. **$7.56 per point**.
+   `roto_points = 3.98 + 0.109 × $`, i.e. **$9.17 per point**.
 3. **Projections** — 2026 actuals + ZiPS rest-of-season, blended with ZiPS
    2027 at the rate × playing-time level, each stat weighted by its measured
    year-over-year reliability. Saves get their own persistence model because
@@ -100,11 +102,11 @@ Full detail in `out/HANDOFF.md`. The statistical core is also written in R at
 | check | result |
 |---|---|
 | current rosters → 2026 standings | Spearman **0.842**, Pearson 0.899; league leader predicted 1st |
-| replacement level, two independent routes | 4.14 roto pts (projection) vs 3.42 (auction intercept) |
+| replacement level, two independent routes | 4.78 roto pts (projection) vs 3.98 (auction intercept) |
 | budget identity | top 230 sum to **exactly $2,600** |
 | decision robustness | 88% of keep/cut calls hold under all six modelling variants |
 
-Honest error bar: **±38% per category** (bootstrap, 2,000 resamples of the
+Honest error bar: **±34% per category** (bootstrap, 2,000 resamples of the
 pooled team-seasons; the analytic ±16% is optimistic). That is wider than most of the knobs the model debates, and it
 should be read alongside every dollar figure.
 

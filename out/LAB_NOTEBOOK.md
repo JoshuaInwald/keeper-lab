@@ -474,3 +474,33 @@ diffing it against what's hard-coded. Added
 `test_reliability_weights_match_a_fresh_refit` (`tests/test_invariants.py`)
 to do exactly that on every test run, rather than only when someone happens
 to remember to refit by hand.
+
+## 13. Fixing #26 didn't fix all of #26 (2026-08-13)
+
+Caught this one by refusing to hand-type a number into a doc without
+regenerating it first. Updating `out/HANDOFF.md`'s denominator table after
+#26's fix, the plan was: pull the fresh numbers, paste them in, done.
+Instead, checking `klab.denoms.teams_per_category` (which decides the
+8-vs-9-team range constant for SV) turned up the exact same bug #26 had just
+fixed one call site of: an unconditional loop over `C.DENOM_SEASONS` with no
+`PARTIAL_EXCLUDE_CATS` check. It's a second, independent occurrence of the
+same shape, in a function that (unlike #30's bootstrap script) feeds the
+live pipeline directly.
+
+**Why fixing one occurrence didn't fix the other:** #26 touched exactly the
+two places that raised errors when tested (`denoms.py`'s dispersion loop and
+`uncertainty.py`'s copy of it) because those were the two places the test
+suite and the rebuild actually exercised. `teams_per_category` is a third,
+separate function that happens to duplicate the same seasons-and-exclusion
+logic in miniature, and nothing forced it to be checked at the same time.
+There is no test that would have caught this on its own — `denominators
+are positive and sane` doesn't distinguish a SV denominator of 6.00 from
+6.57, both are perfectly sane numbers.
+
+**The actual defence that worked here wasn't a test, it was a documentation
+habit:** writing a number into a doc is a commitment that it's traceable to
+a specific rerun, and refusing to do that by hand (typing what looks about
+right) instead of copy-pasting straight from a fresh script's output is what
+surfaced this. Worth remembering next time a doc update feels like a
+formality — it's also a free audit if you make yourself actually run the
+thing instead of remembering the number from three fixes ago.

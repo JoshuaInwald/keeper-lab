@@ -45,21 +45,24 @@ case. Getting this wrong understates every multi-year contract by a season.
 Four steps, each independently checkable.
 
 **1. Denominators — what one standings point costs.** Team totals are divided
-by their season's league mean and pooled across 2024–25, so dispersion is
-estimated off 20 team-seasons rather than 10.
+by their season's league mean and pooled across 2024–26, so dispersion is
+estimated off 30 team-seasons rather than 10 for most categories — 20 for
+ERA/WHIP and 17 for SV, which exclude the in-progress 2026 season because a
+partial season measurably inflates their dispersion (`config.PARTIAL_EXCLUDE_CATS`,
+`out/FINDINGS.md` #26).
 
 | R | HR | RBI | SB | AVG | W | SV | K | ERA | WHIP |
 |---|----|-----|----|----|---|----|---|-----|------|
-| 39.4 | 15.4 | 38.7 | 20.4 | .0023 | 3.79 | 6.57 | 59.1 | .0431 | .0108 |
+| 33.8 | 13.8 | 33.8 | 17.1 | .0023 | 3.67 | 6.57 | 52.6 | .0431 | .0108 |
 
-1 HR ≈ 1.3 SB ≈ 2.6 R. ~30 points of personal BA over 600 AB = 1 point.
-~0.34 of ERA over 180 IP = 1 point. 6.6 saves = 59 strikeouts. The SV field is
+1 HR ≈ 1.2 SB ≈ 2.4 R. ~30 points of personal BA over 600 AB = 1 point.
+~0.34 of ERA over 180 IP = 1 point. 6.6 saves = 52.6 strikeouts. The SV field is
 8 teams after punters are dropped, so it uses the 8-team range constant.
 
 **2. Exchange rate — what a draft dollar buys.** Every auction purchase
 2022–2026 paired with the production actually delivered; busts and injuries
 stay in at the price paid, so the slope is waste-adjusted. Fitted on 2024–26
-(n=404): **roto_points = 3.42 + 0.1323 × $**, i.e. **$7.56 per point**.
+(n=404): **roto_points = 3.98 + 0.109 × $**, i.e. **$9.17 per point**.
 
 **3. Projections.** 2027 = blend of (2026 actuals + ZiPS rest-of-season) and
 ZiPS 2027, blended at the rate × playing-time level, with each stat's weight
@@ -97,7 +100,7 @@ it visible, and it was worth $25 on Ohtani alone.
 | check | result |
 |---|---|
 | Current rosters → 2026 standings | Spearman **0.842**, Pearson **0.899**; Pookie 2.0 predicted 1st, actually 1st |
-| Replacement level, two independent routes | 4.14 roto pts (230th projection) vs 3.42 (auction intercept) |
+| Replacement level, two independent routes | 4.78 roto pts (230th projection) vs 3.98 (auction intercept) |
 | Budget identity | top 230 redraft values sum to **exactly $2,600** (was $3,854 before the calibration fix) |
 | Hand check | 10 players across the value spectrum, `scripts/validate.py` |
 
@@ -200,8 +203,9 @@ All in `/Users/JoshInwald/Documents/Fantasy Baseball/`.
 5. **Rostered salary exceeds the cap** ($3,194 vs $2,600) — mid-season IL and
    reserve artifacts. Doesn't affect keeper math (only ever 6–13 players).
 6. **Point estimates only.** No uncertainty bands anywhere. The honest error
-   bar from fitting dispersion on n=20 team-seasons is roughly **±38% per
-   category** (bootstrapped; see FINDINGS §22.1) — larger than most of the knobs under debate, and it should be
+   bar from fitting dispersion on 30 (17-20 for ERA/WHIP/SV) team-seasons is
+   roughly **±34% per category** (bootstrapped; methodology in FINDINGS §22.1,
+   corrected figure in §30) — larger than most of the knobs under debate, and it should be
    printed next to every dollar figure.
 7. **No positional replacement.** Replacement is the 230th player overall,
    with no adjustment for position. A replacement catcher or middle infielder

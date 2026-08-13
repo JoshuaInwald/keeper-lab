@@ -8,7 +8,7 @@ category  n  denominator    lo95    hi95  rel_width_pct
       SB 30      17.1035 12.4780 20.7782        48.5294
      AVG 30       0.0023  0.0014  0.0029        65.6679
        W 30       3.6700  2.4656  4.5984        58.1134
-      SV 17       6.0004  3.5590  7.9840        73.7454
+      SV 17       6.5736  3.8990  8.7467        73.7454
        K 30      52.5585 34.3582 69.1227        66.1445
      ERA 20       0.0431  0.0267  0.0531        61.4355
     WHIP 20       0.0108  0.0074  0.0133        54.2843
@@ -21,27 +21,27 @@ category  n  denominator    lo95    hi95  rel_width_pct
 EXPERIMENT 2 — leave-one-season-out on the exchange rate
 ================================================================================================
  held_out  pooled_$/pt  actual_$/pt  mean_resid  rmse
-     2022        5.981        3.807      -0.452 3.765
-     2023        5.657        4.407      -0.057 3.482
-     2024        5.187        5.803       0.468 3.190
-     2025        5.067        7.307       0.208 3.454
-     2026        4.956        9.175      -0.223 3.276
+     2022        5.960        3.823      -0.448 3.751
+     2023        5.649        4.405      -0.056 3.460
+     2024        5.184        5.783       0.470 3.172
+     2025        5.064        7.275       0.198 3.422
+     2026        4.954        9.085      -0.219 3.258
 
   mean residual on the held-out season runs -0.45 to +0.47 roto points
-  corr(held-out year, mean residual) = +0.317  -- weak and NOT monotone,
+  corr(held-out year, mean residual) = +0.315  -- weak and NOT monotone,
   so a pooled fit is not systematically biased by season in the
   *residual*. What it does miss is the level: pooled $/pt sits at
   5.0-6.0 while the held-out season's own rate
-  runs 3.8-9.2. Pooling gets the ranking right and the
+  runs 3.8-9.1. Pooling gets the ranking right and the
   price level wrong, which is exactly why EXCHANGE_BASIS exists.
 
 ================================================================================================
 EXPERIMENT 3 — permutation test on the saves finding
 ================================================================================================
-  observed closer excess: +2.18 roto points
+  observed closer excess: +1.87 roto points
   null distribution (label shuffled within season x price band):
-    mean +0.235, sd 0.541, 95% range [-0.82, +1.32]
-  two-sided p = 0.0000  (5000 permutations)
+    mean +0.229, sd 0.537, 95% range [-0.82, +1.32]
+  two-sided p = 0.0006  (5000 permutations)
   The shuffle holds season and price band fixed, so this is not
   the time trend and not 'cheap players beat their price'.
 

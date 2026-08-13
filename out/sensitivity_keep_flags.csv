@@ -89,7 +89,7 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 19627,Brent Rooker,New York Polar Bears,False,False,False,False,False,False,False,False
 19709,Fernando Tatis Jr.,Orange and Black Attack,False,False,False,False,False,False,False,False
 19755,Shohei Ohtani,Pookie 2.0,False,False,False,False,False,False,False,False
-19804,Bryan Baker,Orange and Black Attack,True,False,False,True,True,True,True,True
+19804,Bryan Baker,Orange and Black Attack,False,False,False,False,True,False,False,False
 19853,Michael King,All-Stars,False,False,False,False,False,False,False,False
 19918,Daulton Varsho,NPB No Stars,False,False,True,False,False,False,False,False
 19956,Mickey Moniak,Orange and Black Attack,True,True,True,True,True,True,True,True

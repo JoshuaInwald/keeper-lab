@@ -1337,3 +1337,45 @@ directly rather than reimplementing it, and `sensitivity.py` references
 deliberately, as sensitivity variants — that's the point of the script).
 `experiments.py` was the only one carrying an inline copy, and it's fixed
 now.
+
+## 31. A second, live copy of the same season-set bug: `teams_per_category`
+
+Found while updating `out/HANDOFF.md`'s denominator table by hand and
+double-checking each number against a fresh run rather than trusting the
+arithmetic. `klab.denoms.teams_per_category()` — which feeds
+`denominators_for_level`'s `c_n` range-constant lookup in **both**
+`klab/board.py` and `klab/auction.py`, i.e. every dollar figure the model
+ships, not a diagnostic script — averages the per-season punter-filtered SV
+field size over every season in `C.DENOM_SEASONS` unconditionally. It never
+had the `PARTIAL_EXCLUDE_CATS` check #26 added to
+`pooled_relative_dispersion`. So the field-size constant (`n`, which decides
+whether the model uses the 8-team or 9-team range constant) was computed
+over a different set of seasons than the dispersion estimate (`sigma_rel`)
+it's supposed to be scaling.
+
+Only SV is affected — ERA and WHIP always compare all 10 teams (nobody
+"punts" ERA), so their `n` is 10 regardless of which seasons are averaged.
+For SV, including 2026 put the raw average at 8.667 team (rounds to 9,
+`config.C_N[9]`); excluding it, matching #26, gives 8.5 (rounds to 8 under
+Python's round-half-to-even, `config.C_N[8]`) — a different range constant
+(2.970 vs 2.847) and thus a materially different SV denominator: **6.00 →
+6.57**, a further 9.6% swing on top of #26's original 16.2% correction (net
+effect of both fixes together vs. the pre-session baseline: SV denominator
+7.16 → 6.57, about −8.2%, still a real loosening of the saves denominator,
+just smaller than #26 looked like in isolation before this was caught).
+`usd_per_rp_keep` moves from $9.26 to $9.17, `usd_per_rp_redraft` from
+$6.21 to $6.29. One more keep/cut flip: Bryan Baker (Orange and Black
+Attack), surplus $13.37 → $9.74, still comfortably positive but below his
+team's 13th-keeper cutoff.
+
+Fixed by giving `teams_per_category` the identical exclusion check
+`pooled_relative_dispersion` uses (same code, not a shared helper — small
+enough that a shared helper would be more indirection than the duplication
+it prevents, but worth reconsidering if a third such check ever gets added).
+Same lesson as #30, immediately: **fixing one occurrence of a duplicated
+check does not fix the other occurrences**, and the honest response to
+finding one instance of this bug shape is to grep for the exact same
+unprotected constant everywhere, not to assume the fix generalized. Every
+number in `out/HANDOFF.md`'s denominator table and every headline $/point
+figure in this document reflects the numbers *after* this fix, not #26's
+intermediate ones.

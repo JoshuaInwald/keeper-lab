@@ -171,13 +171,26 @@ def denominators_for_level(sigma_rel: pd.DataFrame, levels: dict,
 @cached
 def teams_per_category(standings: pd.DataFrame | None = None,
                        seasons=None) -> dict:
-    """Mean size of the field actually compared in each category."""
+    """Mean size of the field actually compared in each category.
+
+    Feeds `denominators_for_level`'s c_n range-constant lookup, so the season
+    set here has to match `pooled_relative_dispersion`'s exactly -- this used
+    to average over every season in DENOM_SEASONS unconditionally, including
+    the excluded partial 2026 for ERA/WHIP/SV, so the field size backing the
+    c_n constant described a different set of team-seasons than the sigma_rel
+    estimate it was scaling (out/FINDINGS.md #31). Only SV's rounded field
+    size actually changes (9 -> 8) -- ERA/WHIP always compare all 10 teams,
+    so punter-dropping never bites them the way it does SV.
+    """
     st = standings if standings is not None else load_standings_long()
     seasons = seasons or C.DENOM_SEASONS
     out = {}
     for cat, g in st.groupby("category"):
         ns = []
         for s in seasons:
+            if (C.DENOM_EXCLUDE_PARTIAL_SEASON and cat in C.PARTIAL_EXCLUDE_CATS
+                    and s in C.PARTIAL_SEASONS):
+                continue
             v = g[g["season"] == s]["total"].astype(float).values
             if cat == "SV":
                 v = v[v >= C.SV_PUNT_THRESHOLD]
