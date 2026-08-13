@@ -1,11 +1,17 @@
 # Keeper League Lab
 
+[github.com/JoshuaInwald/keeper-lab](https://github.com/JoshuaInwald/keeper-lab)
+
 A player-valuation engine for a 10-team 5×5 rotisserie keeper auction, built
 on the league's **own** auction history rather than generic dollar values.
 
 It prices every player in dollars, ranks 2027 keeper decisions by multi-year
 surplus, and evaluates trades on two independent lenses — what they do to this
 season's standings, and what they do to future assets.
+
+Requires **Python 3.11+** (or any scipy ≥1.9 — older scipy returns
+`spearmanr()` as a plain tuple without `.statistic`, which breaks one test
+silently rather than loudly).
 
 ```bash
 pip install pandas numpy scipy statsmodels pytest
@@ -15,7 +21,8 @@ open out/keeper_lab.html                          # the app — no server needed
 ```
 
 Raw projection and league exports are not redistributed — see
-`data/README.md` for the exact files needed.
+`data/README.md` for the exact files needed, where the master copies live,
+and how/how often each one needs refreshing.
 
 ## The app
 

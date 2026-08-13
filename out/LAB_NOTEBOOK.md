@@ -344,3 +344,35 @@ Getting the tolerance right mattered: the first run "failed" on three dollar
 figures differing in the 5th decimal, which is the payload rounding, not a bug.
 Standings points must match exactly; sums of rounded dollars must not be asked
 to.
+
+---
+
+## 8. Publishing to GitHub (2026-08-13) — two false alarms, one real gap
+
+Before publishing, `pytest` reported 5 failed / 11 passed / 19 errors on
+Josh's default interpreter (Anaconda Python 3.9). Neither of the two apparent
+causes was a modelling bug.
+
+**False alarm 1: scipy version, not the model.** `test_category_sign_conventions_hold_every_season`
+called `spearmanr(...).statistic` — that attribute was only added in scipy
+1.9; Josh's env had 1.7.3, where `spearmanr()` returns a plain named tuple.
+Building a Python 3.11 venv with current scipy fixed it with zero code
+changes. Lesson: a stats-library version pin is invisible until a specific
+attribute access breaks, and it will look exactly like a test bug.
+
+**False alarm 2: stale bytecode.** `__pycache__` held a mix of
+`.cpython-39.pyc` and `.cpython-311.pyc` side by side — not itself the cause
+of the failures, but the kind of thing that causes real import-confusion bugs
+later. Cleared before diagnosing further, on principle.
+
+**Real gap: two input files were missing from `data/`.** All remaining 19
+errors and 4 failures traced to one `FileNotFoundError`:
+`fg_zips_dc_2028_hitters_projections.csv`. The 2027 ZiPS files were present;
+the 2028 pair (used for the out-year leg of multi-year keeper surplus,
+`klab/keeper.py::project_2028`) simply hadn't made it into the delivered
+`data/` folder, even though `data/HANDOFF.md` documents them as delivered.
+Recovered from `~/Documents/Fantasy Baseball/` (the original working
+directory) — bytes matched every other file that exists in both locations, so
+this was a copy gap, not a data problem. **35/35 pass once both files are
+present.** Nothing in `klab/`, `scripts/`, or the test suite was touched to
+get there.

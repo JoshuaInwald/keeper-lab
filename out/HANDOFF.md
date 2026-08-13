@@ -109,6 +109,10 @@ Everything below is optional. **The app is the front door**: open
 `out/keeper_lab.html` in any browser, including a phone. It is one
 self-contained file with the data inlined — no server, no network, no install.
 
+Needs Python 3.11+ (or scipy ≥1.9 specifically — older scipy's `spearmanr()`
+lacks `.statistic` and fails one test silently rather than loudly; see
+`LAB_NOTEBOOK.md` §8).
+
 ```bash
 pip install pandas numpy scipy statsmodels
 PYTHONPATH=.:scripts python3 scripts/run_all.py  # builds everything, incl. the app

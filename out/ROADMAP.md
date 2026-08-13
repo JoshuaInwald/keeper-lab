@@ -153,6 +153,13 @@ Write-up, methodology notebook, a couple of good charts, and a public README.
 The intellectual content is already strong — the saves conditionality, the
 exchange-rate decay, the reliability table. What's missing is presentation.
 
+**Done:** public repo — [github.com/JoshuaInwald/keeper-lab](https://github.com/JoshuaInwald/keeper-lab).
+`data/` excluded (FanGraphs terms + private league exports); `data/README.md`
+documents every file needed to reproduce it. `out/` — including
+`keeper_lab.html` — is committed deliberately as the readable artifact.
+GitHub Pages not yet enabled; the app currently has to be downloaded and
+opened locally.
+
 ---
 
 ## Suggested order from here

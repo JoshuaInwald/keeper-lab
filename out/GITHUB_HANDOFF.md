@@ -230,16 +230,22 @@ Josh asks. They are noise on a portfolio repo.
 
 Check each and report the result:
 
-- [ ] `PYTHONPATH=. python3 -m pytest tests/ -q` → 35 passed
-- [ ] `git status` clean after commit; `data/` and `node_modules/` untracked
-- [ ] repository visible at its GitHub URL
-- [ ] README renders on GitHub with working links to `out/*.md`
-- [ ] `out/keeper_lab.html` present in the repo (it is the headline artifact)
-- [ ] if Pages enabled: the URL loads and the app is interactive
-- [ ] the git repository lives on Josh's own disk, not only in a cloud container
+- [x] `PYTHONPATH=. python3 -m pytest tests/ -q` → 35 passed (two env fixes
+      plus two missing 2028 ZiPS input files, recovered from Documents — see
+      `LAB_NOTEBOOK.md` §8; no code changed)
+- [x] `git status` clean after commit; `data/` and `node_modules/` untracked
+      (`.claude/` also excluded — local tool config, not project-relevant)
+- [x] repository visible at its GitHub URL —
+      [github.com/JoshuaInwald/keeper-lab](https://github.com/JoshuaInwald/keeper-lab)
+- [x] README renders on GitHub with working links to `out/*.md`
+- [x] `out/keeper_lab.html` present in the repo (it is the headline artifact)
+- [ ] Pages not enabled — Josh hasn't asked for it yet
+- [x] the git repository lives on Josh's own disk (`~/PycharmProjects/keeper-lab`),
+      not only in a cloud container
 
-Final message to Josh: the URL, what was excluded and why, and anything you
-noticed but did not touch. Keep it to a few sentences.
+Done, 2026-08-13. First push hit an HTTP 400 mid-transfer (not a size issue —
+the repo is 2 MB); fixed with `git config http.postBuffer 524288000` and
+forcing HTTP/1.1 for that push.
 
 ---
 
