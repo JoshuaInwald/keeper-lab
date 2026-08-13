@@ -15,7 +15,7 @@ from klab.auction import match_drafts
 from klab.board import build_board, fit_exchange_rate, keeper_status, value_players
 from klab.denoms import teams_per_category
 from klab.keeper import keeper_cost, years_controlled
-from klab.trade import standings_points
+from klab.trade import evaluate_trade, standings_points
 from klab.io import load_hitters_history, load_pitchers_history
 
 
@@ -362,3 +362,35 @@ def test_reliability_weights_match_a_fresh_refit():
             f"RELIABILITY[{stat!r}]={RELIABILITY[stat]} but a fresh refit on "
             f"the same season pairs gives {r:.3f} -- the hard-coded dict has "
             f"drifted from the fit it's supposed to represent")
+
+
+# --- evaluate_trade: had zero coverage until out/FINDINGS.md #32.1 --------
+
+def test_evaluate_trade_requires_usd_per_point(board):
+    """usd_per_point used to default to a hardcoded, silently-stale 7.6 that
+    every real caller forgot to override (out/FINDINGS.md #32.1). It's now a
+    required argument specifically so a caller who forgets it fails loudly,
+    at call time, instead of shipping a quietly-wrong verdict_score."""
+    b, exch, meta = board
+    teams = b["team"].unique()
+    a_name = b[b["team"] == teams[0]]["name"].iloc[0]
+    b_name = b[b["team"] == teams[1]]["name"].iloc[0]
+    with pytest.raises(TypeError):
+        evaluate_trade(b, teams[0], teams[1], [a_name], [b_name])
+
+
+def test_evaluate_trade_verdict_responds_to_usd_per_point(board):
+    """The win-now term is contention_weight * delta_points * usd_per_point.
+    If usd_per_point weren't actually wired through, verdict_score wouldn't
+    move when it changes -- which is exactly the bug #32.1 found (the JS side
+    was live-wired to the wrong constant, not a dead one, so this alone
+    wouldn't have caught that specific mistake, but it does guard against the
+    parameter being ignored entirely)."""
+    b, exch, meta = board
+    teams = b["team"].unique()
+    a_name = b[b["team"] == teams[0]]["name"].iloc[0]
+    b_name = b[b["team"] == teams[1]]["name"].iloc[0]
+    low = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name], usd_per_point=1.0)
+    high = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name], usd_per_point=100.0)
+    if abs(low["a"]["d_standings_points_2026"]) > 0.01:
+        assert low["a"]["verdict_score"] != pytest.approx(high["a"]["verdict_score"])

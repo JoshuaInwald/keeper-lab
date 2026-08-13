@@ -76,10 +76,18 @@ def standings_points(wide: pd.DataFrame) -> pd.DataFrame:
 
 def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
                    a_sends: list[str], b_sends: list[str],
+                   usd_per_point: float,
                    contention_weight: float = C.CONTENTION_WEIGHT,
-                   value_col: str = "redraft_value",
-                   usd_per_point: float | None = None) -> dict:
-    """Evaluate a proposed trade from both sides."""
+                   value_col: str = "redraft_value") -> dict:
+    """Evaluate a proposed trade from both sides.
+
+    `usd_per_point` has no default on purpose (out/FINDINGS.md #32.1): this
+    used to fall back to a hardcoded, silently-stale constant that every
+    real caller forgot to override. Pass `exch["usd_per_point"]` from
+    `klab.board.build_board()`, or `snapshot().constants["usd_per_roto_point_auction"]`
+    if you're working from a `Snapshot`. A wrong number here is wrong in a
+    way nothing else in this function would catch.
+    """
     a_players = [find_player(board, x) for x in a_sends]
     b_players = [find_player(board, x) for x in b_sends]
 
@@ -122,7 +130,7 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
     res["win_now"] = win_now
     # One 2026 standings point is priced at what a roto point costs at auction,
     # discounted by how much the team cares about this season.
-    usd_per_standings_point = usd_per_point if usd_per_point else 7.6
+    usd_per_standings_point = usd_per_point
     for t, key in ((team_a, "a"), (team_b, "b")):
         dp = float(win_now["delta_points"].get(t, 0.0))
         res[key]["d_standings_points_2026"] = dp
