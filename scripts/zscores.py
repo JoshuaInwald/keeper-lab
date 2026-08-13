@@ -74,14 +74,26 @@ def main():
         n_above1=("z_total", lambda s: (s >= 1).sum()),
         n_above2=("z_total", lambda s: (s >= 2).sum()),
         n_below0=("z_total", lambda s: (s < 0).sum()))
+    # Share of team roto production from each z-band, alongside the raw
+    # counts. A count is partly roster churn (how many different players
+    # cycled through a slot), not team quality -- out/QA_ROUND.md #A6.
+    # Share isn't uniformly cleaner (out/FINDINGS.md #29): it's a weaker
+    # predictor at z>=1/z>=2 but a stronger one at "below average". Keeping
+    # both so that isn't lost on the next rerun.
+    total_rp = m.groupby("team")["roto_points"].sum()
+    g["total_rp"] = total_rp
+    g["share_above1"] = m[m["z_total"] >= 1].groupby("team")["roto_points"].sum().reindex(g.index).fillna(0) / total_rp
+    g["share_above2"] = m[m["z_total"] >= 2].groupby("team")["roto_points"].sum().reindex(g.index).fillna(0) / total_rp
+    g["share_below0"] = m[m["z_total"] < 0].groupby("team")["roto_points"].sum().reindex(g.index).fillna(0) / total_rp
     st = load_standings_long()
     wide = st[st["season"] == 2026].pivot(index="team", columns="category", values="total")
     g["standings_pts"] = standings_points(wide[C.CATS])["TOTAL"]
     g = g.sort_values("standings_pts", ascending=False)
     print(g.round(2).to_string())
     from scipy.stats import spearmanr
-    for c in ["sum_z", "mean_z", "n_above1", "n_above2", "n_below0"]:
-        print(f"  spearman(standings, {c:9s}) = "
+    for c in ["sum_z", "mean_z", "n_above1", "n_above2", "n_below0",
+              "total_rp", "share_above1", "share_above2", "share_below0"]:
+        print(f"  spearman(standings, {c:12s}) = "
               f"{spearmanr(g['standings_pts'], g[c]).statistic:+.3f}")
 
     print("\n" + "=" * 96)

@@ -1237,3 +1237,67 @@ in it right now" are different findings, and only checking the dict at
 refit-time (rather than, say, a test that recomputes and compares) means
 this class of error sits invisible for as long as nobody happens to rerun
 the fit.
+
+## 29. Depth-vs-stars, redone with share of production: the hypothesized cleanup only half worked
+
+§18 built the "depth beats stars" case on raw player counts per team at each
+z-threshold. `out/QA_ROUND.md` §A6 named the concern directly: a count is
+partly a measure of *roster churn* (how many different players cycled
+through a slot), not team quality, and proposed **share of team roto
+production** at each threshold as the cleaner version. That test had not
+been run. Ran it.
+
+First, a housekeeping note: §18's own numbers have moved because of #26 and
+#28 in this document (the SV denominator fix and the BB/H reliability fix)
+— both change individual players' `roto_points`, which shifts every z-score
+downstream. Refreshed baseline, same method as §18, same 274 rostered
+players:
+
+| predictor | §18 (documented) | refreshed (this session) |
+|---|---|---|
+| count at z ≥ 1 | +0.840 | +0.906 |
+| count at z ≥ 2 | +0.141 | +0.141 |
+| count below average | −0.755 | −0.772 |
+
+Small moves, same story — good, since neither #26 nor #28 had anything to
+do with z-scores specifically; this is just confirmation the pipeline is
+internally consistent.
+
+**Share of production, the actual new test:**
+
+| predictor | count (raw) | share of production |
+|---|---|---|
+| ≥ z 1 | **+0.906** | +0.794 |
+| ≥ z 2 | +0.141 | −0.019 |
+| below average | −0.772 | **−0.879** |
+| *(context)* total team roto points | — | **+0.939** |
+
+The hypothesis was that share-of-production would be uniformly cleaner than
+raw counts. It's not uniform: **share is a weaker predictor for both
+above-average thresholds** (+0.794 and −0.019 vs. +0.906 and +0.141) but **a
+stronger one for below-average** (−0.879 vs. −0.772). The likely mechanism:
+a team that is deep-but-not-starry — lots of solidly-above-average
+players, no z≥1 studs specifically — has genuinely good *share*-adjacent
+quality, but "share above z≥1" as a ratio penalizes them for not having the
+specific players that clear the threshold, same failure mode as the count
+version, just expressed differently. The "how many did you avoid" side of
+the question doesn't have that ambiguity — bad players hurt whether measured
+by count or by the production they cost you — which is exactly why the share
+version sharpens *that* side of the story.
+
+**The finding that actually reframes the section**: total team roto
+production, with no z-threshold at all, predicts standings (+0.939) better
+than any single threshold metric tested, raw or share. That's worth sitting
+with. Splitting a team's roster into "stars" and "depth" bins and asking
+which bin predicts winning is answering a real question, but it's a noisier
+version of "does this team have more production," which was available the
+whole time without picking a threshold. None of this overturns §18's
+headline claim — z≥1 count/share both beat z≥2 count/share by a wide margin
+in every version tested, so "depth over stars" survives — but it should be
+read as "depth over stars, and both are secondary to just having more total
+production," not as a clean two-factor story.
+
+**Caveat that applies to every number in this section, restated because it's
+easy to lose sight of:** n = 10 teams. Every Spearman correlation here has a
+wide standard error and none of them should be treated as more than
+suggestive on their own.
