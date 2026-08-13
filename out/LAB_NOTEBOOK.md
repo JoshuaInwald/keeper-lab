@@ -376,3 +376,26 @@ directory) — bytes matched every other file that exists in both locations, so
 this was a copy gap, not a data problem. **35/35 pass once both files are
 present.** Nothing in `klab/`, `scripts/`, or the test suite was touched to
 get there.
+
+## 9. Rejected: "re-drafted players get a fresh 3-year clock" (2026-08-13)
+
+Working hypothesis going into this session, for the deGrom/Turang final-year
+puzzle (`out/FINDINGS.md` §25): both are coded `F` in 2026 despite being
+drafted too early (2022, 2023) for a standard 3-year contract to still be
+running. If either had been dropped and re-drafted later, the new draft would
+start a fresh clock and explain it.
+
+**Rejected on the evidence, not on principle.** Grepped `data/draft_2022.csv`
+through `draft_2026.csv` for both names. Each appears exactly once — their
+original draft row — and nowhere else. There is no re-draft event for either
+player anywhere in the record this project holds. A hypothesis that requires
+an event with zero supporting rows isn't a live hypothesis, it's a guess that
+happened to be checkable, so it's closed.
+
+It's also worth noting the hypothesis pointed the wrong direction anyway:
+§23.6 already established, independently, that a re-added player *keeps* his
+original contract rather than resetting it. So even setting the missing
+re-draft event aside, "fresh clock" was never consistent with the project's
+own confirmed rule — it would have needed a second retraction on top of the
+first. Left the underlying anomaly open in FINDINGS §25 rather than force a
+resolution the data doesn't support.

@@ -963,3 +963,66 @@ test checks that no exported row has a null in a field the interface reads.
 
 Both bugs are the same species: **a wrong value that is not an invalid value**.
 The defence is not more assertions on totals, it is looking at one row in full.
+
+## 25. Two final-year contracts don't reconcile against the draft record — unresolved
+
+Two players carry contract code `F` (2026 was the final year) whose draft
+history says their standard 3-year clock should have expired earlier:
+
+| player | drafted | draft price | current team | current salary | code | expected final year (3-yr std) | actual |
+|---|---|---|---|---|---|---|---|
+| Jacob deGrom | 2022, Milwaukee Beers | $21 | Pookie 2.0 | $21 | `F` | 2024 | 2026 |
+| Brice Turang | 2023, New York Polar Bears | $9 | McBlocks | $9 | `F` | 2025 | 2026 |
+
+The 3-year count follows the convention already established elsewhere in this
+project (`klab/config.py`'s contract-code comment, verified against Judge/Witt/
+Tucker: a 2024 draft reaches `F` in 2026, i.e. the draft year counts as year
+one of three). By that same count deGrom is two years past expiry and Turang
+one year past.
+
+Two years remaining doesn't come from a hidden model: `already_extended()`
+(`klab/keeper.py:150-175`) only recognizes an extension when the current
+salary exceeds the last auction price by exactly the constitutional +$5/+$10
+step. Both salaries are **unchanged** from the original draft price, so no
+extension was paid, and the code applies no other rule that would grant extra
+years.
+
+**Hypothesis tested and rejected: a re-drafted player gets a fresh 3-year
+clock.** If either player had been dropped and re-drafted later — say deGrom
+in a 2024 supplemental draft — a fresh clock would explain an `F` in 2026.
+Checked every `data/draft_2022.csv` through `draft_2026.csv` for both names:
+**neither appears anywhere except their original draft row.** There is no
+re-draft event in the record for either player. The hypothesis has nothing to
+attach to, so it's rejected — see `out/LAB_NOTEBOOK.md` for the write-up.
+
+That leaves the confirmed rule from §23.6 as the operative one — a re-added
+player **keeps** his original draft-year contract, he doesn't get a fresh
+one — which predicts the *opposite* of what's observed: both contracts should
+already have expired, not still be running. Both players did leave their
+drafting team and are absent from `keepers_2022.csv`–`keepers_2025.csv`, so a
+drop-and-reacquisition happened at some point; but per §16/§19 those pre-2026
+keeper files are already known to be incomplete (25-29 rows/season vs. a real
+keeper set of 67-101), so their absence there is not evidence either way.
+
+**What this is not:** an arithmetic inconsistency the audit script would
+catch. `contracts_parsed.csv` provenance is already flagged elsewhere
+(`out/METHODS.md:28-29`) as unverifiable — there is no `contracts_raw.txt` to
+check it against. This is most likely either a data-entry artifact in that
+file, or a commissioner ruling (trade dispute, injury settlement — the
+constitution's §V gives commissioners discretion here) that predates this
+project and was never written down anywhere the model can see.
+
+**Practical stakes, current board:** per `out/sensitivity_keep_flags.csv`,
+deGrom is a cut under all 8 sensitivity variants regardless (his 2027
+projection is poor on its own merits), so the extra years don't change his
+recommendation. Turang is a keep under all 8 variants **as `F`**; if his true
+contract had actually expired after 2025, he'd need an extension payment
+to be legally keepable at all in 2027, which would change his surplus by
+exactly $5 (one extension year) — not large, but it's a live number, not a
+hypothetical one.
+
+**Recommendation:** this needs the primary source, not more code. Check the
+CBS commissioner tools or email history for these two players' transaction
+log. Until then, both are carried as-is (`F`, unchanged salary) because that
+is what `contracts_parsed.csv` says, and the model has no basis to overrule
+its own input.
