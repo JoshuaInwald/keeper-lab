@@ -93,6 +93,7 @@ Full detail in `out/HANDOFF.md`. The statistical core is also written in R at
 | `out/METHODS.md` | **every intermediate quantity, step by step, with the judgment calls flagged** |
 | `out/ROADMAP.md` | what's left to build and what it costs |
 | `out/audit.txt` | data-integrity identities you can check with a calculator |
+| `out/ORIGINAL_HANDOFF.md` | the pre-build planning doc, kept for history — several calls in it were later superseded |
 
 ## Validation
 
