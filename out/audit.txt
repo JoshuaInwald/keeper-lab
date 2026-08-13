@@ -1,0 +1,97 @@
+================================================================================================
+DATA INTEGRITY AUDIT
+================================================================================================
+
+1. ROSTER ACCOUNTING — keepers + auction picks should fill 230 slots
+ season  keepers_in_file  auction_picks  sum  slots_unaccounted  auction_spend  implied_keeper_$  implied_$_per_keeper
+   2022               25            137  162                 68           1604               996                  39.8
+   2023               28            136  164                 66           1607               993                  35.5
+   2024               29            163  192                 38           1813               787                  27.1
+   2025               29            129  158                 72           1377              1223                  42.2
+   2026              100            112  212                 18           1236              1364                  13.6
+  [**FAIL**] 2022 implied keeper salary is credible
+           $39.8/keeper from $996 across 25 keepers
+  [**FAIL**] 2022 roster slots roughly accounted for
+           68 of 230 slots unexplained
+  [**FAIL**] 2023 implied keeper salary is credible
+           $35.5/keeper from $993 across 28 keepers
+  [**FAIL**] 2023 roster slots roughly accounted for
+           66 of 230 slots unexplained
+  [**FAIL**] 2024 implied keeper salary is credible
+           $27.1/keeper from $787 across 29 keepers
+  [PASS] 2024 roster slots roughly accounted for
+           38 of 230 slots unexplained
+  [**FAIL**] 2025 implied keeper salary is credible
+           $42.2/keeper from $1223 across 29 keepers
+  [**FAIL**] 2025 roster slots roughly accounted for
+           72 of 230 slots unexplained
+  [PASS] 2026 implied keeper salary is credible
+           $13.6/keeper from $1364 across 100 keepers
+  [PASS] 2026 roster slots roughly accounted for
+           18 of 230 slots unexplained
+
+  Estimated TRUE keeper counts from the two identities:
+ season  keepers_in_file  est_from_slots  est_from_budget
+   2022               25              93             73.0
+   2023               28              94             73.0
+   2024               29              67             58.0
+   2025               29             101             90.0
+   2026              100             118            100.0
+
+2. SALARY CAP — committed salary vs the $260 x 10 cap
+team
+The Fighting Phils         385
+Spehr's Army               369
+New York Polar Bears       323
+NPB No Stars               320
+McBlocks                   313
+All-Stars                  312
+Lisbon Long Balls          303
+Producers                  301
+Pookie 2.0                 299
+Orange and Black Attack    269
+  [PASS] no team is absurdly over the cap
+           max $385, cap $260 (reserve/IL players inflate this)
+
+3. CONTRACTS — codes align with when the player was last bought
+last_draft  2022.0  2023.0  2024.0  2025.0  2026.0
+contract                                          
+1                2       2       6      33       0
+2                0       3       5       8      77
+3                0       0       2       0       0
+F                1       2      28       0       0
+  [PASS] code '2' is mostly 2026 acquisitions
+           83% of coded-'2' drafted players came from 2026
+  [PASS] code '1' is mostly 2025 acquisitions
+           77% of coded-'1' drafted players came from 2025
+  [PASS] code 'F' is mostly 2024 acquisitions
+           90% of coded-'F' drafted players came from 2024
+
+4. STATS vs STANDINGS — is the player pool big enough to produce the totals?
+  [PASS] 2022 league HR is achievable from the top-140 hitter pool
+           league 2208 vs pool 2756 (ratio 0.80)
+  [PASS] 2023 league HR is achievable from the top-140 hitter pool
+           league 2525 vs pool 3038 (ratio 0.83)
+  [PASS] 2024 league HR is achievable from the top-140 hitter pool
+           league 2927 vs pool 2939 (ratio 1.00)
+  [PASS] 2025 league HR is achievable from the top-140 hitter pool
+           league 3138 vs pool 3120 (ratio 1.01)
+  [PASS] 2026 league HR is achievable from the top-140 hitter pool
+           league 2328 vs pool 2242 (ratio 1.04)
+
+5. IDENTIFIERS
+  [PASS] no duplicate player ids on rosters
+           0 duplicates
+  [PASS] every rostered player has a contract
+           97% matched
+
+================================================================================================
+7 CHECK(S) FAILED:
+  - 2022 implied keeper salary is credible
+  - 2022 roster slots roughly accounted for
+  - 2023 implied keeper salary is credible
+  - 2023 roster slots roughly accounted for
+  - 2024 implied keeper salary is credible
+  - 2025 implied keeper salary is credible
+  - 2025 roster slots roughly accounted for
+================================================================================================

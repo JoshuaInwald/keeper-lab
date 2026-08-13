@@ -1,0 +1,276 @@
+fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window 2022-26,flat 50/50 blend,no playing-time floor,no future discount,heavy future discount
+3096,Kenley Jansen,All-Stars,True,True,True,True,True,True,True,True
+4949,Giancarlo Stanton,Producers,False,False,False,False,False,False,False,False
+5361,Freddie Freeman,NPB No Stars,False,False,False,False,False,False,False,False
+5417,Jose Altuve,New York Polar Bears,False,False,False,False,False,False,False,False
+7304,Salvador Perez,All-Stars,False,False,False,False,False,False,False,False
+9132,Nathan Eovaldi,All-Stars,False,False,False,False,False,False,False,False
+9218,Paul Goldschmidt,Lisbon Long Balls,False,False,False,False,False,False,False,False
+9777,Nolan Arenado,NPB No Stars,False,False,False,False,False,False,False,False
+10155,Mike Trout,All-Stars,False,False,False,False,False,False,False,False
+10233,Aroldis Chapman,Lisbon Long Balls,True,True,True,True,True,True,True,True
+10310,Zack Wheeler,Pookie 2.0,False,False,False,False,False,False,False,False
+10603,Chris Sale,McBlocks,True,True,False,True,True,True,True,True
+10954,Jacob deGrom,Pookie 2.0,False,False,False,False,False,False,False,False
+11477,Christian Yelich,All-Stars,False,False,False,False,False,False,False,False
+11486,Robbie Ray,New York Polar Bears,False,False,False,False,False,False,False,False
+11493,Manny Machado,McBlocks,False,False,False,False,False,False,False,False
+11579,Bryce Harper,Pookie 2.0,False,False,False,False,False,False,False,False
+11609,Willson Contreras,Spehr's Army,False,False,False,False,False,False,False,False
+12552,Eugenio Suárez,The Fighting Phils,True,True,True,True,False,True,True,True
+12564,Trevor Story,All-Stars,False,False,False,False,False,False,False,False
+12730,Nick Martinez,Producers,False,False,False,False,False,False,False,False
+12768,Sonny Gray,Pookie 2.0,False,False,False,False,True,False,False,False
+12856,George Springer,McBlocks,False,False,False,False,False,False,False,False
+12916,Francisco Lindor,Producers,False,False,False,False,False,False,False,False
+13066,Teoscar Hernández,Pookie 2.0,False,False,False,False,False,False,False,False
+13125,Gerrit Cole,The Fighting Phils,False,False,False,False,False,False,False,False
+13164,Eduardo Rodriguez,New York Polar Bears,False,False,False,False,False,False,False,False
+13510,José Ramírez,Lisbon Long Balls,False,False,False,False,False,False,False,False
+13543,Blake Snell,Producers,False,False,False,False,False,False,False,False
+13611,Mookie Betts,Producers,False,False,False,False,False,False,False,False
+13613,Ketel Marte,All-Stars,False,False,False,False,False,False,True,False
+13624,Corey Seager,McBlocks,False,False,False,False,False,False,False,False
+13649,Clay Holmes,The Fighting Phils,False,False,False,False,False,False,False,False
+13743,Max Fried,New York Polar Bears,False,False,False,False,True,False,False,False
+14078,Michael Wacha,NPB No Stars,False,False,False,False,False,False,False,False
+14107,Kevin Gausman,Pookie 2.0,False,False,False,False,False,False,False,False
+14161,Byron Buxton,All-Stars,True,True,True,True,True,True,True,True
+14212,Josh Hader,Orange and Black Attack,False,False,False,False,False,False,False,False
+14344,Matt Olson,Orange and Black Attack,False,False,False,False,False,False,False,False
+14374,Tyler Glasnow,McBlocks,False,False,False,False,False,False,False,False
+14771,Emilio Pagán,All-Stars,False,False,False,False,False,False,False,False
+15194,Jake Bauers,Pookie 2.0,False,False,False,False,False,False,False,False
+15440,Matthew Boyd,Lisbon Long Balls,False,False,False,False,False,False,False,False
+15454,Nick Pivetta,All-Stars,False,False,False,False,False,False,False,False
+15640,Aaron Judge,Pookie 2.0,False,False,False,False,False,False,False,False
+15816,Devin Williams,Producers,False,False,False,False,False,False,False,False
+15986,Willy Adames,New York Polar Bears,False,False,False,False,False,False,False,False
+15998,Cody Bellinger,Producers,False,False,False,False,False,False,False,False
+16137,Carlos Rodón,McBlocks,False,False,False,False,False,False,False,False
+16162,Brandon Woodruff,The Fighting Phils,False,False,False,False,False,False,False,False
+16252,Trea Turner,Lisbon Long Balls,False,False,False,False,False,False,False,False
+16432,Foster Griffin,New York Polar Bears,False,False,False,False,False,False,False,False
+16442,Ryan O'Hearn,McBlocks,False,False,False,False,False,False,False,False
+16478,Kyle Schwarber,McBlocks,False,False,True,False,False,False,False,False
+16530,Mauricio Dubón,New York Polar Bears,False,False,False,False,False,False,False,False
+16556,Ozzie Albies,Pookie 2.0,True,True,True,True,True,True,True,True
+16578,Yandy Díaz,New York Polar Bears,False,False,False,False,False,False,False,False
+16997,Gleyber Torres,NPB No Stars,False,False,False,False,False,False,False,False
+17130,Raisel Iglesias,McBlocks,True,False,False,True,True,True,True,True
+17277,Ranger Suarez,New York Polar Bears,False,False,False,False,False,False,False,False
+17350,Rafael Devers,Lisbon Long Balls,False,False,False,False,False,False,False,False
+17479,Jack Flaherty,NPB No Stars,False,False,False,False,False,False,False,False
+17678,Alex Bregman,Orange and Black Attack,False,False,False,False,False,False,False,False
+17722,Trevor Megill,McBlocks,True,True,True,True,True,True,True,True
+17901,Andrew Benintendi,All-Stars,False,False,False,False,False,False,False,False
+17969,Peter Lambert,Orange and Black Attack,False,False,False,False,False,False,False,False
+17982,Ty France,Producers,False,False,False,False,False,False,False,False
+17995,Logan Webb,Spehr's Army,False,False,False,False,False,False,False,False
+18314,Dansby Swanson,Pookie 2.0,True,True,True,True,True,True,True,True
+18345,Kyle Tucker,McBlocks,False,False,False,False,False,False,False,False
+18360,Austin Riley,The Fighting Phils,False,False,False,False,False,False,False,False
+18383,Michael Soroka,Orange and Black Attack,False,False,False,False,False,False,False,False
+18401,Ronald Acuña Jr.,Pookie 2.0,False,False,False,False,False,False,False,False
+18525,Dylan Cease,Spehr's Army,False,False,False,False,False,False,False,False
+18568,Luis Arraez,The Fighting Phils,True,True,True,True,True,True,True,True
+18679,Freddy Peralta,The Fighting Phils,False,False,False,False,False,False,False,False
+18684,Sandy Alcantara,McBlocks,False,False,False,False,False,False,False,False
+18839,Josh Naylor,Spehr's Army,True,True,True,True,False,True,True,True
+18882,Brandon Lowe,Spehr's Army,True,True,True,True,True,True,True,True
+19251,Pete Alonso,Pookie 2.0,False,False,False,False,False,False,False,False
+19290,Randy Arozarena,New York Polar Bears,True,True,True,True,True,True,True,True
+19326,Bryan Reynolds,NPB No Stars,True,True,True,True,True,True,False,True
+19556,Yordan Alvarez,The Fighting Phils,False,False,False,False,False,False,False,False
+19569,David Bednar,Lisbon Long Balls,True,True,True,True,True,True,True,True
+19608,Otto Lopez,All-Stars,True,True,False,True,True,True,False,True
+19611,Vladimir Guerrero Jr.,NPB No Stars,False,False,False,False,False,False,False,False
+19612,Bo Bichette,The Fighting Phils,False,False,False,False,False,False,False,False
+19627,Brent Rooker,New York Polar Bears,False,False,False,False,False,False,False,False
+19709,Fernando Tatis Jr.,Orange and Black Attack,False,False,False,False,False,False,False,False
+19755,Shohei Ohtani,Pookie 2.0,True,True,True,True,True,True,True,True
+19804,Bryan Baker,Orange and Black Attack,False,False,False,False,True,False,False,False
+19853,Michael King,All-Stars,False,False,False,False,False,False,False,False
+19918,Daulton Varsho,NPB No Stars,False,False,True,False,False,False,False,False
+19956,Mickey Moniak,Orange and Black Attack,True,True,True,True,True,True,True,True
+19959,Jesús Luzardo,Spehr's Army,False,False,False,False,True,False,False,False
+20036,Isaac Paredes,McBlocks,False,False,False,False,False,False,False,False
+20123,Juan Soto,The Fighting Phils,False,False,False,False,False,False,False,False
+20178,Miguel Vargas,All-Stars,True,True,True,True,False,True,True,True
+20202,Brandon Marsh,All-Stars,False,False,False,False,False,False,False,False
+20220,Jo Adell,The Fighting Phils,True,True,True,True,True,True,True,True
+20253,Griffin Jax,Lisbon Long Balls,False,False,False,False,False,False,False,False
+20348,Riley O'Brien,Pookie 2.0,False,False,False,False,False,False,False,False
+20352,Ernie Clement,All-Stars,False,False,False,False,False,False,False,False
+20373,Andrés Muñoz,NPB No Stars,True,False,False,True,True,True,True,True
+20391,Luis García Jr.,Orange and Black Attack,True,True,True,True,True,True,True,True
+20437,Royce Lewis,Orange and Black Attack,True,True,True,True,False,True,True,True
+20454,Jazz Chisholm Jr.,The Fighting Phils,False,False,True,False,False,False,False,False
+20492,Casey Mize,Producers,False,False,False,False,False,False,False,False
+20503,William Contreras,Producers,False,False,False,False,False,False,False,False
+20572,Kody Clemens,NPB No Stars,False,False,False,False,False,False,False,False
+20599,Iván Herrera,Producers,True,True,True,True,True,True,True,True
+20778,Cristopher Sánchez,All-Stars,True,True,True,True,True,True,True,True
+21029,Jhoan Duran,The Fighting Phils,True,True,True,True,True,True,True,True
+21306,Jacob Latz,Producers,False,False,False,False,False,False,False,False
+21390,Joe Ryan,All-Stars,False,False,False,False,False,False,False,False
+21479,Nico Hoerner,Pookie 2.0,True,True,True,True,True,True,True,True
+21483,Shane McClanahan,The Fighting Phils,True,True,True,True,True,True,True,True
+21534,Cal Raleigh,New York Polar Bears,False,False,False,False,False,False,False,False
+21622,Jake McCarthy,Pookie 2.0,False,False,False,False,False,False,False,False
+21626,Griffin Conine,Spehr's Army,False,False,False,False,False,False,False,False
+21636,Jeremy Peña,McBlocks,True,True,True,True,True,True,True,True
+21690,Edward Cabrera,New York Polar Bears,False,False,False,False,False,False,False,False
+21711,Oneil Cruz,All-Stars,False,False,True,False,False,False,False,False
+21837,Jonathan Aranda,All-Stars,False,False,False,False,False,False,False,False
+21846,Cole Ragans,Spehr's Army,False,False,False,False,False,False,False,False
+22100,José Soriano,NPB No Stars,False,False,False,False,False,False,False,False
+22182,Hunter Greene,The Fighting Phils,True,True,True,True,True,True,True,True
+22186,Brice Turang,McBlocks,True,True,True,True,True,True,True,True
+22201,MacKenzie Gore,NPB No Stars,True,True,True,True,False,True,True,True
+22250,Logan Gilbert,New York Polar Bears,True,True,False,True,True,True,True,True
+22266,Xavier Edwards,Producers,True,True,True,True,True,True,True,True
+22267,Tarik Skubal,NPB No Stars,True,True,False,True,True,True,True,True
+22286,Trevor Rogers,New York Polar Bears,False,False,False,False,False,False,False,False
+22543,Taj Bradley,The Fighting Phils,False,False,False,False,False,False,False,False
+22664,Gabriel Moreno,The Fighting Phils,True,True,False,True,True,True,True,True
+22715,Maikel Garcia,Orange and Black Attack,False,False,False,False,False,False,False,False
+22799,Geraldo Perdomo,New York Polar Bears,True,True,True,True,False,True,True,True
+22872,Yoendrys Gómez,Spehr's Army,False,False,False,False,False,False,False,False
+23401,José Caballero,The Fighting Phils,False,False,False,False,False,False,False,False
+23590,Ben Brown,Spehr's Army,False,False,False,False,False,False,False,False
+23690,Brayan Rocchio,All-Stars,False,False,False,False,False,False,False,False
+23697,Julio Rodríguez,NPB No Stars,False,False,False,False,False,False,False,False
+23733,Ezequiel Duran,Producers,False,False,False,False,False,False,False,False
+23772,Wilyer Abreu,Pookie 2.0,True,True,True,True,True,True,True,True
+23793,Braxton Ashcraft,All-Stars,False,False,False,False,False,False,False,False
+23796,Ryan Weathers,Pookie 2.0,False,False,False,False,False,False,False,False
+23986,Curtis Mead,NPB No Stars,False,False,False,False,False,False,False,False
+24262,Ceddanne Rafaela,McBlocks,True,True,True,True,True,True,True,True
+24586,Kyle Bradish,McBlocks,False,False,False,False,False,False,False,False
+24617,Jarren Duran,Spehr's Army,True,True,True,True,True,True,True,True
+24618,Ryan Jeffers,Orange and Black Attack,False,False,False,False,False,False,False,False
+24816,Andy Pages,New York Polar Bears,True,True,True,True,True,True,True,True
+25385,Drew Rasmussen,Orange and Black Attack,True,True,True,True,True,True,True,True
+25436,George Kirby,New York Polar Bears,False,False,False,False,False,False,False,False
+25764,Bobby Witt Jr.,Orange and Black Attack,False,False,False,False,False,False,False,False
+25768,CJ Abrams,New York Polar Bears,True,True,True,True,True,True,True,True
+25816,Shea Langeliers,Spehr's Army,True,True,True,True,True,True,True,True
+25878,Corbin Carroll,The Fighting Phils,False,False,False,False,False,False,False,False
+25880,Hunter Brown,NPB No Stars,True,True,False,True,False,True,True,True
+25931,Michael Harris II,New York Polar Bears,True,True,True,True,True,True,True,True
+25976,Riley Greene,Lisbon Long Balls,True,True,True,True,True,True,True,True
+25977,Quinn Priester,Lisbon Long Balls,False,False,False,False,False,False,False,False
+25979,Nasim Nuñez,McBlocks,False,False,False,False,False,False,False,False
+26108,Andre Pallante,McBlocks,False,False,False,False,False,False,False,False
+26151,Kyle Stowers,Producers,False,False,False,False,False,False,False,False
+26202,Jake Mangum,Producers,False,False,False,False,False,False,False,False
+26221,Ryan Pepiot,Orange and Black Attack,False,False,False,False,False,False,False,False
+26288,Adley Rutschman,Producers,False,False,False,False,False,False,False,False
+26289,Gunnar Henderson,Spehr's Army,False,False,False,False,False,False,False,False
+26294,Bryson Stott,Spehr's Army,False,False,False,False,False,False,False,False
+26319,Michael Busch,Spehr's Army,True,True,True,True,False,True,True,True
+26368,JJ Bleday,Lisbon Long Balls,False,False,False,False,False,False,False,False
+26438,Dominic Canzone,Lisbon Long Balls,False,False,False,False,False,False,False,False
+26668,Elly De La Cruz,All-Stars,True,True,True,True,True,True,True,True
+27463,Garrett Crochet,Producers,True,True,False,True,False,True,True,True
+27464,Dillon Dingler,NPB No Stars,False,False,False,False,False,False,False,False
+27465,Spencer Torkelson,NPB No Stars,True,True,True,True,True,True,True,True
+27467,Tyler Soderstrom,Producers,True,True,True,True,True,True,True,True
+27468,Reid Detmers,The Fighting Phils,False,False,False,False,False,False,False,False
+27470,Emerson Hancock,Pookie 2.0,False,False,False,False,False,False,False,False
+27473,Cade Cavalli,New York Polar Bears,False,False,False,False,False,False,False,False
+27474,Max Meyer,New York Polar Bears,False,False,False,False,False,False,False,False
+27475,Jordan Walker,Spehr's Army,False,False,False,False,False,False,False,False
+27490,Nick Gonzales,Orange and Black Attack,False,False,False,False,False,False,False,False
+27496,Owen Caissie,Lisbon Long Balls,False,False,False,False,False,False,False,False
+27498,Spencer Strider,Pookie 2.0,False,False,False,False,False,False,False,False
+27555,Garrett Mitchell,All-Stars,False,False,False,False,False,False,False,False
+27577,Casey Schmitt,NPB No Stars,False,False,False,False,False,False,False,False
+27615,Alec Burleson,Producers,True,True,True,True,True,True,True,True
+27691,Louis Varland,Orange and Black Attack,True,False,False,True,True,True,True,True
+27756,Mick Abel,Lisbon Long Balls,False,False,False,False,False,False,False,False
+27758,Kyle Harrison,Lisbon Long Balls,False,False,False,False,False,False,False,False
+27768,Eury Pérez,Spehr's Army,False,False,False,False,False,False,False,False
+27769,Pete Crow-Armstrong,Producers,True,True,True,True,True,True,True,True
+27770,Zac Veen,Spehr's Army,False,False,False,False,False,False,False,False
+27863,Jared Jones,Spehr's Army,False,False,False,False,False,False,False,False
+27867,Cade Smith,Pookie 2.0,True,True,True,True,True,True,True,True
+27899,Colt Keith,Lisbon Long Balls,False,False,False,False,False,False,False,False
+27914,Daniel Palencia,Spehr's Army,False,False,False,False,False,False,False,False
+27932,Ian Seymour,McBlocks,False,False,False,False,False,False,False,False
+28163,Junior Caminero,Spehr's Army,True,True,True,True,True,True,True,True
+28806,Jackson Chourio,McBlocks,True,True,True,True,True,True,True,True
+28824,Samuel Basallo,Spehr's Army,False,False,False,False,False,False,False,False
+29357,Walbert Ureña,Lisbon Long Balls,False,False,False,False,False,False,False,False
+29490,Jackson Merrill,McBlocks,True,True,True,True,True,True,True,True
+29518,James Wood,Spehr's Army,True,True,True,True,True,True,True,True
+29576,Ben Rice,Lisbon Long Balls,True,True,True,True,True,True,True,True
+29646,Caleb Durbin,Orange and Black Attack,True,True,True,True,True,True,True,True
+29712,Colson Montgomery,Lisbon Long Balls,True,True,True,True,True,True,True,True
+29715,Hunter Goodman,McBlocks,True,True,True,True,True,True,True,True
+29766,Zack Gelof,Pookie 2.0,False,False,False,False,False,False,False,False
+29779,Max Muncy,Producers,False,False,False,False,False,False,False,False
+29805,TJ Rumfield,New York Polar Bears,False,False,False,False,False,False,False,False
+29837,Bryce Miller,All-Stars,False,False,False,False,True,False,False,False
+29844,Liam Hicks,New York Polar Bears,False,False,False,False,False,False,False,False
+29878,Sean Burke,Orange and Black Attack,False,False,False,False,False,False,False,False
+29995,Daylen Lile,Spehr's Army,True,True,True,True,False,True,True,True
+30076,Landen Roupp,All-Stars,False,False,False,False,False,False,False,False
+30107,Christian Scott,Spehr's Army,False,False,False,False,False,False,False,False
+30116,Seiya Suzuki,Spehr's Army,False,False,False,False,False,False,False,False
+30122,Gavin Williams,All-Stars,False,False,False,False,False,False,False,False
+30134,Tanner Bibee,NPB No Stars,False,False,False,False,False,False,False,False
+30146,Jack Leiter,NPB No Stars,False,False,False,False,False,False,False,False
+30184,Noah Cameron,Producers,False,False,False,False,False,False,False,False
+30203,Jackson Jobe,The Fighting Phils,False,False,False,False,False,False,False,False
+30279,Bryan Woo,Orange and Black Attack,True,True,True,True,True,True,True,True
+31204,Justin Wrobleski,Pookie 2.0,False,False,False,False,False,False,False,False
+31347,Zach Neto,Producers,True,True,True,True,True,True,True,True
+31475,Logan Henderson,McBlocks,False,False,False,False,False,False,False,False
+31505,Sal Stewart,McBlocks,True,True,True,True,True,True,True,True
+31539,Drake Baldwin,Pookie 2.0,True,True,True,True,True,True,True,True
+31595,Brooks Lee,New York Polar Bears,False,False,False,False,False,False,False,False
+31623,Jacob Misiorowski,Lisbon Long Balls,True,True,True,True,True,True,True,True
+31757,Mason Miller,Spehr's Army,True,True,True,True,True,True,True,True
+31807,Troy Melton,NPB No Stars,False,False,False,False,False,False,False,False
+31812,Roman Anthony,All-Stars,False,False,False,False,False,False,False,False
+31838,Kodai Senga,Producers,False,False,False,False,False,False,False,False
+31872,Cade Horton,Spehr's Army,False,False,False,False,False,False,False,False
+31893,Robby Snelling,The Fighting Phils,False,False,False,False,False,False,False,False
+31912,Chandler Simpson,NPB No Stars,True,True,True,True,True,True,True,True
+31986,Parker Messick,Orange and Black Attack,False,False,False,False,False,False,False,False
+32095,Cam Schlittler,Lisbon Long Balls,False,False,False,False,False,False,False,False
+32127,Chase DeLauter,Orange and Black Attack,False,False,False,False,False,False,False,False
+33253,Cole Carrigg,Lisbon Long Balls,False,False,False,False,False,False,False,False
+33266,Jacob Wilson,Orange and Black Attack,False,False,False,False,False,False,False,False
+33333,Wyatt Langford,New York Polar Bears,False,False,True,False,False,False,False,False
+33381,Max Clark,NPB No Stars,False,False,False,False,False,False,False,False
+33390,Bryce Eldridge,Lisbon Long Balls,False,False,False,False,False,False,False,False
+33433,George Lombard Jr.,The Fighting Phils,False,False,False,False,False,False,False,False
+33530,Cooper Pratt,McBlocks,False,False,False,False,False,False,False,False
+33572,Kevin McGonigle,Pookie 2.0,False,False,False,False,False,False,False,False
+33575,Colt Emerson,NPB No Stars,False,False,False,False,False,False,False,False
+33656,A.J. Ewing,The Fighting Phils,True,True,True,True,False,True,True,False
+33666,Connelly Early,The Fighting Phils,False,False,False,False,False,False,False,False
+33677,Paul Skenes,McBlocks,True,True,True,True,True,True,True,True
+33703,Nolan McLean,Spehr's Army,False,False,False,False,False,False,False,False
+33825,Yoshinobu Yamamoto,The Fighting Phils,True,True,False,True,True,True,True,True
+33829,Shota Imanaga,Producers,False,False,False,False,False,False,False,False
+33891,Zac Thornton,Producers,False,False,False,False,False,False,False,False
+33927,Grant Taylor,All-Stars,False,False,False,False,False,False,False,False
+34967,Travis Bazzana,The Fighting Phils,False,False,False,False,False,False,False,False
+34985,JJ Wetherholt,Pookie 2.0,True,True,True,True,True,True,True,True
+35041,Jac Caglianone,The Fighting Phils,True,True,True,True,True,True,True,True
+35101,Sam Antonacci,NPB No Stars,False,False,False,False,False,False,False,False
+35108,Cam Smith,Orange and Black Attack,False,False,False,False,False,False,False,False
+35110,Nick Kurtz,NPB No Stars,True,True,True,True,True,True,True,True
+35111,Kaelen Culpepper,All-Stars,False,False,False,False,False,False,False,False
+35177,Carson Benge,Orange and Black Attack,False,False,False,False,False,False,False,False
+35333,Chase Burns,The Fighting Phils,False,False,False,False,True,False,False,False
+35376,Konnor Griffin,The Fighting Phils,True,True,True,True,True,True,True,True
+35418,Gage Jump,Producers,False,False,False,False,False,False,False,False
+35456,Trey Yesavage,NPB No Stars,False,False,False,False,False,False,False,False
+35466,Payton Tolle,Lisbon Long Balls,False,False,False,False,False,False,False,False
+37120,Munetaka Murakami,Lisbon Long Balls,False,False,True,False,False,False,False,False
+37123,Kazuma Okamoto,Spehr's Army,False,False,False,False,False,False,False,False

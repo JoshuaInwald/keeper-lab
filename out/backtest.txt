@@ -1,0 +1,37 @@
+================================================================================================
+BACKTEST — do drafted roto points predict where a team finished?
+================================================================================================
+ season  teams_matched  rho_drafted_rp  rho_rp_per_$  rho_spend
+   2022             10          -0.176         0.030     -0.139
+   2023             10           0.207         0.353     -0.146
+   2024             10           0.467         0.394      0.511
+   2025             10          -0.055        -0.455      0.565
+   2026             10          -0.188         0.285     -0.297
+
+  mean rho(drafted roto points, standings) = +0.051
+  mean rho(roto points per $,   standings) = +0.121
+  mean rho(auction spend,       standings) = +0.099
+
+  Drafted production should predict finishing position. Raw spend
+  should predict it far less -- that is the whole thesis, and if
+  spend correlated as strongly the engine would be adding nothing.
+
+================================================================================================
+CATEGORY-LEVEL CHECK — does a category's roto points track its standings points?
+================================================================================================
+season    2022  2023  2024  2025  2026
+category                              
+R          1.0   1.0   1.0   1.0   1.0
+HR         1.0   1.0   1.0   1.0   1.0
+RBI        1.0   1.0   1.0   1.0   1.0
+SB         1.0   1.0   1.0   1.0   1.0
+AVG        1.0   1.0   1.0   1.0   1.0
+W          1.0   1.0   1.0   1.0   1.0
+SV         1.0   1.0   1.0   1.0   1.0
+K          1.0   1.0   1.0   1.0   1.0
+ERA       -1.0  -1.0  -1.0  -1.0  -1.0
+WHIP      -1.0  -1.0  -1.0  -1.0  -1.0
+
+  ERA and WHIP must be -1.0 (lower total = more points); everything
+  else must be +1.0. Any other value means a sign convention broke.
+  sign conventions: all correct

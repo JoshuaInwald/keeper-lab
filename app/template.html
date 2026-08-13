@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keeper Lab — Legends League</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#161a21; --panel2:#1c212a; --line:#262c37;
+  --ink:#e6e9ef; --dim:#8b95a7; --dimmer:#5c6675;
+  --pos:#4ec9a0; --neg:#e5715f; --accent:#e8b04b; --link:#6fa8dc;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:var(--link)}
+header{border-bottom:1px solid var(--line);padding:14px 20px;display:flex;
+  align-items:baseline;gap:16px;flex-wrap:wrap;background:var(--panel)}
+h1{font-size:16px;margin:0;letter-spacing:.02em;font-weight:600}
+h1 span{color:var(--accent)}
+.sub{color:var(--dim);font-size:12px}
+nav{display:flex;gap:2px;padding:0 14px;background:var(--panel);
+  border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);
+  padding:10px 14px;font-size:13px;cursor:pointer;white-space:nowrap;font-weight:500}
+nav button:hover{color:var(--ink)}
+nav button.on{color:var(--accent);border-bottom-color:var(--accent)}
+main{padding:18px 20px 80px;max-width:1500px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  padding:6px 9px;border-radius:5px;font-size:13px;font-family:inherit}
+input:focus,select:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+input[type=search]{min-width:190px}
+label.chk{display:inline-flex;align-items:center;gap:6px;color:var(--dim);
+  font-size:12.5px;cursor:pointer;user-select:none}
+button.act{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  padding:6px 11px;border-radius:5px;font-size:13px;cursor:pointer}
+button.act:hover{border-color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{position:sticky;top:0;background:var(--panel);text-align:right;padding:7px 8px;
+  border-bottom:1px solid var(--line);color:var(--dim);font-weight:600;
+  cursor:pointer;white-space:nowrap;font-size:11.5px;letter-spacing:.03em;
+  text-transform:uppercase;z-index:2}
+th:hover{color:var(--ink)}
+th.l,td.l{text-align:left}
+th.on{color:var(--accent)}
+td{padding:5px 8px;border-bottom:1px solid #1d222b;text-align:right;
+  font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+td.l{font-family:inherit;font-size:13px}
+tbody tr:hover{background:#1a1f28}
+tbody tr.sel{background:#22303a}
+.name{cursor:pointer}
+.name:hover{color:var(--accent)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.dim{color:var(--dim)}
+.tag{font-size:10.5px;padding:1px 5px;border-radius:3px;border:1px solid var(--line);
+  color:var(--dim);margin-left:5px;vertical-align:1px;font-family:inherit}
+.tag.keep{border-color:var(--pos);color:var(--pos)}
+.tag.il{border-color:var(--neg);color:var(--neg)}
+.tag.ext{border-color:var(--accent);color:var(--accent)}
+.wrap{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:7px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:11px;margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:11px 13px}
+.card .k{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.card .v{font-size:21px;font-family:var(--mono);margin-top:3px;font-variant-numeric:tabular-nums}
+.card .n{color:var(--dimmer);font-size:11.5px;margin-top:3px;line-height:1.35}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+  padding:14px 16px;margin-bottom:16px}
+.panel h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--dim);font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+/* On a phone the board keeps the six columns a keeper decision actually needs:
+   who, what he costs, what he is worth, and the two surplus figures. */
+@media(max-width:700px){
+  main{padding:14px 10px 60px}
+  #tbl th:nth-child(2),#tbl td:nth-child(2),
+  #tbl th:nth-child(3),#tbl td:nth-child(3),
+  #tbl th:nth-child(5),#tbl td:nth-child(5),
+  #tbl th:nth-child(7),#tbl td:nth-child(7),
+  #tbl th:nth-child(9),#tbl td:nth-child(9),
+  #tbl th:nth-child(10),#tbl td:nth-child(10),
+  #tbl th:nth-child(13),#tbl td:nth-child(13),
+  #tbl th:nth-child(14),#tbl td:nth-child(14){display:none}
+  .wrap{max-height:none}
+  input[type=search]{min-width:0;flex:1 1 100%}
+}
+#drawer{position:fixed;top:0;right:0;width:min(470px,100%);height:100%;background:var(--panel);
+  border-left:1px solid var(--line);padding:20px;overflow:auto;transform:translateX(102%);
+  transition:transform .18s ease;z-index:50;box-shadow:-12px 0 34px #0008}
+#drawer.on{transform:none}
+#drawer h2{margin:0 0 2px;font-size:19px}
+#drawer .close{position:absolute;top:14px;right:16px;cursor:pointer;color:var(--dim);
+  font-size:20px;line-height:1;background:none;border:0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 12px;font-size:13px;margin:6px 0 2px}
+.kv .k{color:var(--dim)}
+.kv .v{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.note{color:var(--dimmer);font-size:12px;line-height:1.55;margin-top:8px}
+.pick{display:flex;gap:5px;flex-wrap:wrap;min-height:30px;margin-top:7px}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:13px;
+  padding:2.5px 9px;font-size:12px;cursor:pointer}
+.chip:hover{border-color:var(--neg);color:var(--neg)}
+.picker{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:7px}
+.picker div{padding:4px 9px;cursor:pointer;font-size:12.5px;display:flex;justify-content:space-between}
+.picker div:hover{background:var(--panel2)}
+.picker div.taken{opacity:.35;pointer-events:none}
+.verdict{font-size:16px;font-family:var(--mono);padding:9px 0}
+.bars{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+footer{color:var(--dimmer);font-size:11.5px;padding:0 20px 30px;max-width:1000px;line-height:1.6}
+code{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--panel2);
+  padding:1px 4px;border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Keeper <span>Lab</span></h1>
+  <div class="sub" id="hdr"></div>
+</header>
+<nav id="nav"></nav>
+<main>
+  <div id="view"></div>
+</main>
+<footer id="foot"></footer>
+
+<div id="drawer"><button class="close" onclick="closeDrawer()">×</button><div id="dbody"></div></div>
+
+<script>
+const D = /*__DATA__*/null;
+const IX = {}; D.cols.forEach((c,i)=>IX[c]=i);
+const g = (r,c)=>r[IX[c]];
+const CATS = D.cats, NEG = new Set(D.neg_cats);
+const ROS = ["AB","H","HR","R","RBI","SB","IP","W","SV","K","ER","BB","H_allowed"];
+const TEAMS = Object.keys(D.cur_totals);
+const BOARD = D.board, FA = D.fa;
+const byId = {}; BOARD.concat(FA).forEach(r=>byId[g(r,"fg_id")]=r);
+
+// ---------- formatting ----------
+const $ = (id)=>document.getElementById(id);
+const nf = (v,d=1)=> v==null||!isFinite(v) ? "—" : v.toFixed(d);
+const usd = (v,d=0)=> v==null||!isFinite(v) ? "—" : "$"+v.toFixed(d);
+const sgn = (v,d=1,pre="")=>{
+  if(v==null||!isFinite(v)) return '<span class="dim">—</span>';
+  const c = v>0.0005?"pos":v<-0.0005?"neg":"dim";
+  const s = v<-0.0005?"−":v>0.0005?"+":"";
+  return `<span class="${c}">${s}${pre}${Math.abs(v).toFixed(d)}</span>`;
+};
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---------- shared state ----------
+const S = {tab:"board", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
+           desc:true, fa:false, infl:false};
+const INFL = D.constants.inflation || 1;
+const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
+
+// ---------- roto engine (mirrors trade.win_now_delta) ----------
+function rosterAgg(swap){
+  const agg={}; TEAMS.forEach(t=>{agg[t]={};ROS.forEach(c=>agg[t][c]=0)});
+  for(const r of BOARD){
+    const id=g(r,"fg_id");
+    const t = (swap && swap[id]) || g(r,"team");
+    if(!agg[t]) continue;
+    for(const c of ROS) agg[t][c]+= g(r,"ros_"+c)||0;
+  }
+  return agg;
+}
+function catTotals(agg){
+  const ab0=D.base26.AB, ip0=D.base26.IP, out={};
+  for(const t of TEAMS){
+    const a=agg[t], c=D.cur_totals[t];
+    out[t]={R:c.R+a.R, HR:c.HR+a.HR, RBI:c.RBI+a.RBI, SB:c.SB+a.SB,
+            W:c.W+a.W, SV:c.SV+a.SV, K:c.K+a.K,
+            AVG:(c.AVG*ab0+a.H)/(ab0+a.AB),
+            ERA:(c.ERA*ip0/9+a.ER)*9/(ip0+a.IP),
+            WHIP:(c.WHIP*ip0+a.BB+a.H_allowed)/(ip0+a.IP)};
+  }
+  return out;
+}
+function rankAvg(entries, asc){
+  const s=[...entries].sort((a,b)=> asc ? a[1]-b[1] : b[1]-a[1]);
+  const out={}; let i=0;
+  while(i<s.length){
+    let j=i; while(j+1<s.length && s[j+1][1]===s[i][1]) j++;
+    const r=(i+1+j+1)/2;
+    for(let k=i;k<=j;k++) out[s[k][0]]=r;
+    i=j+1;
+  }
+  return out;
+}
+function rotoPoints(tot){
+  const pts={}; TEAMS.forEach(t=>pts[t]={TOTAL:0});
+  for(const c of CATS){
+    const rk=rankAvg(TEAMS.map(t=>[t,tot[t][c]]), !NEG.has(c));
+    TEAMS.forEach(t=>{pts[t][c]=rk[t]; pts[t].TOTAL+=rk[t];});
+  }
+  return pts;
+}
+const PROJ_PTS = rotoPoints(catTotals(rosterAgg(null)));
+const PROJ_TOT = catTotals(rosterAgg(null));
+
+// ---------- nav ----------
+const TABS=[["board","Keeper board"],["teams","League"],["trade","Trade"],
+            ["standings","Standings"],["fa","Free agents"],["model","Model"]];
+$("nav").innerHTML = TABS.map(([k,l])=>
+  `<button data-t="${k}" onclick="go('${k}')">${l}</button>`).join("");
+function go(t){S.tab=t;render();}
+$("hdr").innerHTML = `10-team 5×5 roto keeper auction · $${D.league.budget}/team · `
+  + `built ${D.built} · <span class="dim">$${nf(D.constants.usd_per_roto_point_redraft,2)}/roto pt · `
+  + `+${nf((INFL-1)*100,0)}% projected auction inflation</span>`;
+$("foot").innerHTML = `Values are 2027 projections priced off this league's own auction history `
+  + `(n≈677 purchases). Honest error bar is <b>±38% per category</b> — read every dollar figure `
+  + `with that in mind. Methodology in <code>out/METHODS.md</code>; `
+  + `what was tried and rejected in <code>out/LAB_NOTEBOOK.md</code>.`;
+
+// ---------- board ----------
+const BOARD_COLS=[
+  ["name","Player","l"],["team","Team","l"],["role","",""],
+  ["salary","Sal"],["contract","Yr"],["keeper_cost","Cost"],
+  ["roto_points","Roto pts"],["redraft_value","Worth '27"],
+  ["value_lo","likely range"],
+  ["surplus_y2027","Gain '27"],["surplus_multiyear","Gain, all yrs"],
+  ["p_surplus_positive","Sure?"],
+  ["redraft_value_2028","Worth '28"],["upside_ft","If full-time"],
+];
+// Plain-English gloss for every column header, shown on hover.
+const COL_HELP = {
+  name:"Click for the full arithmetic.",
+  team:"Current fantasy roster.",
+  role:"H hitter · P pitcher · H/P two-way.",
+  salary:"What his owner pays in 2026.",
+  contract:"Seasons left AFTER 2026. F = final year: extend or lose him.",
+  keeper_cost:"What it costs to roster him in 2027, extension included.",
+  roto_points:"Projected 2027 standings points he adds, all ten categories.",
+  redraft_value:"What he'd be worth in a 2027 auction, in dollars.",
+  value_lo:"80% of bootstrap draws landed inside this range.",
+  surplus_y2027:"Worth '27 minus cost. What you gain by keeping him for 2027.",
+  surplus_multiyear:"The same gain summed over every year you control him, "
+    +"later years discounted 15%/yr and floored at zero, plus the extension option.",
+  p_surplus_positive:"How often the gain stayed positive across the draws. "
+    +"Under 80% means the keep is a coin flip, not a decision.",
+  redraft_value_2028:"Same dollar value, one year further out.",
+  upside_ft:"Extra value if he plays a full season rather than his projected workload.",
+};
+// How often the multi-year surplus stayed positive across the bootstrap draws.
+// This is the column to read for a marginal keeper: $2 of surplus at 55%
+// confidence is a coin flip, $2 at 99% is a decision.
+function conf(r){
+  const p=g(r,"p_surplus_positive");
+  if(p==null) return '<span class="dim">—</span>';
+  const c = p>=0.9?"pos":p<=0.6?"neg":"";
+  return `<span class="${c}">${(100*p).toFixed(0)}%</span>`;
+}
+function band(r,lo,hi){
+  const a=g(r,lo), b=g(r,hi);
+  if(a==null||b==null) return '<span class="dim">—</span>';
+  return `<span class="dim">${usd(adj(a))}–${usd(adj(b))}</span>`;
+}
+function filtered(rows){
+  const q=S.q.toLowerCase();
+  return rows.filter(r=>{
+    if(S.team && g(r,"team")!==S.team) return false;
+    if(S.role && g(r,"role")!==S.role) return false;
+    if(S.only==="keep" && !g(r,"keep_2027")) return false;
+    if(S.only==="keepable" && !g(r,"keepable")) return false;
+    if(S.only==="surplus" && !(g(r,"surplus_multiyear")>0)) return false;
+    if(q && !String(g(r,"name")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function sortRows(rows){
+  const k=S.sort;
+  return rows.sort((a,b)=>{
+    let x=g(a,k), y=g(b,k);
+    if(typeof x==="string"||typeof y==="string"){
+      x=String(x??"");y=String(y??"");
+      return S.desc ? y.localeCompare(x) : x.localeCompare(y);
+    }
+    x=x==null?-1e9:x; y=y==null?-1e9:y;
+    return S.desc ? y-x : x-y;
+  });
+}
+function sortBy(k){ if(S.sort===k) S.desc=!S.desc; else {S.sort=k;S.desc=true;} refilter(); }
+const FA_NOTE = "unrostered, priced at their live draft contract";
+const curRows = ()=> sortRows(filtered(S.tab==="fa"?FA:BOARD));
+// Re-render only the table. Keeps the search box focused and the caret where
+// the user left it, which a full re-render does not.
+function refilter(){
+  const t=$("tbl");
+  if(!t){ render(); return; }
+  t.outerHTML = boardView(curRows(), S.tab==="fa"?FA_NOTE:"");
+}
+function money(v){ return usd(adj(v)); }
+
+function playerRow(r){
+  const keep=g(r,"keep_2027"), il=g(r,"il");
+  const opt=g(r,"extension_option")>0, used=g(r,"extension_used"),
+        block=g(r,"keepable")===false;
+  return `<tr>
+  <td class="l"><span class="name" onclick="showPlayer(${g(r,"fg_id")})">${esc(g(r,"name"))}</span>`
+  + (keep?'<span class="tag keep" title="in the recommended keeper set">KEEP</span>':"")
+  + (il?'<span class="tag il" title="on the injured list">IL</span>':"")
+  + (block?'<span class="tag il" title="cannot be kept: final year and the extension is already spent">LOCKED</span>':"")
+  + (opt?`<span class="tag ext" title="${esc(extLabel(r))} — worth ${usd(adj(g(r,"extension_option")))}">`
+        + (String(g(r,"contract")).toUpperCase()==="F"?"EXT×2":"OPT") + `</span>`:"")
+  + (used&&!block?'<span class="tag" title="extension already used on this contract">USED</span>':"")
+  + `</td>
+  <td class="l dim">${esc(g(r,"team"))}</td>
+  <td class="dim">${g(r,"role")==="PIT"?"P":g(r,"role")==="TWO"?"H/P":"H"}</td>
+  <td>${usd(g(r,"salary"))}</td>
+  <td class="dim">${esc(g(r,"contract"))}</td>
+  <td>${usd(g(r,"keeper_cost"))}</td>
+  <td>${nf(g(r,"roto_points"))}</td>
+  <td>${money(g(r,"redraft_value"))}</td>
+  <td>${band(r,"value_lo","value_hi")}</td>
+  <td>${sgn(adj(g(r,"surplus_y2027")),0,"$")}</td>
+  <td>${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</td>
+  <td>${conf(r)}</td>
+  <td class="dim">${money(g(r,"redraft_value_2028"))}</td>
+  <td class="dim">${sgn(adj(g(r,"upside_ft")),0,"$")}</td></tr>`;
+}
+function boardView(rows,title){
+  const th=BOARD_COLS.map(([k,l,c])=>
+    `<th class="${c||""} ${S.sort===k?"on":""}" onclick="sortBy('${k}')"`
+    + ` title="${esc(COL_HELP[k]||"")} — click to sort">`
+    + `${l}${S.sort===k?(S.desc?" ↓":" ↑"):""}</th>`).join("");
+  const body=rows.map(playerRow).join("");
+  return `<div id="tbl"><div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>
+    <div class="note">${rows.length} players${title?" · "+title:""}. Click a name for the full arithmetic.</div></div>`;
+}
+function controls(showOnly=true){
+  return `<div class="bar">
+    <input type="search" id="q" placeholder="search player" value="${esc(S.q)}"
+      oninput="S.q=this.value;refilter()">
+    <select id="t" onchange="S.team=this.value;refilter()">
+      <option value="">all teams</option>
+      ${TEAMS.map(t=>`<option ${S.team===t?"selected":""}>${esc(t)}</option>`).join("")}
+    </select>
+    <select onchange="S.role=this.value;refilter()">
+      <option value="">hitters + pitchers</option>
+      <option value="HIT" ${S.role==="HIT"?"selected":""}>hitters</option>
+      <option value="PIT" ${S.role==="PIT"?"selected":""}>pitchers</option>
+    </select>
+    ${showOnly?`<select onchange="S.only=this.value;refilter()">
+      <option value="">everyone</option>
+      <option value="keep" ${S.only==="keep"?"selected":""}>recommended keepers</option>
+      <option value="keepable" ${S.only==="keepable"?"selected":""}>keeper-eligible</option>
+      <option value="surplus" ${S.only==="surplus"?"selected":""}>positive surplus</option>
+    </select>`:""}
+    <label class="chk"><input type="checkbox" ${S.infl?"checked":""}
+      onchange="S.infl=this.checked;refilter()"> inflation-adjusted</label>
+  </div>`;
+}
+
+// ---------- player drawer ----------
+// `extension_years` is the decision, not a description: how many years to buy
+// at +$5 each. For a final-year player 1 is the baseline already priced into
+// keeper_cost, so only 2 is news; for a live contract 0 means don't bother.
+function extLabel(r){
+  const n=g(r,"extension_years"), fin=String(g(r,"contract")).toUpperCase()==="F";
+  if(g(r,"extension_used")) return "already used";
+  if(fin) return n>=2 ? "buy 2 yrs, not 1" : "1 yr (in the cost above)";
+  return n>0 ? `${n} yr${n>1?"s":""} at expiry` : "not worth exercising";
+}
+function showPlayer(id){
+  const r=byId[id]; if(!r) return;
+  const cat = c=>`<div class="k">${c}</div><div class="v">${nf(g(r,"rp_"+c),2)}</div>`;
+  const role=g(r,"role"), hits=role!=="PIT", pits=role!=="HIT";
+  const hLine = `<div class="k">PA</div><div class="v">${nf(g(r,"PA"),0)}</div>
+       <div class="k">R</div><div class="v">${nf(g(r,"R"),0)}</div>
+       <div class="k">HR</div><div class="v">${nf(g(r,"HR"),0)}</div>
+       <div class="k">RBI</div><div class="v">${nf(g(r,"RBI"),0)}</div>
+       <div class="k">SB</div><div class="v">${nf(g(r,"SB"),0)}</div>
+       <div class="k">AVG</div><div class="v">${nf(g(r,"AVG"),3)}</div>`;
+  const pLine = `<div class="k">IP</div><div class="v">${nf(g(r,"IP"),0)}</div>
+       <div class="k">W</div><div class="v">${nf(g(r,"W"),0)}</div>
+       <div class="k">SV</div><div class="v">${nf(g(r,"SV"),0)}</div>
+       <div class="k">K</div><div class="v">${nf(g(r,"K"),0)}</div>
+       <div class="k">ERA</div><div class="v">${nf(g(r,"ERA"),2)}</div>
+       <div class="k">WHIP</div><div class="v">${nf(g(r,"WHIP"),3)}</div>`;
+  const line = `<div class="kv">${hits?hLine:""}${pits?pLine:""}</div>`;
+  const cats = hits&&pits ? CATS : (pits?D.pit_cats:D.hit_cats);
+  const yrs = [["2027","surplus_y2027"],["2028","surplus_y2028"],["2029","surplus_y2029"]]
+    .filter(([y,k])=>g(r,k)!==0)
+    .map(([y,k])=>`<div class="k">${y} surplus</div><div class="v">${sgn(adj(g(r,k)),1,"$")}</div>`).join("");
+  $("dbody").innerHTML=`
+    <h2>${esc(g(r,"name"))}</h2>
+    <div class="sub dim">${esc(g(r,"team"))} · ${esc(g(r,"keeper_status"))}
+      ${g(r,"extension_used")?" · extension already used":""}</div>
+    <div class="panel" style="margin-top:14px">
+      <h3>2027 projection${g(r,"pt_scale")>1.001?` · playing time scaled ×${nf(g(r,"pt_scale"),2)}`:""}</h3>
+      ${line}
+      <h3 style="margin-top:12px">Roto points by category</h3>
+      <div class="kv">${cats.map(cat).join("")}
+        <div class="k" style="color:var(--ink)">total</div>
+        <div class="v">${nf(g(r,"roto_points"),2)}</div>
+        <div class="k">above replacement</div><div class="v">${nf(g(r,"rp_above_repl"),2)}</div></div>
+    </div>
+    <div class="panel">
+      <h3>Money</h3>
+      <div class="kv">
+        <div class="k">salary</div><div class="v">${usd(g(r,"salary"))}</div>
+        <div class="k">cost to keep in 2027</div><div class="v">${usd(g(r,"keeper_cost"))}</div>
+        <div class="k">value, redraft scale</div><div class="v">${money(g(r,"redraft_value"))}</div>
+        <div class="k">&nbsp;&nbsp;${D.band.lo}–${D.band.hi}% range</div>
+        <div class="v">${band(r,"value_lo","value_hi")}</div>
+        <div class="k">value, 2028</div><div class="v">${money(g(r,"redraft_value_2028"))}</div>
+        <div class="k">full-time upside</div><div class="v">${sgn(adj(g(r,"upside_ft")),0,"$")}</div>
+        ${yrs}
+        <div class="k">extension: ${extLabel(r)}</div>
+        <div class="v">${sgn(adj(g(r,"extension_option")),1,"$")}</div>
+        <div class="k" style="color:var(--ink)">multi-year surplus</div>
+        <div class="v">${sgn(adj(g(r,"surplus_multiyear")),1,"$")}</div>
+        <div class="k">&nbsp;&nbsp;${D.band.lo}–${D.band.hi}% range</div>
+        <div class="v">${band(r,"surplus_lo","surplus_hi")}</div>
+        <div class="k">&nbsp;&nbsp;surplus positive in</div><div class="v">${conf(r)} of draws</div>
+      </div>
+      <div class="note">Surplus = value − cost, each future year discounted
+        ${nf(D.settings.FUTURE_YEAR_DISCOUNT,2)}× and floored at zero, because a contract is an
+        option you may decline, not an obligation.</div>
+      <div class="note">Ranges come from ${D.band.draws} bootstrap resamples of the team-seasons
+        the denominators are fit on. They describe uncertainty in <i>how to score a stat line</i>,
+        not in the stat line — projection error is separate and additional.</div>
+    </div>
+    <div class="panel">
+      <h3>Rest of 2026</h3>
+      <div class="kv">
+        ${g(r,"role")==="PIT"
+          ? `<div class="k">IP</div><div class="v">${nf(g(r,"ros_IP"),0)}</div>
+             <div class="k">W / SV / K</div><div class="v">${nf(g(r,"ros_W"),0)} / ${nf(g(r,"ros_SV"),0)} / ${nf(g(r,"ros_K"),0)}</div>`
+          : `<div class="k">AB</div><div class="v">${nf(g(r,"ros_AB"),0)}</div>
+             <div class="k">R / HR / RBI / SB</div><div class="v">${nf(g(r,"ros_R"),0)} / ${nf(g(r,"ros_HR"),0)} / ${nf(g(r,"ros_RBI"),0)} / ${nf(g(r,"ros_SB"),0)}</div>`}
+      </div>
+    </div>`;
+  $("drawer").classList.add("on");
+}
+function closeDrawer(){$("drawer").classList.remove("on");}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
+
+// ---------- generic sortable table ----------
+// Every table on every tab sorts by clicking a header; a second click flips
+// the direction. `cols` is [key, label, align, render, help].
+function sortableTable(rows, cols, stateKey, note){
+  const st = S[stateKey] || (S[stateKey] = {k: cols[1][0], desc: true});
+  const sorted = rows.slice().sort((a,b)=>{
+    let x=a[st.k], y=b[st.k];
+    if(typeof x==="string"||typeof y==="string"){
+      x=String(x??""); y=String(y??"");
+      return st.desc ? y.localeCompare(x) : x.localeCompare(y);
+    }
+    x = (x==null||!isFinite(x)) ? -1e18 : x;
+    y = (y==null||!isFinite(y)) ? -1e18 : y;
+    return st.desc ? y-x : x-y;
+  });
+  const th = cols.map(([k,l,al,,help])=>
+    `<th class="${al||""} ${st.k===k?"on":""}" onclick="reSort('${stateKey}','${k}')"`
+    + ` title="${esc(help||"")} — click to sort">${l}${st.k===k?(st.desc?" ↓":" ↑"):""}</th>`).join("");
+  const body = sorted.map(r=>"<tr>"+cols.map(([k,,al,render])=>
+    `<td class="${al||""}">${render?render(r):r[k]}</td>`).join("")+"</tr>").join("");
+  return `<div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`
+    + (note?`<div class="note">${note}</div>`:"");
+}
+function reSort(stateKey,k){
+  const st=S[stateKey];
+  if(st.k===k) st.desc=!st.desc; else {st.k=k; st.desc=true;}
+  render();
+}
+
+// ---------- teams ----------
+function teamsView(){
+  const t=D.teams.map(x=>({...x,
+    proj: PROJ_PTS[x.team] ? PROJ_PTS[x.team].TOTAL : null,
+    per_dollar: x.keeper_salary>0 ? x.keeper_value/x.keeper_salary : null}));
+  const c=D.constants;
+  const cards=`<div class="cards">
+    <div class="card"><div class="k">$ per roto point</div><div class="v">$${nf(c.usd_per_roto_point_redraft,2)}</div>
+      <div class="n">redraft scale; auction scale $${nf(c.usd_per_roto_point_auction,2)}</div></div>
+    <div class="card"><div class="k">projected inflation</div><div class="v">+${nf((INFL-1)*100,0)}%</div>
+      <div class="n">$${nf(c.remaining_budget,0)} chasing $${nf(c.remaining_worth,0)} of talent</div></div>
+    <div class="card"><div class="k">keeper salary, league</div><div class="v">$${nf(c.keeper_salary,0)}</div>
+      <div class="n">buys $${nf(c.keeper_worth,0)} of value</div></div>
+    <div class="card"><div class="k">aggregate surplus</div><div class="v">$${nf(c.aggregate_surplus,0)}</div>
+      <div class="n">the whole league's edge over the auction</div></div>
+    <div class="card"><div class="k">replacement level</div><div class="v">${nf(c.replacement_roto_points,2)}</div>
+      <div class="n">roto pts of a free player · waiver setting "${D.settings.WAIVER_VALUE}"</div></div>
+  </div>`;
+  // "Committed salary" used to sit here and it was close to meaningless: it
+  // summed every contract on the roster including in-season free-agent adds
+  // nobody will keep. Replaced with value-per-keeper-dollar, which is the
+  // thing a keeper set is actually judged on.
+  const cols=[
+    ["team","Team","l",x=>`<span class="name" onclick="S.tab='board';S.team=${JSON.stringify(esc(x.team))};render()">${esc(x.team)}</span>`,
+      "Click to see this team's players."],
+    ["points_2026","Points now","",x=>nf(x.points_2026,1),"Roto points in the live 2026 standings."],
+    ["proj","Projected finish","",x=>nf(x.proj,1),
+      "Current roster rolled forward on rest-of-season projections, all ten teams re-ranked."],
+    ["n_keep","Keepers","",x=>x.n_keep,"How many players the model says to keep."],
+    ["keeper_salary","Keeper cost","",x=>usd(x.keeper_salary),"Total 2027 salary of that keeper set."],
+    ["keeper_value","Keeper worth","",x=>money(x.keeper_value),"What those players would fetch at auction."],
+    ["surplus","Gain","",x=>sgn(adj(x.surplus),0,"$"),
+      "Worth minus cost — the only thing that survives into next season."],
+    ["per_dollar","Worth per $","",x=>x.per_dollar==null?"—":nf(x.per_dollar,2)+"×",
+      "Keeper worth divided by keeper cost. How efficient the set is, independent of its size."],
+    ["auction_budget","Auction $","",x=>usd(x.auction_budget),"$260 minus keeper cost."],
+    ["roster_size","Roster","",x=>`<span class="dim">${x.roster_size}</span>`,"Players currently rostered."],
+  ];
+  return cards + sortableTable(t, cols, "sortTeams",
+    "Every column sorts — click a header, click again to reverse.");
+}
+
+// ---------- standings ----------
+const CAT_DP = c=> c==="AVG" ? 3 : (c==="ERA"||c==="WHIP") ? 2 : 0;
+function standingsView(){
+  const now={}; D.standings.forEach(s=>now[s.team]=s);
+  const rows=TEAMS.map(t=>{
+    const r={team:t, now:now[t].points_2026, proj:PROJ_PTS[t].TOTAL};
+    r.delta=r.proj-r.now;
+    CATS.forEach(c=>{ r[c]=S.totals?PROJ_TOT[t][c]:PROJ_PTS[t][c]; });
+    return r;
+  });
+  const cols=[
+    ["team","Team","l",r=>esc(r.team),"Fantasy team."],
+    ["now","Points now","",r=>nf(r.now,1),"Roto points in the live standings."],
+    ["proj","Projected","",r=>nf(r.proj,1),"Roster rolled forward to the end of 2026, re-ranked."],
+    ["delta","Change","",r=>sgn(r.delta,1),"Projected finish minus current position."],
+    ...CATS.map(c=>[c,c,"",r=>{
+      const v=r[c];
+      return S.totals
+        ? `<span class="dim">${nf(v,CAT_DP(c))}</span>`
+        : `<span class="dim" title="projected total ${nf(PROJ_TOT[r.team][c],CAT_DP(c))}">${nf(v,0)}</span>`;
+    }, S.totals ? `Projected end-of-season ${c} total (${C_UNIT(c)}).`
+                : `Projected roto points in ${c}. Hover a cell for the total.`])
+  ];
+  return `<div class="bar">
+      <button class="act" onclick="S.totals=!S.totals;render()">
+        showing: <b>${S.totals?"category totals":"roto points"}</b> — click to switch</button>
+    </div>`
+    + sortableTable(rows, cols, "sortStand",
+        S.totals
+          ? "Projected end-of-season totals. Rate categories are team rates, not sums."
+          : "Projected roto points, 10 for first place down to 1 for last. Every column sorts.");
+}
+const C_UNIT = c => NEG.has(c) ? "lower is better"
+  : c==="AVG" ? "team batting average, higher is better" : "season total";
+
+// ---------- trade ----------
+const T={a:"",b:"",aOut:[],bOut:[]};
+function tradeView(){
+  if(!T.a) T.a=TEAMS[0];
+  if(!T.b) T.b=TEAMS[1];
+  const side=(key,team,other)=>{
+    const roster=BOARD.filter(r=>g(r,"team")===team)
+      .sort((x,y)=>g(y,"surplus_multiyear")-g(x,"surplus_multiyear"));
+    const taken=new Set(T[key]);
+    return `<div class="panel">
+      <h3>${key==="a"?"Team A sends":"Team B sends"}</h3>
+      <select onchange="T.${key==='a'?'a':'b'}=this.value;T.${key}Out=[];render()">
+        ${TEAMS.map(t=>`<option ${t===team?"selected":""} ${t===other?"disabled":""}>${esc(t)}</option>`).join("")}
+      </select>
+      <div class="pick">${T[key+"Out"].map(id=>
+        `<span class="chip" onclick="drop('${key}',${id})">${esc(g(byId[id],"name"))} ×</span>`).join("")
+        || '<span class="dim" style="font-size:12px">nobody yet</span>'}</div>
+      <div class="picker">${roster.map(r=>{
+        const id=g(r,"fg_id");
+        return `<div class="${taken.has(id)?"taken":""}" onclick="add('${key}',${id})">
+          <span>${esc(g(r,"name"))} <span class="dim">${g(r,"role")==="PIT"?"P":"H"}</span></span>
+          <span class="dim">${usd(g(r,"keeper_cost"))} → ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</span></div>`;
+      }).join("")}</div></div>`;
+  };
+  return `<div class="bar">
+      <label class="chk"><input type="checkbox" ${S.infl?"checked":""}
+        onchange="S.infl=this.checked;render()"> inflation-adjusted</label>
+      <button class="act" onclick="T.aOut=[];T.bOut=[];render()">clear</button>
+    </div>
+    <div class="grid2">${side("a",T.a,T.b)}${side("b",T.b,T.a)}</div>
+    <div id="verdict">${tradeResult()}</div>`;
+}
+function add(k,id){ if(!T[k+"Out"].includes(id)) T[k+"Out"].push(id); render(); }
+function drop(k,id){ T[k+"Out"]=T[k+"Out"].filter(x=>x!==id); render(); }
+
+function tradeResult(){
+  if(!T.aOut.length && !T.bOut.length)
+    return `<div class="panel"><h3>Verdict</h3><div class="dim">Pick players on both sides.</div></div>`;
+  const sum=(ids,col)=>ids.reduce((s,id)=>s+(g(byId[id],col)||0),0);
+  const swap={}; T.aOut.forEach(id=>swap[id]=T.b); T.bOut.forEach(id=>swap[id]=T.a);
+  const after=rotoPoints(catTotals(rosterAgg(swap)));
+  const usdpt=D.constants.usd_per_roto_point_redraft;
+  const cw=D.league.contention_weight;
+
+  const block=(team,outIds,inIds)=>{
+    const vIn=sum(inIds,"redraft_value"), vOut=sum(outIds,"redraft_value");
+    const cIn=sum(inIds,"keeper_cost"),   cOut=sum(outIds,"keeper_cost");
+    const dS=(vIn-cIn)-(vOut-cOut);
+    const dMY=sum(inIds,"surplus_multiyear")-sum(outIds,"surplus_multiyear");
+    const dP=after[team].TOTAL-PROJ_PTS[team].TOTAL;
+    const score=dS + cw*dP*usdpt;
+    const cats=CATS.map(c=>{
+      const d=after[team][c]-PROJ_PTS[team][c];
+      return Math.abs(d)<0.01?"":`${c} ${sgn(d,1)}`;
+    }).filter(Boolean).join(" · ") || '<span class="dim">no category moves</span>';
+    return `<div class="panel">
+      <h3>${esc(team)}</h3>
+      <div class="verdict">${sgn(adj(score),0,"$")} <span class="dim" style="font-size:12px">combined</span></div>
+      <div class="kv">
+        <div class="k">2027 value in / out</div><div class="v">${money(vIn)} / ${money(vOut)}</div>
+        <div class="k">2027 salary in / out</div><div class="v">${usd(cIn)} / ${usd(cOut)}</div>
+        <div class="k">Δ surplus, 2027</div><div class="v">${sgn(adj(dS),1,"$")}</div>
+        <div class="k">Δ surplus, multi-year</div><div class="v">${sgn(adj(dMY),1,"$")}</div>
+        <div class="k">Δ 2026 standings points</div><div class="v">${sgn(dP,1)}</div>
+      </div>
+      <div class="bars" style="margin-top:8px">${cats}</div>
+    </div>`;
+  };
+  const others=TEAMS.filter(t=>t!==T.a&&t!==T.b)
+    .map(t=>[t,after[t].TOTAL-PROJ_PTS[t].TOTAL]).filter(([t,d])=>Math.abs(d)>0.05);
+  return `<div class="grid2">
+      ${block(T.a,T.aOut,T.bOut)}
+      ${block(T.b,T.bOut,T.aOut)}
+    </div>
+    <div class="panel"><h3>Collateral damage</h3>
+      <div class="bars">${others.length
+        ? others.map(([t,d])=>`${esc(t)} ${sgn(d,1)}`).join(" · ")
+        : "no other team's standings move"}</div>
+      <div class="note">Combined score = Δ2027 surplus + ${nf(cw,2)} × Δ2026 standings points ×
+        $${nf(usdpt,2)}. The weight is the rebuilder's setting: a 2026 standings point is worth a
+        quarter of a 2027 dollar. Slide it toward 1.0 if you are contending.</div>
+    </div>`;
+}
+
+// ---------- model ----------
+function modelView(){
+  const c=D.constants, den=c.denominators;
+  // Was a two-way test that labelled anything not in NEG_CATS a counting stat,
+  // which called AVG a counting stat. It is a rate, and higher is better.
+  const RATE=new Set(["AVG","ERA","WHIP"]);
+  const kind = x => !RATE.has(x) ? "counting · higher is better"
+    : NEG.has(x) ? "rate · lower is better" : "rate · higher is better";
+  const rows=CATS.map(x=>{
+    const d=den[x];
+    return `<tr><td class="l">${x}</td><td>${nf(d, d<1?4:2)}</td>
+      <td class="l dim">${kind(x)}</td></tr>`;}).join("");
+  const set=Object.entries(D.settings).map(([k,v])=>
+    `<div class="k">${k.toLowerCase().replace(/_/g," ")}</div><div class="v">${esc(Array.isArray(v)?v.join(", "):v)}</div>`).join("");
+  return `<div class="grid2">
+    <div class="panel"><h3>Denominators — units per standings point</h3>
+      <table><thead><tr><th class="l">Cat</th><th>Units / pt</th><th class="l">Kind</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <div class="note">Estimated from pooled relative dispersion across
+        ${D.settings.DENOM_SEASONS} team-seasons, scaled by the expected range of a
+        ${D.league.n_teams}-team sample. Saves use an 8-team field because two teams punt.</div>
+    </div>
+    <div class="panel"><h3>Fitted constants</h3>
+      <div class="kv">
+        <div class="k">$ / roto point, auction scale</div><div class="v">$${nf(c.usd_per_roto_point_auction,2)}</div>
+        <div class="k">$ / roto point, redraft scale</div><div class="v">$${nf(c.usd_per_roto_point_redraft,2)}</div>
+        <div class="k">auction intercept, roto pts</div><div class="v">${nf(c.auction_intercept,2)}</div>
+        <div class="k">replacement level, roto pts</div><div class="v">${nf(c.replacement_roto_points,2)}</div>
+        <div class="k">top-230 budget check</div><div class="v">$${nf(c.budget_check_top230,0)}</div>
+        <div class="k">projected 2027 inflation</div><div class="v">${nf(INFL,3)}×</div>
+        <div class="k">a 2027 dollar buys</div><div class="v">${nf(c.dollar_buys,3)}</div>
+      </div>
+      <div class="note">The intercept is a second, independent read on replacement level: a
+        $0 player returns ${nf(c.auction_intercept,2)} roto points, against ${nf(c.replacement_roto_points,2)}
+        from the projection route. They were never fitted to agree.</div>
+    </div>
+    <div class="panel"><h3>Active settings</h3><div class="kv">${set}</div>
+      <div class="note">Change any of these in <code>klab/config.py</code> and rebuild with
+        <code>python3 scripts/build_app.py</code>. 17% of keep/cut calls depend on
+        <code>PROJECTION_BASIS</code> alone.</div></div>
+    <div class="panel"><h3>What this does that a generic calculator does not</h3>
+      <div class="note" style="font-size:12.5px">
+        Commercial auction calculators divide a budget across a projected player pool. This one
+        regresses <i>realised</i> production on <i>prices actually paid in this league</i>, busts
+        included at the price paid. That buys three things: league-specific mispricing (saves are
+        underpaid by +2.23 roto points per closer, conditional on competing), drift (a dollar bought
+        2.5× as much in 2022 as in 2026 as keepers absorbed the talent), and contract-aware
+        multi-year surplus with the +$5 extension priced as an option.
+      </div></div>
+  </div>`;
+}
+
+// ---------- render ----------
+function render(){
+  document.querySelectorAll("nav button").forEach(b=>
+    b.classList.toggle("on", b.dataset.t===S.tab));
+  const v=$("view");
+  if(S.tab==="board") v.innerHTML=controls()+boardView(curRows());
+  else if(S.tab==="fa") v.innerHTML=controls(false)+boardView(curRows(), FA_NOTE);
+  else if(S.tab==="teams") v.innerHTML=teamsView();
+  else if(S.tab==="trade") v.innerHTML=tradeView();
+  else if(S.tab==="standings") v.innerHTML=standingsView();
+  else if(S.tab==="model") v.innerHTML=modelView();
+}
+render();
+</script>
+</body>
+</html>

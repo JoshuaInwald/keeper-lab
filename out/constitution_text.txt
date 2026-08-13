@@ -1,0 +1,66 @@
+Fantasy Baseball Constitution for CBS Sports – Mixed-League Keeper Auction League
+I. General League Rules
+League Type: Mixed-League Keeper Auction League
+Platform: CBS Sports Fantasy Baseball
+Roster Composition: Each team will have an active roster consisting of 23 players and a reserve roster comprised of minor league and injured players.
+Each team must maintain the following positions: (1) Catcher, (1) 1B, (1) 2B, (1) SS, (1) 3B, (1) Corner Infield, (1) Middle Infield, (5) Outfielders (2) Utility, (9) Pitchers
+Owners are responsible for reserving/reactivating their injured/minor league players as well as adding fill-in free agents. Owners having issues making these moves may email the commissioners for assistance.
+Suspended players are not eligible to be added to the reserve list.
+Keeper League: This is a keeper league where teams can retain players for the future seasons. Keepers are based on contract years. The standard player contract is three years.
+Contracts and Salaries: 
+Each player has a salary determined during the auction draft.
+II. Draft Rules
+Auction Draft: 
+The league will hold a pre-season auction draft where each team will build their roster by bidding on players using their allotted budget ($260 per team).
+Minor League Purchases: 
+Each team may purchase, at most, one minor league player during the draft. This player will count as a reserve player and their salary will be determined by the auction price. Minor leaguers may only be drafted during the auction.
+III. Roster Management
+Roster Lock:
+Roster moves (including starting lineups) must be finalized 5 minutes before the first game of the day. Any changes made after this time will apply to the next day’s slate of games.
+Waiver Order:
+Waiver order will be determined by reverse order of the standings. Teams will have the opportunity to claim players off waivers in this order.
+The waiver order resets weekly, starting again with the team in last place at the beginning of each new week.
+Any owned player that is dropped by an owner will automatically be added to the waiver pool.
+Owners will have 24 hours from when a player is added to the waiver pool to input their waiver claim.
+Free Agent Pickup Salary:
+Before the All-Star Game, the salary for free agent pickups will be $10. After the All-Star game, free agent pickup salaries will increase to $20. This salary increase applies to any players claimed as free agents after the break.
+Emailing the Commissioner for MLB Debuts or First-Time IL Activations:
+If a free agent player is making his MLB debut or is activated off the Injured List (IL) for the first time this season, the owner must email the commissioner to request the pickup. This ensures that owners can pick up players who are re-entering the league but have not yet been activated in the league.
+For example, if Nolan Ryan returns from Tommy John surgery in June, the owner must email the commissioner to add him to their roster.
+Inactive/Reserve Players:
+Players who are re-activated to their teams’ active 26-man MLB roster cannot remain on the team’s reserve list for more than 14 days. After this time, the player must be added to the active roster or dropped.
+IV. Keeper Rules
+Keeper Deadline: 
+Each owner must submit their keeper roster to the commissioner by the designated deadline (a few weeks before the start of the season).
+Keeper Eligibility: 
+Players about to enter the final year of their contract eligibility can be retained for additional seasons. To do so, owners must extend the player’s contract by adding $5 for each additional year. 
+For example: If a player is entering the final year of his contract at $10, the owner can extend the player for one more season at $15 or two more seasons at $20.
+Players can only be extended once per contract (e.g. if Hank Aaron’s original contract price was $30 and he is extended for an extra season at $35, owner X cannot further extend Aaron the following season).
+Keeper Limits:
+Each team must keep a minimum of 6 players and a maximum of 13 upon submission of keeper rosters in March ahead of every season.
+V. Trades and Transactions
+Trading: 
+Trades between teams are allowed but must be approved by the league’s commissioners. Any trade suspected of being unfair or collusive may be vetoed by the commissioners after review. All trades should be submitted by email to the commissioners with all relevant trade parties copied, not through the CBS system.
+The trade deadlines is August 31st at 6:00 pm ET.
+Free Agent Claims: 
+Free agents (with the exception of those players making their MLB debut and those coming off of the IL for their first appearance of the season) may be added by owners on a first come, first serve basis.
+VI. Scoring and Categories
+Scoring System: 
+The league will use a standard rotisserie (Roto) scoring system. Scoring categories include Home Runs, RBIs, Runs, Stolen Bases, Batting Average, Wins, ERA, Saves, WHIP, and Strikeouts.
+VII. League Management
+Commissioners: 
+The league will have one or more commissioners who are responsible for overseeing trades, resolving disputes, and enforcing the league’s rules.
+Dispute Resolution: 
+Any disputes that arise, whether related to trades, rules interpretation, or any other issue, will be reviewed by the commissioners, who will make a final decision.
+VIII. Conduct
+Fair Play: 
+All owners are expected to behave in a sportsmanlike manner and make decisions in the spirit of fair play.
+Collusion: 
+Any collusion (i.e., trading or manipulating transactions to gain unfair advantage) will result in disciplinary action, including but not limited to salary cap penalties, a dunce cap, or expulsion from the league.
+IX. Miscellaneous
+League Communication: 
+The primary method of communication for all league-related matters will be via email, with all major announcements and decisions being communicated to the league via the commissioner(s).
+X. Conclusion
+By joining this league, each team owner agrees to abide by this constitution and any amendments that may be made during the season. The purpose of these rules is to ensure that the league remains competitive, fair, and fun for all participants. Let's play some fantasy baseball!
+The commissioners have done their best to make this constitution as comprehensive as possible. We are human – please be understanding if we have may have missed inputting a rule or two. We will do our best to maintain honesty and update this constitution accordingly as needed.
+This Fantasy Baseball Constitution is intended to provide a fair and organized structure for the league, ensuring that all owners have an enjoyable experience throughout the season.

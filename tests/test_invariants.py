@@ -1,0 +1,301 @@
+"""Invariants that must hold, and that would have caught real bugs.
+
+Every test here maps to a mistake actually made during development. They are
+cheap (the whole file runs in a few seconds on a warm cache) and they are the
+difference between "the numbers changed" and "the numbers broke".
+
+    PYTHONPATH=. python3 -m pytest tests/ -q
+"""
+import numpy as np
+import pandas as pd
+import pytest
+
+import klab.config as C
+from klab.auction import match_drafts
+from klab.board import build_board, fit_exchange_rate, keeper_status, value_players
+from klab.denoms import teams_per_category
+from klab.keeper import keeper_cost, years_controlled
+from klab.trade import standings_points
+
+
+@pytest.fixture(scope="module")
+def board():
+    b, exch, meta = build_board()
+    return b, exch, meta
+
+
+# --- the bug external review found -----------------------------------------
+
+def test_budget_identity(board):
+    """The 230 rostered players must clear exactly the league's cap.
+
+    This failed silently for a whole build: values were calculated at
+    full-time playing time against a scale calibrated on expected playing
+    time, and the top 230 summed to $3,854 instead of $2,600.
+    """
+    _, _, meta = board
+    assert meta["budget_check_top230"] == pytest.approx(C.N_TEAMS * C.BUDGET, rel=1e-6)
+
+
+def test_replacement_agrees_with_auction_intercept(board):
+    """Two unrelated routes to 'production you get for free' must agree.
+
+    Replacement level is the 230th-best projection. The auction regression
+    intercept is what $0 bought historically. Nothing forces them to match, so
+    a large gap means one of the two chains is broken.
+    """
+    _, exch, meta = board
+    assert abs(meta["replacement_rp"] - exch["intercept"]) < 1.5
+
+
+# --- sign conventions -------------------------------------------------------
+
+def test_standings_points_direction():
+    """Biggest counting total earns the most points; lowest ERA/WHIP wins.
+
+    An inverted rank here made every category backwards and put the league
+    leader in last place. It was caught by a human noticing, not by the code.
+    """
+    wide = pd.DataFrame(
+        {c: [1.0, 2.0, 3.0] for c in C.CATS}, index=["a", "b", "c"])
+    pts = standings_points(wide)
+    assert pts.loc["c", "HR"] > pts.loc["a", "HR"]      # more HR = more points
+    assert pts.loc["a", "ERA"] > pts.loc["c", "ERA"]    # lower ERA = more points
+    assert pts.loc["a", "WHIP"] > pts.loc["c", "WHIP"]
+
+
+def test_denominators_positive_and_sane(board):
+    _, _, meta = board
+    D = meta["denominators"]
+    assert set(D) == set(C.CATS)
+    assert all(v > 0 for v in D.values())
+    # 1 HR should buy more than 1 SB, and both far more than 1 R
+    assert D["HR"] < D["SB"] < D["R"]
+
+
+def test_saves_use_the_reduced_field_constant():
+    """After punters are dropped the SV field is 8 teams, not 10.
+
+    Using the 10-team range constant there overvalued every save by 19%.
+    """
+    n = teams_per_category()
+    assert n["SV"] < C.N_TEAMS
+    assert n["HR"] == C.N_TEAMS
+
+
+# --- contract semantics -----------------------------------------------------
+
+@pytest.mark.parametrize("code,years,cost", [
+    ("1", 1, 20.0), ("2", 2, 20.0), ("3", 3, 20.0), ("F", 1, 25.0),
+])
+def test_contract_codes(code, years, cost):
+    """The code is seasons remaining AFTER the current one; only F pays +$5.
+
+    The original handoff had this backwards, which understated every
+    multi-year contract by a season.
+    """
+    assert years_controlled(code) == years
+    assert keeper_cost(20, code) == cost
+
+
+def test_unknown_contract_is_charged_worst_case():
+    assert keeper_cost(20, "?") == 25.0
+    assert keeper_status("?") == "unknown"
+
+
+# --- data integrity ---------------------------------------------------------
+
+def test_board_has_no_duplicate_players(board):
+    """Ohtani has two rows in the contracts file (batter and pitcher) sharing
+    one FanGraphs id; a careless join put him on the board twice."""
+    b, _, _ = board
+    assert b["fg_id"].duplicated().sum() == 0
+
+
+def test_only_real_two_way_players_are_tagged_two(board):
+    """The FanGraphs hitter export carries a zero-PA row for every pitcher.
+    Left in, it tagged every starter as a two-way player."""
+    b, _, _ = board
+    assert (b["role"] == "TWO").sum() <= 2
+    assert (b["role"] == "PIT").sum() > 50
+
+
+def test_name_matching_coverage():
+    """671 of 677 auction purchases resolve. The 6 that don't are genuine
+    zero-production buys (Bauer suspended, Painter/Buehler on TJ)."""
+    d = match_drafts(verbose=False)
+    assert d["fg_id"].notna().sum() >= 670
+    assert len(d) == 677
+
+
+def test_values_never_negative(board):
+    """A player cannot be a negative asset -- a bad arm gets benched and the
+    roster spot reverts to a waiver pickup."""
+    b, _, _ = board
+    assert (b["redraft_value"] >= 0).all()
+    assert (b["keep_value"] >= 0).all()
+
+
+def test_keeper_sets_respect_league_limits(board):
+    b, _, _ = board
+    counts = b[b["keep_2027"]].groupby("team").size()
+    assert (counts >= C.MIN_KEEPERS).all()
+    assert (counts <= C.MAX_KEEPERS).all()
+
+
+def test_full_time_value_never_below_expected(board):
+    """Scaling playing time up cannot make a player worth less."""
+    b, _, _ = board
+    assert (b["redraft_value_ft"] >= b["redraft_value"] - 1e-6).all()
+
+
+# --- golden file: ten players across the value spectrum ---------------------
+#
+# Not exact equality -- the model is meant to change. These are loose bounds
+# that encode domain knowledge, so a refactor that silently breaks the
+# valuation fails here rather than in a trade discussion.
+
+GOLDEN = [
+    ("Shohei Ohtani",    50, 120),   # best player in the league, two-way
+    ("Tarik Skubal",     35,  70),   # elite starter
+    ("Paul Skenes",      25,  60),
+    ("Mason Miller",     20,  60),   # elite closer
+    ("Junior Caminero",  20,  50),
+    ("Elly De La Cruz",  20,  50),
+    ("Julio Rodríguez",  15,  40),
+    ("Pete Alonso",      10,  35),
+    ("Christian Scott",   0,  12),   # good rates, tiny sample
+    ("Kevin Gausman",     0,  12),   # replacement level
+]
+
+
+@pytest.mark.parametrize("name,lo,hi", GOLDEN)
+def test_golden_player_values(board, name, lo, hi):
+    b, _, _ = board
+    row = b[b["name"] == name]
+    assert len(row) == 1, f"{name} not found exactly once"
+    v = float(row["redraft_value"].iloc[0])
+    assert lo <= v <= hi, f"{name} valued at ${v:.1f}, expected ${lo}-${hi}"
+
+
+# --- free agents and the public API ----------------------------------------
+
+def test_free_agents_carry_their_draft_contract():
+    """A dropped player keeps his draft-year contract if re-added, so 2026
+    buys have two years of control and 2025 buys have one."""
+    from klab.freeagents import free_agent_board
+    fa = free_agent_board()
+    live = fa[fa["acquisition"] == "draft contract"]
+    assert len(live) > 20
+    for yr, yrs in [(2026, 2), (2025, 1)]:
+        sub = live[live["draft_year"] == yr]
+        if len(sub):
+            assert (sub["years_controlled"] == yrs).all()
+    # anything older has expired and reverts to the standard price
+    stale = fa[fa["acquisition"] == "free agent price"]
+    assert (stale["salary"] == C.FA_SALARY_POST_ASB).all()
+
+
+def test_free_agents_are_not_on_rosters(board):
+    from klab.freeagents import free_agent_board
+    b, _, _ = board
+    fa = free_agent_board()
+    assert len(set(fa["fg_id"]) & set(b["fg_id"])) == 0
+
+
+def test_free_agents_have_out_year_values():
+    """Merging 2028 values off the rostered board silently zeroed every free
+    agent's out year and understated multi-year surplus."""
+    from klab.freeagents import free_agent_board
+    fa = free_agent_board()
+    live = fa[fa["acquisition"] == "draft contract"]
+    assert (live["redraft_value_2028"] > 0).sum() > 5
+
+
+def test_snapshot_is_self_consistent():
+    from klab.api import snapshot
+    s = snapshot()
+    assert s.constants["budget_check_top230"] == pytest.approx(2600, rel=1e-6)
+    assert 1.0 < s.constants["inflation"] < 3.0
+    assert set(s.teams.index) == set(s.board["team"].unique())
+    assert len(s.standings) == C.N_TEAMS
+
+
+def test_multiyear_surplus_never_penalises_length():
+    """A contract is an option: an extra year of control cannot make a player
+    worth less than the same player with one year."""
+    from klab.keeper import multiyear_surplus
+    v27 = pd.Series([10.0, 10.0]); v28 = pd.Series([0.0, 0.0])
+    cost = pd.Series([11.0, 11.0]); yrs = pd.Series([1, 2])
+    out = multiyear_surplus(v27, v28, cost, yrs, pd.Series([11.0, 11.0]))
+    assert out["surplus_multiyear"].iloc[1] >= out["surplus_multiyear"].iloc[0] - 1e-9
+
+
+def test_category_sign_conventions_hold_every_season():
+    """Across all five seasons, a bigger counting total must earn more
+    standings points and a lower ERA/WHIP must too."""
+    from klab.io import load_standings_long
+    from scipy.stats import spearmanr
+    st = load_standings_long()
+    for y in st["season"].unique():
+        w = st[st["season"] == y].pivot(index="team", columns="category", values="total")
+        pts = standings_points(w[C.CATS])
+        for cat in C.CATS:
+            rho = spearmanr(w[cat], pts[cat]).statistic
+            want = -1.0 if cat in C.NEG_CATS else 1.0
+            assert abs(rho - want) < 0.01, f"{y} {cat}: rho={rho}"
+
+
+def test_final_year_player_can_buy_two_extension_years():
+    """The constitution allows +$5 PER YEAR for one or two years. A final-year
+    player whose 2028 line clears the extra $5 must be valued at two years, not
+    one. The old code zeroed the option for `F` players entirely."""
+    from klab.keeper import multiyear_surplus
+    # Cheap star: $16 salary, worth $72 in 2027 and $62 in 2028.
+    v27, v28 = pd.Series([72.0]), pd.Series([62.0])
+    sal = pd.Series([16.0])
+    cost = sal + C.EXTENSION_COST          # keeper_cost for an `F` contract
+    out = multiyear_surplus(v27, v28, cost, pd.Series([1]), sal)
+    one_year = float(v27.iloc[0] - cost.iloc[0])
+    two_year = float((v27.iloc[0] - (sal.iloc[0] + 10))
+                     + (v28.iloc[0] - (sal.iloc[0] + 10)) * C.FUTURE_YEAR_DISCOUNT)
+    assert out["extension_years"].iloc[0] == 2
+    assert out["surplus_multiyear"].iloc[0] == pytest.approx(two_year)
+    assert out["surplus_multiyear"].iloc[0] > one_year
+
+    # ...and a player whose 2028 line does NOT clear it stays at one year.
+    out2 = multiyear_surplus(v27, pd.Series([18.0]), cost, pd.Series([1]), sal)
+    assert out2["extension_years"].iloc[0] == 1
+    assert out2["extension_option"].iloc[0] == pytest.approx(0.0)
+    assert out2["surplus_multiyear"].iloc[0] == pytest.approx(one_year)
+
+
+def test_extension_years_is_zero_where_the_option_is_worthless():
+    """A live contract whose extension is not worth exercising reports 0 years,
+    so the board never advises paying $5 for nothing."""
+    from klab.keeper import multiyear_surplus
+    sal = pd.Series([30.0])
+    out = multiyear_surplus(pd.Series([20.0]), pd.Series([5.0]), sal,
+                            pd.Series([2]), sal)
+    assert out["extension_years"].iloc[0] == 0
+    assert out["extension_option"].iloc[0] == pytest.approx(0.0)
+
+
+def test_app_payload_has_no_column_collisions_and_no_nans():
+    """The exported payload is what the browser sees. A silent column collision
+    (ros PA vs projected PA) shipped a null into the player card once."""
+    import sys
+    sys.path.insert(0, str(C.DATA.parent / "scripts"))
+    from build_app import build_payload, PLAYER_COLS
+    p = build_payload()
+    assert len(p["cols"]) == len(set(p["cols"])), "duplicate column in payload"
+    ix = {c: i for i, c in enumerate(p["cols"])}
+    for col in ["PA", "AB", "IP", "redraft_value", "keeper_cost", "surplus_multiyear"]:
+        assert col in ix
+    ohtani = [r for r in p["board"] if r[ix["name"]] == "Shohei Ohtani"]
+    assert len(ohtani) == 1 and ohtani[0][ix["PA"]] > 0
+    # every rostered row must carry the fields the UI dereferences
+    for r in p["board"]:
+        for col in ["name", "team", "role", "salary", "keeper_cost", "redraft_value"]:
+            assert r[ix[col]] is not None, f"{r[ix['name']]} missing {col}"
+    assert set(p["cur_totals"]) == set(t["team"] for t in p["teams"])

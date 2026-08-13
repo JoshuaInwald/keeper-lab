@@ -1,0 +1,66 @@
+================================================================================================
+EXPERIMENT 1 — bootstrap confidence intervals on the denominators
+================================================================================================
+category  n  denominator    lo95    hi95  rel_width_pct
+       R 20      39.4334 14.0436 59.6114       115.5562
+      HR 20      15.4256  7.7788 20.2938        81.1312
+     RBI 20      38.7282 17.6221 55.7260        98.3880
+      SB 20      20.3529 14.4425 24.3134        48.4988
+     AVG 20       0.0023  0.0013  0.0031        79.0216
+       W 20       3.7851  2.2344  4.8818        69.9433
+      SV 17       6.5736  3.8787  8.6839        73.0993
+       K 20      59.0756 33.5154 79.4711        77.7913
+     ERA 20       0.0431  0.0282  0.0540        59.9522
+    WHIP 20       0.0108  0.0074  0.0135        56.0592
+
+  mean 95% interval width: ±38% of the point estimate
+  The '±16%' quoted elsewhere is the analytic SE and is optimistic;
+  the bootstrap is the number to put next to a dollar figure.
+
+================================================================================================
+EXPERIMENT 2 — leave-one-season-out on the exchange rate
+================================================================================================
+ held_out  pooled_$/pt  actual_$/pt  mean_resid  rmse
+     2022        6.533        4.155      -0.431 3.557
+     2023        6.194        4.782      -0.039 3.246
+     2024        5.659        6.357       0.457 2.977
+     2025        5.525        8.092       0.181 3.250
+     2026        5.415        9.981      -0.225 3.078
+
+  mean residual on the held-out season runs -0.43 to +0.46 roto points
+  corr(held-out year, mean residual) = +0.289  -- weak and NOT monotone,
+  so a pooled fit is not systematically biased by season in the
+  *residual*. What it does miss is the level: pooled $/pt sits at
+  5.4-6.5 while the held-out season's own rate
+  runs 4.2-10.0. Pooling gets the ranking right and the
+  price level wrong, which is exactly why EXCHANGE_BASIS exists.
+
+================================================================================================
+EXPERIMENT 3 — permutation test on the saves finding
+================================================================================================
+  observed closer excess: +2.23 roto points
+  null distribution (label shuffled within season x price band):
+    mean +0.217, sd 0.501, 95% range [-0.76, +1.20]
+  two-sided p = 0.0000  (5000 permutations)
+  The shuffle holds season and price band fixed, so this is not
+  the time trend and not 'cheap players beat their price'.
+
+================================================================================================
+EXPERIMENT 4 — calibrating the AVG denominator against CBS's rank
+================================================================================================
+  matched 93 of 94 CBS hitters
+ AVG_denom_multiplier  AVG_denominator  spearman_vs_CBS
+                 0.40           0.0009           0.6898
+                 0.50           0.0011           0.7551
+                 0.60           0.0014           0.7971
+                 0.75           0.0017           0.8445
+                 1.00           0.0023           0.8927
+                 1.25           0.0029           0.9107
+                 1.50           0.0034           0.9117
+                 2.00           0.0046           0.9011
+
+  best agreement at multiplier 1.5 (denominator 0.00345), rho = 0.912
+  current setting is 1.0, rho = 0.893
+  -> the curve is flat near 1.0; no material evidence the AVG
+     denominator is mis-set. The CBS/model disagreement on
+     average-vs-power is not explained by this parameter.

@@ -1,0 +1,225 @@
+# Keeper League Lab — Handoff
+
+**What it is:** a valuation engine for Josh's Legends League (CBS, 10-team
+5×5 roto keeper auction) that prices players in dollars grounded in *this
+league's* auction history, ranks 2027 keeper decisions by surplus, and
+evaluates trades from both a win-now and an asset perspective.
+
+**Status:** built, validated, in use. Numbers are trustworthy subject to §6.
+
+**Companion docs:**
+- `LAB_NOTEBOOK.md` — what was tried, what failed, why the structure is what
+  it is. Read this before changing any modelling decision.
+- `FINDINGS.md` — research results (saves mispricing, draft value chain,
+  stat reliability). The intellectual content.
+
+---
+
+## 1. League rules that drive the math
+
+- 10 teams, auction, **$260/team**. First keeper year 2022.
+- Active **23** = 14 hitters (C,1B,2B,3B,SS,CI,MI,5×OF,2×UTIL) + 9 pitchers,
+  plus a reserve list. 5×5: R/HR/RBI/SB/AVG · W/SV/K/ERA/WHIP.
+- Keep **6–13**. FA acquisition costs $10 before the All-Star break, $20 after.
+- 3-year contracts; a player in his final year can be extended for **+$5/yr**.
+
+### Contract codes
+
+The code is the number of seasons remaining **after** the current one:
+
+| code | meaning | 2027 cost |
+|---|---|---|
+| `3` | 2027, 2028, 2029 at salary | salary |
+| `2` | 2027, 2028 at salary | salary |
+| `1` | 2027 only, at salary | salary |
+| `F` | 2026 was the final year | salary + $5 |
+
+This was previously documented backwards. The evidence for the correction is
+in `LAB_NOTEBOOK.md` §2. Three players carry `?` and are charged the worst
+case. Getting this wrong understates every multi-year contract by a season.
+
+---
+
+## 2. How the valuation works
+
+Four steps, each independently checkable.
+
+**1. Denominators — what one standings point costs.** Team totals are divided
+by their season's league mean and pooled across 2024–25, so dispersion is
+estimated off 20 team-seasons rather than 10.
+
+| R | HR | RBI | SB | AVG | W | SV | K | ERA | WHIP |
+|---|----|-----|----|----|---|----|---|-----|------|
+| 39.4 | 15.4 | 38.7 | 20.4 | .0023 | 3.79 | 6.57 | 59.1 | .0431 | .0108 |
+
+1 HR ≈ 1.3 SB ≈ 2.6 R. ~30 points of personal BA over 600 AB = 1 point.
+~0.34 of ERA over 180 IP = 1 point. 6.6 saves = 59 strikeouts. The SV field is
+8 teams after punters are dropped, so it uses the 8-team range constant.
+
+**2. Exchange rate — what a draft dollar buys.** Every auction purchase
+2022–2026 paired with the production actually delivered; busts and injuries
+stay in at the price paid, so the slope is waste-adjusted. Fitted on 2024–26
+(n=404): **roto_points = 3.42 + 0.1323 × $**, i.e. **$7.56 per point**.
+
+**3. Projections.** 2027 = blend of (2026 actuals + ZiPS rest-of-season) and
+ZiPS 2027, blended at the rate × playing-time level, with each stat's weight
+on the 2026 leg scaled by that stat's year-over-year reliability. 2028 comes
+straight from ZiPS 2028. Both use expected playing time; the full-season
+counterfactual is reported separately (see step 4).
+
+**4. Dollars and surplus.** Two scales, both floored at $0:
+
+- `keep_value` — opportunity cost, `(roto_points − intercept)/slope`. What
+  you'd spend at auction to replace him.
+- `redraft_value` — same ranking rescaled so the 230 best players clear
+  exactly $2,600. **This is the headline number and what keeper flags use.**
+
+Both are computed on **expected** playing time, and the dollar scale is
+calibrated on that same pool, so the budget identity holds exactly.
+`redraft_value_ft` and `upside_ft` show the counterfactual if the player takes
+a full season's workload (600 PA / 150 IP / 25 SV) — use it to spot breakouts
+the point projection buries, not as a price.
+
+`surplus_multiyear` sums `value − cost` over the years the contract controls,
+discounting 0.85/yr past 2027, **plus the extension option**: any contract
+reaching its final year can be extended at +$5 **per year** for one or two
+years, so a code-1 player is one year plus a call option, not a rental. Which
+of one or two years to buy is priced, not assumed — `extension_years` says
+(0, 1 or 2). For a final-year (`F`) player the one-year price is already inside
+`keeper_cost`, so `extension_option` there is the *incremental* value of buying
+two years instead of one. See FINDINGS §24: this was wrong until the app made
+it visible, and it was worth $25 on Ohtani alone.
+
+---
+
+## 3. Validation
+
+| check | result |
+|---|---|
+| Current rosters → 2026 standings | Spearman **0.842**, Pearson **0.899**; Pookie 2.0 predicted 1st, actually 1st |
+| Replacement level, two independent routes | 4.14 roto pts (230th projection) vs 3.42 (auction intercept) |
+| Budget identity | top 230 redraft values sum to **exactly $2,600** (was $3,854 before the calibration fix) |
+| Hand check | 10 players across the value spectrum, `scripts/validate.py` |
+
+---
+
+## 4. Running it
+
+Everything below is optional. **The app is the front door**: open
+`out/keeper_lab.html` in any browser, including a phone. It is one
+self-contained file with the data inlined — no server, no network, no install.
+
+```bash
+pip install pandas numpy scipy statsmodels
+PYTHONPATH=.:scripts python3 scripts/run_all.py  # builds everything, incl. the app
+PYTHONPATH=.:scripts python3 scripts/build_app.py # just the app (~3s)
+node app/verify.mjs                              # diff the browser against pandas
+PYTHONPATH=. python3 scripts/validate.py         # the four checks above
+PYTHONPATH=. python3 scripts/leaderboard_2026.py # 2026 value + hindsight prices
+PYTHONPATH=. python3 scripts/draft_surplus.py    # where auction surplus lives
+PYTHONPATH=. python3 scripts/eval_trade.py "Team A" "Team B" "P1,P2" "P3,P4"
+PYTHONPATH=. python3 scripts/team_reports.py [team ...]  # keeper sets + channels
+PYTHONPATH=. python3 scripts/sensitivity.py      # how much do the knobs matter
+PYTHONPATH=. python3 -m pytest tests/ -q         # 35 invariants, ~4s
+```
+
+A cold run takes ~2.7s; a second build in the same process is ~0.08s (loaders
+and fitted constants are memoised in `io.cached`).
+
+```python
+from klab.board import build_board
+from klab.trade import evaluate_trade, format_trade
+board, exch, meta = build_board()
+print(format_trade(evaluate_trade(
+    board, "NPB No Stars", "Spehr's Army",
+    ["Julio Rodríguez", "Tarik Skubal"], ["Christian Scott", "Brandon Lowe"])))
+```
+
+### Code map
+
+```
+klab/config.py    every knob: league constants, contract semantics, PT floors,
+                  denominator/auction windows, discount rate
+klab/io.py        loaders + name resolver (671/677 draft names matched)
+klab/denoms.py    pooled dispersion -> denominators; RotoScorer
+klab/auction.py   draft<->production matching, regression battery
+klab/project.py   2027 blend, reliability weights, save persistence model
+klab/keeper.py    full-time PT scaling, 2028 lines, multi-year surplus
+klab/board.py     dollar values, keeper costs, optimal keeper sets
+klab/trade.py     two-lens trade evaluation
+klab/api.py       snapshot() -- one object with everything an interface needs
+app/template.html the interface; the build inlines the data into it
+app/verify.mjs    diffs the browser's JS arithmetic against pandas
+```
+
+### Outputs (`out/`)
+
+**`keeper_lab.html`** — the app · `keeper_board_2027.csv` (275 rostered
+players) · `optimal_keepers_2027.csv` · `player_values_2027.csv` (~2,000
+projected) · `leaderboard_2026.csv` · `auction_sample.csv` ·
+`auction_regression_battery.csv` · `draft_surplus_sample.csv` ·
+`model_params.json` · `app_reference.json` (ground truth for `verify.mjs`)
+
+---
+
+## 5. Data
+
+All in `/Users/JoshInwald/Documents/Fantasy Baseball/`.
+
+| file | role |
+|---|---|
+| `standings_long_all.csv` | team category totals 2022–26 → denominators |
+| `draft_2022..2025.csv`, `draft_salaries_all.csv` | auction prices → exchange rate |
+| `fg_hitters_2022_2026.csv`, `fg_pitchers_2022_2026.csv` | realized production |
+| `fg_ros_*.csv` | ZiPS rest-of-2026 |
+| `fg_zips_dc_2027_*`, `_2028_*` | out-year projections (no SV column) |
+| `contracts_parsed.csv`, `rosters_valued.csv` | salaries, contract codes, rosters |
+| `keepers_2022..2026.csv` | eligibility lists, not selections |
+
+`contracts_raw.txt` referenced by the original handoff is **not present**;
+`contracts_parsed.csv` is the salary source.
+
+---
+
+## 6. Known limitations — read before trusting a number
+
+1. **Save-punter exclusion is the single biggest lever.** Dropping teams under
+   15 SV before computing the SV denominator is what makes the saves finding
+   significant at all (+2.23, t=3.75 excluded; +0.92, t=1.82 included).
+   Defensible — it is the right marginal rate for a team competing in saves —
+   but every closer valuation rests on it. See `FINDINGS.md` §1.
+2. **No prospect-upside term.** Breakout candidates are valued off a
+   conservative point projection; the PT floor helps but does not model upside.
+3. **No aging curves.** The 2028 leg is raw ZiPS.
+4. **No waiver-wire value.** Teams fill ~10 of 23 slots from FA; that
+   production is invisible and is why replacement level sits as high as it does.
+5. **Rostered salary exceeds the cap** ($3,194 vs $2,600) — mid-season IL and
+   reserve artifacts. Doesn't affect keeper math (only ever 6–13 players).
+6. **Point estimates only.** No uncertainty bands anywhere. The honest error
+   bar from fitting dispersion on n=20 team-seasons is roughly **±38% per
+   category** (bootstrapped; see FINDINGS §22.1) — larger than most of the knobs under debate, and it should be
+   printed next to every dollar figure.
+7. **No positional replacement.** Replacement is the 230th player overall,
+   with no adjustment for position. A replacement catcher or middle infielder
+   is far worse than the 230th-best player, so scarce-position keepers are
+   systematically undervalued relative to OF/1B. Standard first-order term in
+   auction valuation; currently missing.
+**Closed:** the worry that ZiPS 2027 already incorporates 2026 (double-counting
+it in the blend) was tested and refuted — see `LAB_NOTEBOOK.md` §7.
+
+---
+
+## 7. Next steps, in order
+
+1. ~~**Sensitivity harness.**~~ **Done** — `scripts/sensitivity.py`, results in
+   `FINDINGS.md` §6. Headline: 12% of keeper decisions are choice-dependent,
+   88% are robust. The denominator window is the highest-stakes knob.
+2. ~~**Tests.**~~ **Done** — `tests/test_invariants.py`, 26 tests in 3.7s.
+   Every one maps to a bug actually made.
+3. **App / UI.** The core is stable enough to build on.
+3. Prospect-upside term.
+4. Waiver-value decomposition → better replacement level.
+5. Aging curves for 2028+.
+6. Uncertainty bands.
+7. Transaction logs → historical roster reconstruction → value attribution
+   (draft vs waiver vs trade).

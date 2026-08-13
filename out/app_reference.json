@@ -1,0 +1,41 @@
+{
+ "team_a": "Pookie 2.0",
+ "team_b": "All-Stars",
+ "a_sends": [
+  "Cade Smith",
+  "Nico Hoerner"
+ ],
+ "b_sends": [
+  "Elly De La Cruz",
+  "Byron Buxton"
+ ],
+ "points_before": {
+  "All-Stars": 56.5,
+  "Lisbon Long Balls": 52.0,
+  "McBlocks": 66.5,
+  "NPB No Stars": 28.0,
+  "New York Polar Bears": 48.5,
+  "Orange and Black Attack": 55.0,
+  "Pookie 2.0": 78.0,
+  "Producers": 39.0,
+  "Spehr's Army": 70.5,
+  "The Fighting Phils": 56.0
+ },
+ "points_after": {
+  "All-Stars": 58.0,
+  "Lisbon Long Balls": 53.5,
+  "McBlocks": 65.5,
+  "NPB No Stars": 28.0,
+  "New York Polar Bears": 47.5,
+  "Orange and Black Attack": 57.5,
+  "Pookie 2.0": 75.5,
+  "Producers": 40.0,
+  "Spehr's Army": 69.5,
+  "The Fighting Phils": 55.0
+ },
+ "a_dS": -14.981347,
+ "b_dS": 14.981347,
+ "a_dMY": -17.105771,
+ "a_dP": -2.5,
+ "b_dP": 1.5
+}

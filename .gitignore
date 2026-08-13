@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+venv/
+.venv/
+.venv311/
+
+# Node (the app's verifier)
+app/node_modules/
+app/package-lock.json
+
+# OS
+.DS_Store
+
+# Local Claude Code settings (this machine's tool permissions, not project config)
+.claude/
+
+# Raw data — see data/README.md for how to regenerate.
+# Third-party projection exports are not ours to redistribute.
+data/
+
+# Generated outputs are committed deliberately: the documentation in out/
+# is the portfolio artifact and must be readable without running anything.

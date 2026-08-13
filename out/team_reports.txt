@@ -1,0 +1,113 @@
+MODEL CONSTANTS USED
+  exchange rate : roto_points = 3.417 + 0.1323 x $   (n=404, seasons [2024, 2025, 2026])
+  replacement   : 4.136 roto points (230th projection)
+  redraft scale : $6.662 per roto point above replacement
+  budget check  : top-230 redraft values sum to $2,600
+  denominators  : R 39.43, HR 15.43, RBI 38.73, SB 20.35, AVG 0.002298, W 3.785, SV 6.574, K 59.08, ERA 0.04306, WHIP 0.01082
+
+==============================================================================================================
+Pookie 2.0
+==============================================================================================================
+             name role contract  years_controlled  salary  keeper_cost  roto_points  redraft_value  redraft_value_ft  redraft_value_2028  extension_option  surplus_redraft  surplus_multiyear  keep_2027
+    Shohei Ohtani  TWO        F                 1      16         21.0        14.78          71.91             71.91               61.51              0.00            50.91              50.91       True
+       Cade Smith  PIT        1                 1      10         10.0         9.26          35.15             35.15               23.15              6.93            25.15              32.08       True
+     Nico Hoerner  HIT        1                 1       1          1.0         6.04          13.67             13.67                8.54              2.16            12.67              14.83       True
+     Wilyer Abreu  HIT        2                 2       1          1.0         5.66          11.13             13.51                3.23              0.00            10.13              12.03       True
+    JJ Wetherholt  HIT        2                 2       5          5.0         5.52          10.23             10.23                7.37              0.00             5.23               7.25       True
+   Dansby Swanson  HIT        2                 2       3          3.0         5.31           8.85              9.24                0.00              0.00             5.85               5.85       True
+     Ozzie Albies  HIT        2                 2       5          5.0         5.47           9.90              9.90                2.23              0.00             4.90               4.90       True
+    Jake McCarthy  HIT        2                 2      10         10.0         5.72          11.58             19.05                1.93              0.00             1.58               1.58       True
+    Drake Baldwin  HIT        1                 1      10         10.0         5.65          11.12             14.60                8.04              0.00             1.12               1.12       True
+  Kevin McGonigle  HIT        2                 2      13         13.0         5.70          11.44             14.59                5.65              0.00            -1.56              -1.56      False
+  Spencer Strider  PIT        2                 2       4          4.0         3.50           0.00              7.34                6.02              0.00            -4.00              -2.28      False
+      Pete Alonso  HIT        1                 1      27         27.0         7.41          22.80             22.80               13.02              0.00            -4.20              -4.20      False
+Teoscar Hernández  HIT        F                 1       6         11.0         4.99           6.70             13.15                1.20              0.00            -4.30              -4.30      False
+    Kevin Gausman  PIT        1                 1       5          5.0         3.10           0.00              0.00                0.00              0.00            -5.00              -5.00      False
+     Bryce Harper  HIT        F                 1      16         21.0         6.33          15.63             15.74                3.07              0.00            -5.37              -5.37      False
+       Zack Gelof  HIT        2                 2      10         10.0         4.66           4.48             15.66                4.31              0.00            -5.52              -5.52      False
+ Ronald Acuña Jr.  HIT        1                 1      26         26.0         6.99          20.00             29.05               25.13              0.00            -6.00              -6.00      False
+    Riley O'Brien  PIT        2                 2      10         10.0         4.58           3.94              3.94                0.00              0.00            -6.06              -6.06      False
+     Zack Wheeler  PIT        2                 2      14         14.0         5.10           7.44             10.11                0.00              0.00            -6.56              -6.56      False
+      Jake Bauers  HIT        2                 2      10         10.0         4.45           3.10             14.33                0.00              0.00            -6.90              -6.90      False
+       Sonny Gray  PIT        1                 1       7          7.0         3.27           0.00              0.00                0.00              0.00            -7.00              -7.00      False
+  Emerson Hancock  PIT        2                 2      10         10.0         2.06           0.00              0.00                0.00              0.00           -10.00             -10.00      False
+    Ryan Weathers  PIT        2                 2      10         10.0         1.40           0.00              0.00                0.00              0.00           -10.00             -10.00      False
+ Justin Wrobleski  PIT        2                 2      10         10.0         2.46           0.00              0.00                0.00              0.00           -10.00             -10.00      False
+     Jacob deGrom  PIT        F                 1      21         26.0         5.41           9.51             10.39                0.00              0.00           -16.49             -16.49      False
+      Aaron Judge  HIT        F                 1      39         44.0         6.56          17.17             31.61               20.31              0.00           -26.83             -26.83      False
+
+  RECOMMEND KEEPING 9  |  salary committed $66  |  auction budget left $194  |  total surplus +$131
+  closest calls not kept: Kevin McGonigle ($-2), Spencer Strider ($-2), Pete Alonso ($-4)
+
+==============================================================================================================
+NPB No Stars
+==============================================================================================================
+                 name role contract  years_controlled  salary  keeper_cost  roto_points  redraft_value  redraft_value_ft  redraft_value_2028  extension_option  surplus_redraft  surplus_multiyear  keep_2027
+    Spencer Torkelson  HIT        2                 2       1          1.0         5.93          12.95             12.95               14.86              6.40            11.95              30.13       True
+         Tarik Skubal  PIT        3                 3      38         38.0        11.33          48.94             48.94               47.78              2.94            10.94              29.26       True
+     Chandler Simpson  HIT        2                 2       3          3.0         6.25          15.07             17.31               12.28              3.09            12.07              23.05       True
+           Nick Kurtz  HIT        1                 1      10         10.0         6.66          17.79             24.31               30.08             12.82             7.79              20.61       True
+         Hunter Brown  PIT        1                 1      10         10.0         6.11          14.16             18.52               22.49              6.36             4.16              10.53       True
+         Andrés Muñoz  PIT        2                 2      13         13.0         6.66          17.84             32.46               11.65              0.00             4.84               4.84       True
+       Bryan Reynolds  HIT        2                 2       4          4.0         5.14           7.68              7.68                0.00              0.00             3.68               3.68       True
+       MacKenzie Gore  PIT        1                 1       1          1.0         4.29           2.05              2.05                0.00              0.00             1.05               1.05       True
+         Tanner Bibee  PIT        2                 2       6          6.0         5.02           6.88              6.88                2.49              0.00             0.88               0.88       True
+         José Soriano  PIT        2                 2       1          1.0         2.82           0.00              0.00                0.00              0.00            -1.00              -1.00      False
+       Daulton Varsho  HIT        2                 2       4          4.0         4.42           2.89              9.02                1.05              0.00            -1.11              -1.11      False
+        Michael Wacha  PIT        1                 1       2          2.0         1.69           0.00              0.00                0.00              0.00            -2.00              -2.00      False
+        Jack Flaherty  PIT        2                 2       2          2.0         2.07           0.00              0.00                0.00              0.00            -2.00              -2.00      False
+        Sam Antonacci  HIT        2                 2      10         10.0         5.16           7.79             11.43                6.72              0.00            -2.21              -2.21      False
+        Trey Yesavage  PIT        2                 2       3          3.0         2.64           0.00              0.00                0.00              0.00            -3.00              -3.00      False
+       Dillon Dingler  HIT        2                 2      10         10.0         4.74           5.06             10.10                0.00              0.00            -4.94              -4.94      False
+        Nolan Arenado  HIT        2                 2       8          8.0         4.09           0.69              5.10                0.00              0.00            -7.31              -7.31      False
+       Gleyber Torres  HIT        2                 2      10         10.0         4.33           2.33              6.20                3.54              0.00            -7.67              -7.67      False
+         Kody Clemens  HIT        2                 2      10         10.0         4.09           0.72              8.67                0.00              0.00            -9.28              -9.28      False
+        Casey Schmitt  HIT        2                 2      10         10.0         4.03           0.30             11.66                0.00              0.00            -9.70              -9.70      False
+         Colt Emerson  HIT        2                 2      10         10.0         3.24           0.00              0.00                3.44              0.00           -10.00             -10.00      False
+          Curtis Mead  HIT        2                 2      10         10.0         3.48           0.00              8.81                0.00              0.00           -10.00             -10.00      False
+          Troy Melton  PIT        2                 2      10         10.0         2.47           0.00              0.00                0.00              0.00           -10.00             -10.00      False
+          Jack Leiter  PIT        2                 2      10         10.0         2.46           0.00              0.00                0.00              0.00           -10.00             -10.00      False
+      Freddie Freeman  HIT        2                 2      26         26.0         6.25          15.11             15.11                1.60              0.00           -10.89             -10.89      False
+Vladimir Guerrero Jr.  HIT        1                 1      35         35.0         7.17          21.22             21.22               24.75              0.00           -13.78             -13.78      False
+      Julio Rodríguez  HIT        2                 2      43         43.0         8.07          27.20             27.20               29.61              0.00           -15.80             -15.80      False
+            Max Clark  HIT        2                 2      20         20.0         3.48           0.00              6.92               10.16              0.00           -20.00             -20.00      False
+
+  RECOMMEND KEEPING 9  |  salary committed $86  |  auction budget left $174  |  total surplus +$124
+  closest calls not kept: José Soriano ($-1), Daulton Varsho ($-1), Michael Wacha ($-2)
+
+==============================================================================================================
+WHERE 2026 PRODUCTION CAME FROM
+==============================================================================================================
+              players  salary    roto   value  roto_share  roto_per_$
+channel                                                              
+auction 2026       76    1031  411.11  637.08       27.13        0.40
+free agent        118    1230  607.49  848.91       40.10        0.49
+keeper             81     933  496.50  923.42       32.77        0.53
+
+share of each team's 2026 roto production, by channel (%):
+channel                  auction 2026  free agent  keeper
+team                                                     
+Lisbon Long Balls                21.5        61.4    17.1
+Producers                        25.3        50.2    24.4
+New York Polar Bears             31.0        48.6    20.4
+All-Stars                        24.3        40.3    35.4
+McBlocks                         27.3        40.2    32.6
+Orange and Black Attack          24.9        39.6    35.5
+Spehr's Army                     31.0        38.1    31.0
+NPB No Stars                     36.3        36.7    27.0
+Pookie 2.0                       20.6        34.1    45.3
+The Fighting Phils               31.0        14.6    54.4
+
+efficiency: roto points banked per $ committed, by team and channel
+channel                  auction 2026  free agent  keeper
+team                                                     
+All-Stars                        0.34        0.49    0.83
+Lisbon Long Balls                0.30        0.56    0.68
+McBlocks                         0.49        0.47    0.64
+NPB No Stars                     0.52        0.38    0.37
+New York Polar Bears             0.34        0.53    0.48
+Orange and Black Attack          0.66        0.72    0.49
+Pookie 2.0                       0.81        0.66    0.48
+Producers                        0.34        0.47    0.37
+Spehr's Army                     0.32        0.45    0.78
+The Fighting Phils               0.33        0.24    0.50

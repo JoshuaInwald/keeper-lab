@@ -1,0 +1,165 @@
+{
+  "exchange_rate": {
+    "slope": 0.10982421049141282,
+    "intercept": 3.952674872128774,
+    "slope_se": 0.016321685350693872,
+    "r2": 0.16433261970215607,
+    "n": 404,
+    "usd_per_point": 9.105460403725736,
+    "seasons": [
+      2024,
+      2025,
+      2026
+    ],
+    "basis": "keeper_adjusted"
+  },
+  "save_model": {
+    "intercept": 0.5061112268696957,
+    "slope": 0.6518888053402745,
+    "r2": 0.4330654285713893,
+    "n": 1637,
+    "mean_sv_t": 2.197923029932804,
+    "mean_sv_t1": 1.9389126450824679
+  },
+  "denominators_2027": {
+    "R": 33.80421023447594,
+    "HR": 13.841199997308218,
+    "RBI": 33.82021783106501,
+    "SB": 17.10346558827353,
+    "AVG": 0.002298408633249166,
+    "W": 3.6699758833921825,
+    "SV": 7.164081997704085,
+    "K": 52.55846066401461,
+    "ERA": 0.043056500846906,
+    "WHIP": 0.010820611077712095
+  },
+  "league_avg_team_2027": {
+    "n_teams": 10.0,
+    "realization_hit": 0.9997160174697157,
+    "realization_pit": 0.9569441367269893,
+    "team_AB": 7713.490828439293,
+    "team_H": 1957.5127254262873,
+    "team_AVG": 0.253775,
+    "team_IP": 1426.691711524169,
+    "team_ER": 572.8029177256064,
+    "team_WH": 1677.5118196005633,
+    "team_ERA": 3.6131999999999995,
+    "team_WHIP": 1.17585
+  },
+  "replacement_rp": 4.760826081095143,
+  "usd_per_rp_keep": 9.105460403725736,
+  "usd_per_rp_redraft": 6.316471236815465,
+  "config": {
+    "N_TEAMS": 10,
+    "BUDGET": 260,
+    "N_HIT_SLOTS": 14,
+    "N_PIT_SLOTS": 9,
+    "N_ACTIVE": 23,
+    "HIT_CATS": [
+      "R",
+      "HR",
+      "RBI",
+      "SB",
+      "AVG"
+    ],
+    "PIT_CATS": [
+      "W",
+      "SV",
+      "K",
+      "ERA",
+      "WHIP"
+    ],
+    "CATS": [
+      "R",
+      "HR",
+      "RBI",
+      "SB",
+      "AVG",
+      "W",
+      "SV",
+      "K",
+      "ERA",
+      "WHIP"
+    ],
+    "COUNT_CATS": [
+      "R",
+      "HR",
+      "RBI",
+      "SB",
+      "W",
+      "SV",
+      "K"
+    ],
+    "EXTENSION_COST": 5,
+    "MIN_KEEPERS": 6,
+    "MAX_KEEPERS": 13,
+    "FA_SALARY_PRE_ASB": 10,
+    "FA_SALARY_POST_ASB": 20,
+    "YEARS_REMAINING": {
+      "1": 1,
+      "2": 2,
+      "3": 3
+    },
+    "EXTENSION_MAX_YEARS": 2,
+    "EXTENSION_ALREADY_USED_IF_SALARY_ABOVE_DRAFT": true,
+    "KEEPER_PA_FLOOR": 600,
+    "KEEPER_IP_FLOOR": 150,
+    "KEEPER_SV_FLOOR": 25,
+    "KEEPER_RP_IP_FLOOR": 65,
+    "MAX_PT_SCALE": 2.0,
+    "FUTURE_YEAR_DISCOUNT": 0.85,
+    "DENOM_SEASONS": [
+      2024,
+      2025,
+      2026
+    ],
+    "PARTIAL_SEASONS": {
+      "2026": 0.75
+    },
+    "DENOM_EXCLUDE_PARTIAL_FOR_RATES": true,
+    "SV_PUNT_THRESHOLD": 15,
+    "SB_REGIME_START": 2023,
+    "SB_PRE_REGIME_WEIGHT": 0.0,
+    "AUCTION_SEASONS": [
+      2024,
+      2025,
+      2026
+    ],
+    "KEEPERS_REMOVED": {
+      "2022": 25,
+      "2023": 28,
+      "2024": 29,
+      "2025": 29,
+      "2026": 100
+    },
+    "KEEPERS_EXPECTED_2027": 100,
+    "EXCHANGE_BASIS": "keeper_adjusted",
+    "LEVEL_SEASONS": [
+      2024,
+      2025
+    ],
+    "WAIVER_VALUE": "low",
+    "WAIVER_RANK": {
+      "low": 230,
+      "medium": 300
+    },
+    "WAIVER_HIGH_RP": 5.04,
+    "POSITIONAL_ADJUSTMENT": false,
+    "POSITION_SLOTS": {
+      "C": 1,
+      "MI": 2,
+      "CI": 2,
+      "OF": 5,
+      "UTIL": 2,
+      "P": 9
+    },
+    "PROJ_2027_HITTERS": "fg_zips_dc_2027_hitters_projections.csv",
+    "PROJ_2027_PITCHERS": "fg_zips_dc_2027_pitchers_projections.csv",
+    "PROJ_2028_HITTERS": "fg_zips_dc_2028_hitters_projections.csv",
+    "PROJ_2028_PITCHERS": "fg_zips_dc_2028_pitchers_projections.csv",
+    "PROJECTION_BASIS": "blend",
+    "BLEND_W_2026": 0.5,
+    "BLEND_W_ZIPS27": 0.5,
+    "CONTENTION_WEIGHT": 0.25
+  }
+}
