@@ -53,7 +53,15 @@ def free_agent_board() -> pd.DataFrame:
     # is the conservative assumption for a player added from here on.
     fa["acquisition"] = np.where(has_contract, "draft contract", "free agent price")
     fa["salary"] = np.where(has_contract, fa["draft_salary"], C.FA_SALARY_POST_ASB)
-    fa["contract"] = fa["contract"].fillna("1")
+    # A player priced at the post-break FA price is, by that same assumption,
+    # being acquired in 2026 -- so his contract clock starts in 2026 too, same
+    # as DRAFT_YEAR_TO_CODE[2026]. CORRECTED 2026-08-13 (out/FINDINGS.md #32):
+    # this used to fillna("1"), one year short of what the salary assumption
+    # implies. Zero dollar impact found on the current board (every affected
+    # free agent is already well underwater on surplus_multiyear regardless
+    # of contract length), but the years_controlled/contract columns shown to
+    # the user were understating control length.
+    fa["contract"] = fa["contract"].fillna(DRAFT_YEAR_TO_CODE[2026])
 
     fa["keeper_cost"] = [keeper_cost(s, c) for s, c in zip(fa["salary"], fa["contract"])]
     fa["years_controlled"] = fa["contract"].map(years_controlled)

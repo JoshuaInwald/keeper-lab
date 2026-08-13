@@ -584,7 +584,10 @@ function tradeResult(){
   const sum=(ids,col)=>ids.reduce((s,id)=>s+(g(byId[id],col)||0),0);
   const swap={}; T.aOut.forEach(id=>swap[id]=T.b); T.bOut.forEach(id=>swap[id]=T.a);
   const after=rotoPoints(catTotals(rosterAgg(swap)));
-  const usdpt=D.constants.usd_per_roto_point_redraft;
+  // One 2026 standings point is priced at what a roto point costs at
+  // auction, matching klab/trade.py::evaluate_trade -- not the redraft
+  // scale, which is what d_surplus below uses. See out/FINDINGS.md #32.
+  const usdpt=D.constants.usd_per_roto_point_auction;
   const cw=D.league.contention_weight;
 
   const block=(team,outIds,inIds)=>{

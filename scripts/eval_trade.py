@@ -61,7 +61,8 @@ def main():
             })
     print(pd.DataFrame(rows).round(2).to_string(index=False))
 
-    res = evaluate_trade(board, a_team, b_team, a_send, b_send)
+    res = evaluate_trade(board, a_team, b_team, a_send, b_send,
+                         usd_per_point=exch["usd_per_point"])
     print("\n" + format_trade(res))
     print("\n2026 category standings-point deltas:")
     for t, d in res["win_now"]["category_point_delta"].items():

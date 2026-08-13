@@ -167,6 +167,14 @@ def already_extended() -> set:
     # extension: a $3 draftee who was dropped and claimed back after the
     # break carries $20, which is "above his draft price" for a reason that
     # has nothing to do with extending him.
+    #
+    # KNOWN GAP (out/FINDINGS.md #32.3): this guard is not always correct.
+    # A $5 draft price + a legal +$5 extension also lands on exactly $10; a
+    # $15 draft price + $5 lands on $20; a $10 draft price + $10 lands on
+    # $20. Those genuine extensions would be wrongly read as re-adds. No
+    # current player hits this (checked directly), and there's no data-
+    # driven fix without a transaction date, which this project does not
+    # have. Left as a documented dormant edge case rather than guessed at.
     fa_price = c["salary"].isin([C.FA_SALARY_PRE_ASB, C.FA_SALARY_POST_ASB])
     # A legal extension adds exactly $5 or $10 (one or two years).
     legal = (c["salary"] - c["draft_salary"]).isin(

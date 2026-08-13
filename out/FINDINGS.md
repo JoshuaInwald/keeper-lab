@@ -1415,3 +1415,82 @@ unprotected constant everywhere, not to assume the fix generalized. Every
 number in `out/HANDOFF.md`'s denominator table and every headline $/point
 figure in this document reflects the numbers *after* this fix, not #26's
 intermediate ones.
+
+## 32. General review of the modules the earlier fixes didn't touch
+
+Sent a fresh review pass at `klab/keeper.py`, `klab/trade.py`,
+`klab/freeagents.py`, and `klab/io.py` — the four core modules #26/#28/#30/#31
+never touched — specifically for the same bug shape found elsewhere this
+session (a hardcoded or duplicated value silently out of sync with the live
+model). Two real, verified findings; one confirmed-real logical gap left
+undecided on purpose.
+
+**32.1 Every trade evaluation ever run used a stale hardcoded $/point,
+never the live one.** `klab/trade.py::evaluate_trade`'s `usd_per_point`
+parameter defaults to `None`, which falls back to a hardcoded `7.6`
+(`klab/trade.py:125`) — and neither real caller passed anything else:
+`scripts/eval_trade.py:64` and `scripts/build_app.py:175` (the source of
+`out/app_reference.json`, the ground truth `app/verify.mjs` diffs the
+browser against) both called `evaluate_trade()` with the parameter left at
+its default. The comment right above the fallback says "priced at what a
+roto point costs at auction" — the live figure for that is $9.17
+(`exch["usd_per_point"]`, currently in scope at both call sites and simply
+never passed through). Every trade verdict's win-now component has been
+computed against a number that was already stale (the pre-session live
+value was $7.56) even before this session's #26/#31 fixes moved it further
+to $9.17.
+
+Fixed both call sites to pass the live value. Measured impact on the
+reference trade in `_reference()`: verdict scores move about $0.5–1 per
+side for this particular trade; the correction scales with
+`contention_weight × Δstandings_points`, so a trade with a bigger win-now
+swing moves more.
+
+**Same bug also existed independently in the app's JavaScript.** `app/template.html`'s
+trade tab re-implements this same formula in JS (necessarily — it recomputes
+trade verdicts client-side for interactivity) and was *not* stale — it read
+`D.constants.usd_per_roto_point_redraft` live — but on the **wrong basis**:
+redraft scale ($6.29), not the auction scale ($9.17) the Python comment
+documents as intended. So Python and JS have been computing two different
+numbers for the same quantity, on two different, independently-arrived-at
+bases, this whole time. Fixed the JS to use `usd_per_roto_point_auction`,
+matching Python's documented intent. **This could not be verified with
+`app/verify.mjs`** — no Node install in this environment, flagged earlier in
+this session — so this specific change needs a manual check next time
+someone has Node available. It's the highest-risk unverified change from
+this session for exactly that reason: a JS/Python parity script exists
+specifically to catch this class of error, and it could not be run.
+
+**32.2 Free agents with no draft history understated their own contract
+length.** `klab/freeagents.py`: a free agent with no live draft-year record
+gets priced at the post-All-Star-break acquisition price
+(`C.FA_SALARY_POST_ASB`, i.e. "acquired now, in 2026") but the code
+defaulted his `contract` field to `"1"` rather than `"2"` — one year short
+of what a 2026 acquisition should carry under `DRAFT_YEAR_TO_CODE[2026] =
+"2"`, the same mapping used two lines above for players who *do* have a
+2026 draft record. Fixed to `fillna(DRAFT_YEAR_TO_CODE[2026])`. **Zero
+dollar impact on the current board** — checked all 1,630 affected players;
+every one has `surplus_multiyear` clustered near the −$20 floor regardless
+of contract length, so nothing currently displayed changes. Worth having
+fixed anyway: the `contract`/`years_controlled` columns on the free-agent
+board are user-facing, and a genuinely attractive future waiver pickup
+would have shown one year short of real control.
+
+**32.3 A real ambiguity in `already_extended()`, left undecided rather than
+guessed at.** `klab/keeper.py:166`'s free-agent-price guard treats any
+salary exactly equal to `$10` or `$20` as "this must be a re-add, not an
+extension," which is how it tells a re-acquired-at-FA-price player apart
+from a genuine extension. But those two things are **not always
+distinguishable from salary alone**: a `$5` draft price plus a legal `+$5`
+one-year extension also lands on exactly `$10`; a `$15` draft price plus
+`+$5` lands on `$20`; a `$10` draft price plus a `+$10` two-year extension
+also lands on `$20`. In each of those cases the current logic would
+wrongly classify a real extension as a re-add, understating that player's
+extension-used status. **Checked every current player against this exact
+condition — nobody on the current board hits it**, so this is a dormant
+edge case, not a live error. Not fixed, because there's no way to fix it
+correctly with the data available: distinguishing "re-added at FA price"
+from "extended to a salary that happens to equal the FA price" requires a
+transaction date, which is the same missing-transaction-log blocker as §27
+and §11 of `out/LAB_NOTEBOOK.md`. Documented here so it's a known,
+findable gap rather than a silent one if it ever does trigger.
