@@ -22,6 +22,13 @@ planning doc — superseded, kept for history only.
    folder or from a fresh `git clone` — so it has to actually be pushed, not
    just saved locally.
 
+   **Exception: `out/snapshots/`.** Dated Parquet value-history files from
+   `klab.api.write_snapshot()`, gitignored on purpose (2026-08-13) — they're
+   binary, meant to accumulate indefinitely, and don't serve the "readable
+   without running anything" goal the rest of `out/` does. Kept as a local
+   archive only. A fresh `git clone` will not have snapshot history; that's
+   expected, not a bug.
+
 ## Before ending any session that touched tracked files
 
 Run `./check_sync.sh`. It fails loudly if there are uncommitted changes or if

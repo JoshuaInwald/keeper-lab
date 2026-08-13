@@ -503,7 +503,9 @@ There is **no database.** Here is the whole storage story:
 - **In flight:** pandas DataFrames in memory. A DataFrame is a table that lives
   in RAM: rows, typed columns, and a large library of operations. Think of it
   as a spreadsheet you manipulate with code.
-- **Outputs:** CSVs and JSON in `out/`, plus dated **Parquet** snapshots.
+- **Outputs:** CSVs and JSON in `out/`, plus dated **Parquet** snapshots in
+  `out/snapshots/` — the one part of `out/` that's gitignored, kept as a
+  local archive rather than pushed (2026-08-13).
 
 Every run reads the CSVs from scratch and recomputes everything. Cold: 2.4
 seconds.

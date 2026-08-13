@@ -1454,12 +1454,12 @@ redraft scale ($6.29), not the auction scale ($9.17) the Python comment
 documents as intended. So Python and JS have been computing two different
 numbers for the same quantity, on two different, independently-arrived-at
 bases, this whole time. Fixed the JS to use `usd_per_roto_point_auction`,
-matching Python's documented intent. **This could not be verified with
-`app/verify.mjs`** — no Node install in this environment, flagged earlier in
-this session — so this specific change needs a manual check next time
-someone has Node available. It's the highest-risk unverified change from
-this session for exactly that reason: a JS/Python parity script exists
-specifically to catch this class of error, and it could not be run.
+matching Python's documented intent. **Verified 2026-08-13 with `app/verify.mjs`**
+after installing Node — `PASS  JS matches pandas on all 25 quantities`,
+`PASS  no console errors across six tabs, drawer, filters, re-sort`. This had
+shipped without Node available in the working environment, which is exactly
+the situation the parity script exists to guard against — a JS/Python
+mismatch that looks fine until someone actually runs the check.
 
 **32.2 Free agents with no draft history understated their own contract
 length.** `klab/freeagents.py`: a free agent with no live draft-year record

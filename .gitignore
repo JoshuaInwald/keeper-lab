@@ -23,3 +23,9 @@ data/
 
 # Generated outputs are committed deliberately: the documentation in out/
 # is the portfolio artifact and must be readable without running anything.
+
+# Dated value snapshots (klab.api.write_snapshot) are binary parquet, meant
+# to accumulate over time, and don't serve the "readable without running
+# anything" goal the rest of out/ does -- kept as a local archive only, not
+# pushed to GitHub. See out/HANDOFF.md / README.md for the policy note.
+out/snapshots/

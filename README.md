@@ -142,6 +142,8 @@ s.keepers("Pookie 2.0") # recommended keeper set
 ```
 
 `write_snapshot()` persists a dated copy so values can be tracked over time.
+Snapshots live in `out/snapshots/` as a local archive only — gitignored, not
+pushed to GitHub, since they're binary and meant to accumulate indefinitely.
 
 ## Layout
 
