@@ -112,11 +112,11 @@ def pooled_relative_dispersion(standings: pd.DataFrame | None = None,
         for s in seasons:
             if cat == "SB" and s < C.SB_REGIME_START:
                 continue        # pre-rule-change stolen bases are a different game
-            if (C.DENOM_EXCLUDE_PARTIAL_FOR_RATES and cat in C.RATE_CATS
+            if (C.DENOM_EXCLUDE_PARTIAL_SEASON and cat in C.PARTIAL_EXCLUDE_CATS
                     and s in C.PARTIAL_SEASONS):
-                continue        # see config.PARTIAL_SEASONS -- a rate stat is
-                                # over-dispersed while its denominator is still
-                                # accumulating innings and at-bats
+                continue        # see config.PARTIAL_SEASONS / PARTIAL_EXCLUDE_CATS
+                                # -- these categories are over-dispersed while
+                                # their denominator is still accumulating
             gs = g[g["season"] == s]["total"].astype(float).values
             if cat == "SV":
                 gs = gs[gs >= C.SV_PUNT_THRESHOLD]

@@ -105,23 +105,43 @@ DENOM_SEASONS = [2024, 2025, 2026]   # regime changed in 2024; 2026 added below
 #
 # What does NOT cancel is sampling noise. Relative variance of a team total is
 # roughly  sigma_talent^2 + sigma_noise^2 / f, so a partial season is
-# over-dispersed by the noise term. Measured, per-season CV:
+# over-dispersed by the noise term. CORRECTED 2026-08-13 -- the original
+# version of this comment checked five categories (ERA, WHIP, R, HR, SB),
+# generalized "rate cats bad, counting cats fine," and shipped that as
+# DENOM_EXCLUDE_PARTIAL_FOR_RATES. All ten, measured per-season CV:
 #
 #            2024    2025    2026(f=.75)
-#   ERA     0.037   0.035   0.073   <-- 2x the full-season figure
-#   WHIP    0.028   0.028   0.042
 #   R       0.142   0.063   0.054
 #   HR      0.190   0.104   0.103
+#   RBI     0.150   0.053   0.064
 #   SB      0.341   0.301   0.127
+#   AVG     0.036   0.014   0.026   <-- NOT inflated, despite being a rate cat
+#   W       0.114   0.144   0.121
+#   SV      0.254   0.177   0.328   <-- inflated, despite being a counting cat
+#   K       0.090   0.164   0.085
+#   ERA     0.037   0.035   0.073   <-- 2x the full-season figure
+#   WHIP    0.028   0.028   0.042
 #
-# Counting categories are in range or lower. The **rate** categories are
-# visibly inflated, which is what the noise term predicts: ERA and WHIP are
-# ratios whose denominators are still accumulating. Including them raw would
-# widen the ERA/WHIP denominators and undervalue every pitcher's rate work.
+# The rate-vs-counting split was a proxy, and it fails on both ends: AVG
+# denominates over at-bats, which accumulate at a stable known rate all
+# season (every hitter plays ~daily), so a partial season is not meaningfully
+# noisier there. SV denominates over save opportunities, which depend on a
+# specific role (closer) that is unstable and gets reassigned mid-season --
+# the actual mechanism is "denominator accumulates unevenly / is subject to
+# role churn," not "is this a rate stat." Pooling AVG's 2026 data tightens its
+# standard error by ~21% for a ~2% shift in the point estimate (clear win);
+# excluding SV's 2026 data drops the pooled estimate by 16% (0.250 -> 0.209,
+# about 1.2 current-scheme standard errors, so directionally supported by the
+# closer-role-churn mechanism but not overwhelming on its own). See
+# out/FINDINGS.md #26 for the full experiment, and out/LAB_NOTEBOOK.md for why
+# the original five-category check wasn't wrong, just incomplete.
 PARTIAL_SEASONS = {2026: 0.75}
-# Use partial seasons for counting categories only. Set False to pool all
-# thirty team-seasons everywhere and accept the rate-category inflation.
-DENOM_EXCLUDE_PARTIAL_FOR_RATES = True
+# Categories whose 2026 data is excluded from denominator pooling because a
+# partial season measurably inflates their dispersion. Not RATE_CATS -- see
+# comment above. Set DENOM_EXCLUDE_PARTIAL_SEASON = False to pool all thirty
+# team-seasons everywhere and accept the ERA/WHIP/SV inflation.
+PARTIAL_EXCLUDE_CATS = {"ERA", "WHIP", "SV"}
+DENOM_EXCLUDE_PARTIAL_SEASON = True
 # Teams below this SV total are punting saves and are dropped before
 # computing the SV denominator (HANDOFF §7).
 SV_PUNT_THRESHOLD = 15

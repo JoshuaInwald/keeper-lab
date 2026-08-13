@@ -399,3 +399,30 @@ re-draft event aside, "fresh clock" was never consistent with the project's
 own confirmed rule — it would have needed a second retraction on top of the
 first. Left the underlying anomaly open in FINDINGS §25 rather than force a
 resolution the data doesn't support.
+
+## 10. The partial-season exclusion rule generalized from 5 of 10 categories (2026-08-13)
+
+`config.py`'s comment justifying `DENOM_EXCLUDE_PARTIAL_FOR_RATES` (out/FINDINGS.md
+§26) showed a CV table for ERA, WHIP, R, HR, SB — five categories — found the
+two rate cats inflated in the partial 2026 season and the three counting cats
+not, and generalized to "exclude rate cats, include counting cats." That's a
+real pattern in the five categories checked. It just isn't the actual
+mechanism, and checking the other five exposed it: AVG (a rate cat) shows no
+inflation, and SV (a counting cat) shows the most inflation of any category
+in the entire table (0.328 vs. 0.177–0.254 in the two full seasons).
+
+**Why this is the same species of bug as §23/§24, not a different one.**
+Nothing here was arithmetically wrong — the five-category check was computed
+correctly, and "rate stats have accumulating denominators" is a real and
+correct mechanism. The mistake was closing the case at 5/10 categories
+because the pattern looked clean, rather than checking whether the
+*classification* (rate vs. counting) was doing the explanatory work or just
+correlated with it in the categories sampled. It wasn't — the real driver is
+"does this category's denominator accumulate evenly," and AVG/SV are the two
+categories in the whole set where rate-vs-counting and
+evenly-vs-unevenly-accumulating come apart.
+
+**Lesson for next time a judgment call ships with a supporting table:** if
+the table doesn't cover every category in `C.CATS`, say so explicitly in the
+comment, because "this table looks conclusive" and "this table is complete"
+read identically to the next person extending the code.

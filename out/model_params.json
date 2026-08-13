@@ -1,11 +1,11 @@
 {
   "exchange_rate": {
-    "slope": 0.10982421049141282,
-    "intercept": 3.952674872128774,
-    "slope_se": 0.016321685350693872,
-    "r2": 0.16433261970215607,
+    "slope": 0.10794463913088895,
+    "intercept": 4.013319115421449,
+    "slope_se": 0.016463484241745405,
+    "r2": 0.15900373175724425,
     "n": 404,
-    "usd_per_point": 9.105460403725736,
+    "usd_per_point": 9.264007995686045,
     "seasons": [
       2024,
       2025,
@@ -14,9 +14,9 @@
     "basis": "keeper_adjusted"
   },
   "save_model": {
-    "intercept": 0.5061112268696957,
-    "slope": 0.6518888053402745,
-    "r2": 0.4330654285713893,
+    "intercept": 0.5061112268696969,
+    "slope": 0.651888805340274,
+    "r2": 0.4330654285713894,
     "n": 1637,
     "mean_sv_t": 2.197923029932804,
     "mean_sv_t1": 1.9389126450824679
@@ -26,9 +26,9 @@
     "HR": 13.841199997308218,
     "RBI": 33.82021783106501,
     "SB": 17.10346558827353,
-    "AVG": 0.002298408633249166,
+    "AVG": 0.002251912996156634,
     "W": 3.6699758833921825,
-    "SV": 7.164081997704085,
+    "SV": 6.000368563916126,
     "K": 52.55846066401461,
     "ERA": 0.043056500846906,
     "WHIP": 0.010820611077712095
@@ -46,9 +46,9 @@
     "team_ERA": 3.6131999999999995,
     "team_WHIP": 1.17585
   },
-  "replacement_rp": 4.760826081095143,
-  "usd_per_rp_keep": 9.105460403725736,
-  "usd_per_rp_redraft": 6.316471236815465,
+  "replacement_rp": 4.777551837698108,
+  "usd_per_rp_keep": 9.264007995686045,
+  "usd_per_rp_redraft": 6.241845278098493,
   "config": {
     "N_TEAMS": 10,
     "BUDGET": 260,
@@ -102,6 +102,20 @@
     },
     "EXTENSION_MAX_YEARS": 2,
     "EXTENSION_ALREADY_USED_IF_SALARY_ABOVE_DRAFT": true,
+    "CONTRACT_OVERRIDES": {
+      "Cam Smith": [
+        "2",
+        1
+      ],
+      "William Contreras": [
+        "2",
+        11
+      ],
+      "Jarren Duran": [
+        "F",
+        1
+      ]
+    },
     "KEEPER_PA_FLOOR": 600,
     "KEEPER_IP_FLOOR": 150,
     "KEEPER_SV_FLOOR": 25,
@@ -116,7 +130,7 @@
     "PARTIAL_SEASONS": {
       "2026": 0.75
     },
-    "DENOM_EXCLUDE_PARTIAL_FOR_RATES": true,
+    "DENOM_EXCLUDE_PARTIAL_SEASON": true,
     "SV_PUNT_THRESHOLD": 15,
     "SB_REGIME_START": 2023,
     "SB_PRE_REGIME_WEIGHT": 0.0,

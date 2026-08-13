@@ -60,7 +60,7 @@ def _pools(seasons=None) -> dict:
         for s in seasons:
             if cat == "SB" and s < C.SB_REGIME_START:
                 continue
-            if (C.DENOM_EXCLUDE_PARTIAL_FOR_RATES and cat in C.RATE_CATS
+            if (C.DENOM_EXCLUDE_PARTIAL_SEASON and cat in C.PARTIAL_EXCLUDE_CATS
                     and s in C.PARTIAL_SEASONS):
                 continue
             v = g[g["season"] == s]["total"].astype(float).values

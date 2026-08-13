@@ -1026,3 +1026,84 @@ CBS commissioner tools or email history for these two players' transaction
 log. Until then, both are carried as-is (`F`, unchanged salary) because that
 is what `contracts_parsed.csv` says, and the model has no basis to overrule
 its own input.
+
+## 26. Partial-2026 denominator exclusion: the rate-vs-counting split was a proxy for something else
+
+`config.PARTIAL_SEASONS` treats 2026 as a 75%-complete season for the purpose
+of pooling denominators, and `DENOM_EXCLUDE_PARTIAL_FOR_RATES` excluded 2026
+for the three rate categories (AVG, ERA, WHIP) while including it raw for
+every counting category. The comment justifying this checked five categories
+against a "partial seasons are over-dispersed" mechanism and generalized to
+"rate cats bad, counting cats fine." This was the judgment call the project
+brief flagged as needing a proper test rather than an assumption.
+
+**The test: measure single-season CV (std/mean across teams) for all ten
+categories, 2024 and 2025 (full seasons) vs 2026 (partial), and see which
+categories actually show partial-season inflation.**
+
+| category | 2024 | 2025 | 2026 (f≈0.75) | inflated vs. both full seasons? |
+|---|---|---|---|---|
+| R | 0.142 | 0.063 | 0.054 | no |
+| HR | 0.190 | 0.104 | 0.103 | no |
+| RBI | 0.150 | 0.053 | 0.064 | no |
+| SB | 0.341 | 0.301 | 0.127 | no (much lower, if anything) |
+| AVG | 0.036 | 0.014 | 0.026 | **no** — between the two full seasons |
+| W | 0.114 | 0.144 | 0.121 | no |
+| SV | 0.254 | 0.177 | 0.328 | **yes** — higher than both |
+| K | 0.090 | 0.164 | 0.085 | no |
+| ERA | 0.037 | 0.035 | 0.073 | yes — ~2x |
+| WHIP | 0.028 | 0.028 | 0.042 | yes — ~1.5x |
+
+The rate-vs-counting split gets 8 of 10 categories right by accident and 2
+wrong: **AVG isn't actually inflated**, and **SV is, despite being a counting
+stat**. The mechanism isn't "rate stat" — it's whether the category's
+denominator accumulates unevenly within a partial season. At-bats accumulate
+at a stable, near-daily rate for every hitter, so AVG's volume is genuinely
+~75% done and its dispersion behaves like a scaled-down full season. Saves
+depend on a specific role (closer) that gets reassigned mid-season — a
+partial season doesn't just have less save volume, it has *less-settled* save
+volume, which is the same noise mechanism ERA and WHIP have from incomplete
+innings.
+
+Recomputed the pooled dispersion under three schemes — current (rate cats
+excluded), include-2026-everywhere, and exclude-2026-everywhere — to size the
+effect:
+
+- **AVG**: including 2026 shifts the point estimate by only −2.0%, but tightens
+  its standard error by ~21% (more team-seasons pooled for a stat that isn't
+  contaminated). Clear win to include it.
+- **SV**: excluding 2026 shifts the point estimate by −16.2% (0.250 → 0.209).
+  That's about 1.2 standard errors under the current scheme — directionally
+  consistent with the closer-role-churn mechanism and not something to ignore,
+  but not overwhelming on its own either. Every other category was unaffected
+  by the choice (counting cats other than SV are scale-invariant to a uniform
+  2026 include/exclude, confirming the code's original cancellation argument;
+  ERA/WHIP were already excluded either way in this comparison).
+
+**Changed `config.py`**: replaced the `RATE_CATS`-keyed exclusion with an
+explicit `PARTIAL_EXCLUDE_CATS = {"ERA", "WHIP", "SV"}`, decoupled from the
+rate/counting classification. Reran the full pipeline:
+
+| quantity | before | after | change |
+|---|---|---|---|
+| SV denominator | 7.16 | 6.00 | −16.2% (saves worth more) |
+| AVG denominator | 0.002298 | 0.002252 | −2.0% |
+| replacement level | 4.761 | 4.778 | +0.35% |
+| $/roto pt (keeper) | $9.11 | $9.26 | +1.74% |
+| $/roto pt (redraft) | $6.32 | $6.24 | −1.18% |
+| every other denominator | — | — | unchanged |
+
+**5 of 275 rostered players flip keep/cut**: Andrés Muñoz, Bryan Baker, Cam
+Smith, and William Contreras flip to keep; Yoshinobu Yamamoto flips to cut
+(the last one is the small ripple through the exchange rate, not a saves
+effect directly). The saves-value shift itself is visible in every closer's
+surplus — Cade Smith, Mason Miller, David Bednar, Jhoan Duran and similar all
+gain roughly $5.50–$6.80 of keeper surplus. This is not a rounding-error
+change; it is 5 real roster decisions and real money for every rostered
+closer.
+
+**What this doesn't resolve.** The SV shift is the weaker of the two changes
+statistically (1.2 SE, not a clean multi-SE signal), so treat "SV joins the
+excluded set" as the best current evidence rather than a closed question —
+worth revisiting once 2026 is a complete season and there's a same-season
+comparison point instead of an in-progress one.
