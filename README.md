@@ -9,6 +9,13 @@ It prices every player in dollars, ranks 2027 keeper decisions by multi-year
 surplus, and evaluates trades on two independent lenses — what they do to this
 season's standings, and what they do to future assets.
 
+> **Asked to evaluate a trade, a keeper decision, or "what should team X
+> do"? Read `out/WORKFLOWS.md` before doing anything else.** Every one of
+> those questions has an existing, tested function — using it instead of
+> hand-calculating an answer is the entire point of this project. That file
+> also has the "does my environment actually have the data" check to run
+> first; skipping it is the single most common way a fresh session breaks.
+
 Requires **Python 3.11+** (or any scipy ≥1.9 — older scipy returns
 `spearmanr()` as a plain tuple without `.statistic`, which breaks one test
 silently rather than loudly).
@@ -16,7 +23,7 @@ silently rather than loudly).
 ```bash
 pip install pandas numpy scipy statsmodels pytest
 PYTHONPATH=.:scripts python3 scripts/run_all.py   # build everything into out/
-PYTHONPATH=. python3 -m pytest tests/ -q          # 35 invariants, ~4s
+PYTHONPATH=. python3 -m pytest tests/ -q          # 39 invariants, ~5s
 open out/keeper_lab.html                          # the app — no server needed
 ```
 
@@ -87,6 +94,7 @@ Full detail in `out/HANDOFF.md`. The statistical core is also written in R at
 
 | file | what's in it |
 |---|---|
+| `out/WORKFLOWS.md` | **start here if you've been asked to evaluate a trade or keeper decision** — tested recipes, not theory |
 | `out/HANDOFF.md` | how the system works, league rules, validation, limitations |
 | `out/LAB_NOTEBOOK.md` | what was tried and rejected, every bug found, and why |
 | `out/FINDINGS.md` | empirical results, with the sensitivity analysis |

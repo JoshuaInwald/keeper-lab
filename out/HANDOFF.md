@@ -8,6 +8,8 @@ evaluates trades from both a win-now and an asset perspective.
 **Status:** built, validated, in use. Numbers are trustworthy subject to §6.
 
 **Companion docs:**
+- `WORKFLOWS.md` — asked to evaluate a trade or a keeper decision? Start
+  there, not here. Tested recipes, not narrative.
 - `LAB_NOTEBOOK.md` — what was tried, what failed, why the structure is what
   it is. Read this before changing any modelling decision.
 - `FINDINGS.md` — research results (saves mispricing, draft value chain,

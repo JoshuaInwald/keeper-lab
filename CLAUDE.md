@@ -1,11 +1,20 @@
 # Keeper Lab — project notes for future sessions
 
 Player-valuation engine for a private 10-team 5×5 roto keeper auction league.
-Full context lives in the docs, not here — read `README.md` first, then
-`out/HANDOFF.md` (current state), `out/LAB_NOTEBOOK.md` (bugs found, forks
-tested, why the code looks like this), `out/ROADMAP.md` (what's next),
-`out/FINDINGS.md` (results). `out/ORIGINAL_HANDOFF.md` is the pre-build
-planning doc — superseded, kept for history only.
+
+**If you've been asked to evaluate a trade, a keeper decision, or "what
+should team X do" — go straight to `out/WORKFLOWS.md`, before reading
+anything else in this list.** It has tested, copy-paste recipes and the
+environment check to run first. A session that skips it and hand-calculates
+an answer instead of using the existing `klab/` functions will get it wrong
+in ways that are hard to catch — this has actually happened (see
+`out/WORKFLOWS.md`'s own opening paragraph).
+
+For everything else, full context lives in the docs, not here — read
+`README.md` first, then `out/HANDOFF.md` (current state), `out/LAB_NOTEBOOK.md`
+(bugs found, forks tested, why the code looks like this), `out/ROADMAP.md`
+(what's next), `out/FINDINGS.md` (results). `out/ORIGINAL_HANDOFF.md` is the
+pre-build planning doc — superseded, kept for history only.
 
 ## Three places, three jobs — don't blur them
 
