@@ -1107,3 +1107,73 @@ statistically (1.2 SE, not a clean multi-SE signal), so treat "SV joins the
 excluded set" as the best current evidence rather than a closed question —
 worth revisiting once 2026 is a complete season and there's a same-season
 comparison point instead of an in-progress one.
+
+## 27. Replacement level, revisited: the field-standard comparison, a new sanity
+check, and confirming the clean test is still genuinely blocked
+
+`out/QA_ROUND.md` §A4 named a specific unrun test for replacement level
+("take every player available on the wire on date X, measure realised
+production forward, take the median — availability without survivorship")
+and named its blocker: it needs transaction logs. First step here was
+checking whether that's still true. It is — `data/` has no file with FA
+transaction dates; `grep`ing for anything resembling one turns up nothing.
+The blocker is confirmed, not assumed.
+
+**The three existing routes, recomputed against the current pipeline**
+(after §26's denominator fix, which moved every number slightly):
+
+| route | value | what it is |
+|---|---|---|
+| auction regression intercept | 4.01 | extrapolation past the $1 floor — a lower bound |
+| 230th-best projection (`WAIVER_VALUE="low"`) | 4.78 | one per active roster slot |
+| median of players actually added via FA in 2026 | 5.04 | survivorship-biased upper bound |
+
+All three moved by less than the §26 denominator change alone would predict,
+confirming none of them silently drifted from anything but that change.
+
+**Where the 230th-projection route sits relative to the field:** this is
+functionally the "Last Player Picked" (LPP) methodology (Larry Schechter) —
+replacement level defined as the value of the last player who'd actually be
+rostered given the league's real roster construction, not an average or a
+generic "freely available" fudge factor. LPP is treated as the more
+defensible approach in the sabermetric literature specifically because it's
+tied to actual roster math rather than an assumed talent cutoff. The model
+already implements this; it just wasn't written down as a deliberate
+methodological choice matching a named, respected approach.
+
+**A test that doesn't need transaction logs and hadn't been run: is the
+230th-projection number internally consistent with the free-agent pool it's
+supposed to describe?** If replacement level is really "the value at which
+supply of free agents roughly equals what's worth adding," then the pool of
+currently unrostered players should have very few players priced above it,
+and its best players should cluster right around that value. Checked against
+`out/free_agent_board.csv` (1,714 unrostered projected players):
+
+- Only **24 of 1,714** free agents (1.4%) project above the current
+  replacement level of 4.78.
+- The top of that pool decays smoothly — rank 10 at 5.09, rank 20 at 4.84,
+  rank 30 at 4.55 — putting the estimate almost exactly at the elbow where
+  the free-agent pool stops having plausible adds. There's no cliff or gap
+  that would suggest the number is badly placed.
+
+This passes. It's not proof the estimate is exactly right, but it rules out
+"badly miscalibrated in either direction" — if replacement were meaningfully
+too low, dozens of clearly-better free agents would be sitting unrostered; if
+meaningfully too high, the model would be claiming almost nobody on waivers
+is worth adding, which contradicts the fact that 118 players were actually
+added via free agency in 2026 (`out/acquisition_channels_2026.csv`).
+
+**One more thing worth recording:** recomputed the 5.04 actual-FA-median
+figure directly from `acquisition_channels_2026.csv`'s free-agent-channel
+rows (118 players) using the current, post-§26 denominators — got **5.037**,
+matching the hardcoded `config.WAIVER_HIGH_RP` to three decimals. The
+constant looked stale (no script derives it; it's just typed into `config.py`
+with a comment) but turned out not to be — worth knowing it's still accurate
+rather than assuming it drifted.
+
+**Recommendation: keep `WAIVER_VALUE = "low"` (4.78) as the default.** It's
+the field-standard method, it passes a new internal-consistency check the
+project hadn't run, and the clean transaction-log-based test that could
+displace it remains genuinely infeasible with the data on hand — not for
+lack of trying, but because the data doesn't exist yet. Revisit if/when
+transaction logs become available.

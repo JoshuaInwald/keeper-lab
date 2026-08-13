@@ -426,3 +426,26 @@ evenly-vs-unevenly-accumulating come apart.
 the table doesn't cover every category in `C.CATS`, say so explicitly in the
 comment, because "this table looks conclusive" and "this table is complete"
 read identically to the next person extending the code.
+
+## 11. Rejected: median of the full free-agent pool as a survivorship-free replacement estimate (2026-08-13)
+
+Trying to substitute for the transaction-log test QA_ROUND §A4 wants (see
+out/FINDINGS.md §27): if realised production of *actually added* players is
+survivorship-biased upward, why not take the median of the *entire* unrostered
+pool's projections instead — no conditioning on being picked up at all?
+
+Computed it: median roto_points across all 1,714 players in
+`out/free_agent_board.csv` is **1.10** — nowhere near any of the three
+existing estimates (4.0–5.0). Rejected immediately, and the reason is worth
+keeping: the full free-agent pool is overwhelmingly deep-minors filler that
+nobody would ever actually roster. A median over that pool answers "what does
+a random unrostered player project for," which isn't the question —
+replacement level is about the *marginal* addition, not a random one. Any
+version of this test needs a restriction to a plausible-add-sized subset of
+the pool, and choosing that subset's size just re-derives "one per active
+slot" or some other rank cutoff arbitrarily — it doesn't add new information
+over the 230th-projection route already in use. Redirected the effort into an
+internal-consistency check instead (FINDINGS §27), which used the same free-
+agent-board data more usefully: not "what's the median," but "how many free
+agents actually clear the current bar, and does the bar sit at a sensible
+point in the pool's shape."
