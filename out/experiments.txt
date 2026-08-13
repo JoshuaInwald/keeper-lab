@@ -8,12 +8,12 @@ category  n  denominator    lo95    hi95  rel_width_pct
       SB 30      17.1035 12.4780 20.7782        48.5294
      AVG 30       0.0023  0.0014  0.0029        65.6679
        W 30       3.6700  2.4656  4.5984        58.1134
-      SV 26       7.1641  4.6407  9.4345        66.9144
-       K 30      52.5585 34.1600 69.2965        66.8522
-     ERA 30       0.0614  0.0366  0.0832        75.7818
-    WHIP 30       0.0129  0.0088  0.0165        60.3470
+      SV 17       6.0004  3.5590  7.9840        73.7454
+       K 30      52.5585 34.3582 69.1227        66.1445
+     ERA 20       0.0431  0.0267  0.0531        61.4355
+    WHIP 20       0.0108  0.0074  0.0133        54.2843
 
-  mean 95% interval width: ±35% of the point estimate
+  mean 95% interval width: ±34% of the point estimate
   The '±16%' quoted elsewhere is the analytic SE and is optimistic;
   the bootstrap is the number to put next to a dollar figure.
 
@@ -40,7 +40,7 @@ EXPERIMENT 3 — permutation test on the saves finding
 ================================================================================================
   observed closer excess: +2.18 roto points
   null distribution (label shuffled within season x price band):
-    mean +0.235, sd 0.537, 95% range [-0.80, +1.31]
+    mean +0.235, sd 0.541, 95% range [-0.82, +1.32]
   two-sided p = 0.0000  (5000 permutations)
   The shuffle holds season and price band fixed, so this is not
   the time trend and not 'cheap players beat their price'.

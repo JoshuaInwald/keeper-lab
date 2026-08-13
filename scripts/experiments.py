@@ -43,6 +43,13 @@ def exp1_bootstrap_denominators(B=2000):
     for cat in C.CATS:
         obs = []
         for s in C.DENOM_SEASONS:
+            # Same exclusion as klab.denoms.pooled_relative_dispersion -- this
+            # loop used to be independent of it and always included 2026 raw,
+            # so the bootstrap band was computed around different point
+            # estimates than the ones actually shipped (out/FINDINGS.md #30).
+            if (C.DENOM_EXCLUDE_PARTIAL_SEASON and cat in C.PARTIAL_EXCLUDE_CATS
+                    and s in C.PARTIAL_SEASONS):
+                continue
             v = st[(st.season == s) & (st.category == cat)]["total"].astype(float).values
             if cat == "SV":
                 v = v[v >= C.SV_PUNT_THRESHOLD]

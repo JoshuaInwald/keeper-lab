@@ -1301,3 +1301,39 @@ production," not as a clean two-factor story.
 easy to lose sight of:** n = 10 teams. Every Spearman correlation here has a
 wide standard error and none of them should be treated as more than
 suggestive on their own.
+
+## 30. The headline ±38% uncertainty band was computed around the wrong point estimates
+
+Caught while reconciling every doc's numbers against the live pipeline after
+#26 and #28. `scripts/experiments.py::exp1_bootstrap_denominators` — the
+source of the "±38% per category" figure quoted in README.md, `out/HANDOFF.md`
+and `out/ARCHITECTURE.md` as the honest uncertainty band on every dollar
+figure — pools team-seasons with its own loop over `C.DENOM_SEASONS`,
+written independently of `klab.denoms.pooled_relative_dispersion`. It never
+had the partial-2026 exclusion logic at all: it included 2026 raw for every
+category, always, including ERA/WHIP/SV. That means the bootstrap interval
+was centered on a different set of point estimates than the ones the model
+actually ships (confirmed directly: ERA came out to 0.0614 from this
+script, against 0.0431 in `out/model_params.json`) — an uncertainty band
+answering "how uncertain is a denominator computed a different way,"
+not "how uncertain is the number in the app."
+
+Fixed by applying the same `PARTIAL_EXCLUDE_CATS` / `PARTIAL_SEASONS` check
+`klab/denoms.py` uses. Rerun: every denominator now matches
+`model_params.json` exactly, and the mean interval width moves from ±38%
+(the stale, pre-session number) to **±34%**. Smaller, not larger — SV's
+narrower post-#26 team-season pool (n=17, not 26) turned out to matter less
+for the *average* width than ERA and WHIP's estimates tightening slightly
+now that their point estimates are computed the same way twice instead of
+two different ways.
+
+**Same species of bug as #10 and #12: a script that duplicates logic instead
+of importing it, and drifts the moment the imported version changes.**
+Checked every other script in `scripts/` for the same pattern
+(`grep` for `DENOM_SEASONS`/`RATE_CATS`/`RELIABILITY`/`PARTIAL_SEASONS`):
+`run_all.py` and `eval_trade.py` both call `pooled_relative_dispersion`
+directly rather than reimplementing it, and `sensitivity.py` references
+`klab.project.RELIABILITY` and `C.DENOM_SEASONS` live (it swaps them out
+deliberately, as sensitivity variants — that's the point of the script).
+`experiments.py` was the only one carrying an inline copy, and it's fixed
+now.
