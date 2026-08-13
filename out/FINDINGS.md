@@ -1177,3 +1177,63 @@ project hadn't run, and the clean transaction-log-based test that could
 displace it remains genuinely infeasible with the data on hand — not for
 lack of trying, but because the data doesn't exist yet. Revisit if/when
 transaction logs become available.
+
+## 28. Reliability refit found a real bug: BB and H were both silently set to WHIP's number
+
+`out/QA_ROUND.md` §A2 flagged `klab/project.py`'s `RELIABILITY` dict as a
+one-time fit that "should be refit when 2026 closes. Not urgent." Refit it
+directly: same method as the original (year-over-year Pearson r of each
+per-PA or per-IP rate, hitters with 250+ PA in both years of a pair,
+pitchers with 40+ IP, pooled across the (2022,2023)/(2023,2024)/(2024,2025)
+season pairs — identical to `fit_save_model`'s own season pairs, for
+consistency).
+
+**Eight of ten values reproduced exactly**: HR 0.607, R 0.425, RBI 0.380,
+SB 0.739, AVG 0.436, K 0.701, W 0.151, ER 0.174 (documented as 0.176, a
+rounding difference, not a discrepancy). **Two did not**: `BB` and `H` are
+both hard-coded to **0.237**, and refitting gets **BB = 0.463, H = 0.359** —
+different from each other and from 0.237. Checked where 0.237 actually came
+from: it's `WHIP`'s own year-over-year reliability
+(`(BB+H)/IP` correlated year over year: r = 0.237 exactly, n=785). `WHIP` is
+also a key in `RELIABILITY`, and `grep` confirms it is never read through
+`rel_weight()` anywhere in `klab/` — WHIP is blended through its two
+components (BB, H) the same way AVG is blended through H/AB, so the `WHIP`
+entry is inert documentation. **BB and H were overwritten with WHIP's value
+by what looks like a copy-paste across three related keys, and unlike WHIP,
+BB and H are both live** — every 2027 projection has been discounting last
+year's observed walk and hit rates as if they were as unreliable as WHIP
+itself (0.237/0.739 relative weight) when they're actually meaningfully more
+repeatable (0.463 and 0.359).
+
+**Fixed in `klab/project.py`.** Reran the full pipeline:
+
+| quantity | before | after |
+|---|---|---|
+| replacement level | 4.778 | 4.778 (unchanged) |
+| $/roto pt (keeper) | $9.264 | $9.264 (unchanged) |
+| $/roto pt (redraft) | $6.242 | $6.214 (−0.45%) |
+| keep/cut flips | — | 1 (Yoshinobu Yamamoto) |
+| mean \|Δ surplus\| across 275 rostered players | — | $0.16 |
+
+The headline scalars barely move — this bug lived entirely inside
+pitcher-level WHIP projections, not the league-wide denominators or
+exchange rate. But individual pitchers move real money: Jacob Misiorowski
++$3.51, Cam Schlittler +$2.57, Drew Rasmussen +$1.98, Freddy Peralta −$1.92,
+Garrett Crochet −$1.55 — all in the direction you'd expect once last year's
+actual walk/hit rate is trusted more and ZiPS's regression-to-the-mean is
+trusted correspondingly less.
+
+**Robustness check, not adopted:** also refit including a fourth pair,
+(2025, 2026), using 2026's partial season as the "year 2" observation. Every
+value moved by less than 0.02 in either direction (e.g. BB 0.463→0.476, H
+0.359→0.347, W 0.151→0.130) — consistent with each other and with the
+existing fit, no reason to switch. Kept the original three-pair fit so this
+change is isolated to fixing the BB/H error, not bundled with a second,
+smaller decision about whether to use partial 2026 data here too.
+
+**On "not urgent":** it wasn't wrong that a full refit could wait, since 8 of
+10 values hadn't moved. But "should be refit eventually" and "has a live bug
+in it right now" are different findings, and only checking the dict at
+refit-time (rather than, say, a test that recomputes and compares) means
+this class of error sits invisible for as long as nobody happens to rerun
+the fit.

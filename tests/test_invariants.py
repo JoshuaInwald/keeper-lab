@@ -16,6 +16,7 @@ from klab.board import build_board, fit_exchange_rate, keeper_status, value_play
 from klab.denoms import teams_per_category
 from klab.keeper import keeper_cost, years_controlled
 from klab.trade import standings_points
+from klab.io import load_hitters_history, load_pitchers_history
 
 
 @pytest.fixture(scope="module")
@@ -299,3 +300,45 @@ def test_app_payload_has_no_column_collisions_and_no_nans():
         for col in ["name", "team", "role", "salary", "keeper_cost", "redraft_value"]:
             assert r[ix[col]] is not None, f"{r[ix['name']]} missing {col}"
     assert set(p["cur_totals"]) == set(t["team"] for t in p["teams"])
+
+
+def test_reliability_weights_match_a_fresh_refit():
+    """klab.project.RELIABILITY is a hard-coded fit, not something recomputed
+    at runtime. It quietly drifted: BB and H were both set to WHIP's r=0.237
+    (WHIP is never looked up through rel_weight -- it's inert -- so this was
+    a copy-paste into the two keys that ARE live), rather than their own
+    correlations. Refitting directly gave BB=0.463, H=0.359. This test
+    reruns the same fit the dict is supposed to represent and would have
+    caught that a value in the dict came from the wrong stat."""
+    from klab.project import RELIABILITY
+
+    def yoy_r(df, id_col, pt_col, pt_min, num_a, num_b, denom_a, denom_b, pairs):
+        frames = []
+        for a, b in pairs:
+            ta = df[(df["season"] == a) & (df[pt_col] >= pt_min)]
+            tb = df[(df["season"] == b) & (df[pt_col] >= pt_min)]
+            m = ta.merge(tb, on=id_col, suffixes=("_a", "_b"))
+            ra = m[num_a] / m[denom_a]
+            rb = m[num_b] / m[denom_b]
+            frames.append(pd.DataFrame({"a": ra, "b": rb}))
+        p = pd.concat(frames, ignore_index=True).dropna()
+        return float(np.corrcoef(p["a"], p["b"])[0, 1])
+
+    pairs = [(2022, 2023), (2023, 2024), (2024, 2025)]
+    hit = load_hitters_history()
+    pit = load_pitchers_history()
+
+    refit = {}
+    for stat in ["HR", "R", "RBI", "SB"]:
+        refit[stat] = yoy_r(hit, "fg_id", "PA", 250,
+                            f"{stat}_a", f"{stat}_b", "PA_a", "PA_b", pairs)
+    refit["AVG"] = yoy_r(hit, "fg_id", "PA", 250, "H_a", "H_b", "AB_a", "AB_b", pairs)
+    for stat in ["W", "K", "ER", "BB", "H"]:
+        refit[stat] = yoy_r(pit, "fg_id", "IP", 40,
+                            f"{stat}_a", f"{stat}_b", "IP_a", "IP_b", pairs)
+
+    for stat, r in refit.items():
+        assert abs(RELIABILITY[stat] - r) < 0.03, (
+            f"RELIABILITY[{stat!r}]={RELIABILITY[stat]} but a fresh refit on "
+            f"the same season pairs gives {r:.3f} -- the hard-coded dict has "
+            f"drifted from the fit it's supposed to represent")

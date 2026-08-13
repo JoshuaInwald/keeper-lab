@@ -449,3 +449,28 @@ internal-consistency check instead (FINDINGS §27), which used the same free-
 agent-board data more usefully: not "what's the median," but "how many free
 agents actually clear the current bar, and does the bar sit at a sensible
 point in the pool's shape."
+
+## 12. BB and H reliability were copy-pasted from WHIP (2026-08-13)
+
+Refitting `klab/project.py`'s `RELIABILITY` dict (out/FINDINGS.md #28)
+reproduced 8 of 10 values to three decimals on the first try, using the same
+method and season pairs the original comment describes. `BB` and `H` didn't
+reproduce -- both are hard-coded to 0.237, and a fresh fit gives 0.463 and
+0.359. 0.237 turned out to be `WHIP`'s own year-over-year r exactly, and
+`WHIP` never gets read anywhere live (`grep rel_weight.*WHIP` in `klab/`
+returns nothing -- WHIP is blended through its BB/H components, same as AVG
+through H/AB). So this shipped as: compute WHIP's reliability correctly,
+then paste that number into BB and H's slots too, and leave WHIP's own slot
+sitting unused. Two of three related keys got the wrong, too-low value; the
+one that got the *right* value doesn't matter because it's never read.
+
+**Why the existing invariant tests didn't catch it.** Nothing about a
+too-low reliability weight is arithmetically invalid -- it's a valid weight,
+just discounting real signal more than it should. This is the same species
+of bug as the deGrom/Ohtani-adjacent findings elsewhere in this notebook: a
+wrong value that is not an invalid value. The defence, again, is not more
+assertions on the output, it's re-deriving an input from scratch and
+diffing it against what's hard-coded. Added
+`test_reliability_weights_match_a_fresh_refit` (`tests/test_invariants.py`)
+to do exactly that on every test run, rather than only when someone happens
+to remember to refit by hand.

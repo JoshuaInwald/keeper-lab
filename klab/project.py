@@ -40,10 +40,21 @@ SHRINK_IP = 70.0
 # year's win rate is almost pure noise, and carrying it forward buried a
 # pitcher who went 3-17 on a bad team. Each stat's weight on the 2026 leg is
 # scaled by its reliability relative to the most repeatable stat.
+#
+# CORRECTED 2026-08-13 (out/FINDINGS.md #28) -- BB and H were both hard-coded
+# to 0.237, WHIP's own year-over-year r. WHIP is never actually looked up
+# through rel_weight() (it's a downstream ratio of BB+H over IP, blended via
+# its two components, same pattern as AVG/H-AB), so this was a copy-paste
+# into the two keys that ARE live, silently discounting last year's walk and
+# hit rates as if they were as noisy as WHIP itself. Refit directly: BB
+# r=0.463, H r=0.359 -- both meaningfully more repeatable than 0.237.
+# Reproduced every other value in this dict exactly (same three
+# season-pairs, same PA/IP thresholds), so this was the one entry with a
+# fitting error, not a wholesale re-derivation.
 RELIABILITY = {
     "HR": 0.607, "R": 0.425, "RBI": 0.380, "SB": 0.739, "AVG": 0.436,
-    "K": 0.701, "W": 0.151, "ER": 0.176, "WHIP": 0.237, "BB": 0.237,
-    "H": 0.237,
+    "K": 0.701, "W": 0.151, "ER": 0.176, "WHIP": 0.237, "BB": 0.463,
+    "H": 0.359,
 }
 REL_MAX = max(RELIABILITY.values())
 
