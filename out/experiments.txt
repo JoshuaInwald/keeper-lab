@@ -2,18 +2,18 @@
 EXPERIMENT 1 — bootstrap confidence intervals on the denominators
 ================================================================================================
 category  n  denominator    lo95    hi95  rel_width_pct
-       R 20      39.4334 14.0436 59.6114       115.5562
-      HR 20      15.4256  7.7788 20.2938        81.1312
-     RBI 20      38.7282 17.6221 55.7260        98.3880
-      SB 20      20.3529 14.4425 24.3134        48.4988
-     AVG 20       0.0023  0.0013  0.0031        79.0216
-       W 20       3.7851  2.2344  4.8818        69.9433
-      SV 17       6.5736  3.8787  8.6839        73.0993
-       K 20      59.0756 33.5154 79.4711        77.7913
-     ERA 20       0.0431  0.0282  0.0540        59.9522
-    WHIP 20       0.0108  0.0074  0.0135        56.0592
+       R 30      33.8042 16.2338 50.1161       100.2309
+      HR 30      13.8412  8.7021 17.7891        65.6516
+     RBI 30      33.8202 19.4713 48.3795        85.4760
+      SB 30      17.1035 12.4780 20.7782        48.5294
+     AVG 30       0.0023  0.0014  0.0029        65.6679
+       W 30       3.6700  2.4656  4.5984        58.1134
+      SV 26       7.1641  4.6407  9.4345        66.9144
+       K 30      52.5585 34.1600 69.2965        66.8522
+     ERA 30       0.0614  0.0366  0.0832        75.7818
+    WHIP 30       0.0129  0.0088  0.0165        60.3470
 
-  mean 95% interval width: ±38% of the point estimate
+  mean 95% interval width: ±35% of the point estimate
   The '±16%' quoted elsewhere is the analytic SE and is optimistic;
   the bootstrap is the number to put next to a dollar figure.
 
@@ -21,26 +21,26 @@ category  n  denominator    lo95    hi95  rel_width_pct
 EXPERIMENT 2 — leave-one-season-out on the exchange rate
 ================================================================================================
  held_out  pooled_$/pt  actual_$/pt  mean_resid  rmse
-     2022        6.533        4.155      -0.431 3.557
-     2023        6.194        4.782      -0.039 3.246
-     2024        5.659        6.357       0.457 2.977
-     2025        5.525        8.092       0.181 3.250
-     2026        5.415        9.981      -0.225 3.078
+     2022        5.981        3.807      -0.452 3.765
+     2023        5.657        4.407      -0.057 3.482
+     2024        5.187        5.803       0.468 3.190
+     2025        5.067        7.307       0.208 3.454
+     2026        4.956        9.175      -0.223 3.276
 
-  mean residual on the held-out season runs -0.43 to +0.46 roto points
-  corr(held-out year, mean residual) = +0.289  -- weak and NOT monotone,
+  mean residual on the held-out season runs -0.45 to +0.47 roto points
+  corr(held-out year, mean residual) = +0.317  -- weak and NOT monotone,
   so a pooled fit is not systematically biased by season in the
   *residual*. What it does miss is the level: pooled $/pt sits at
-  5.4-6.5 while the held-out season's own rate
-  runs 4.2-10.0. Pooling gets the ranking right and the
+  5.0-6.0 while the held-out season's own rate
+  runs 3.8-9.2. Pooling gets the ranking right and the
   price level wrong, which is exactly why EXCHANGE_BASIS exists.
 
 ================================================================================================
 EXPERIMENT 3 — permutation test on the saves finding
 ================================================================================================
-  observed closer excess: +2.23 roto points
+  observed closer excess: +2.18 roto points
   null distribution (label shuffled within season x price band):
-    mean +0.217, sd 0.501, 95% range [-0.76, +1.20]
+    mean +0.235, sd 0.537, 95% range [-0.80, +1.31]
   two-sided p = 0.0000  (5000 permutations)
   The shuffle holds season and price band fixed, so this is not
   the time trend and not 'cheap players beat their price'.
@@ -50,17 +50,17 @@ EXPERIMENT 4 — calibrating the AVG denominator against CBS's rank
 ================================================================================================
   matched 93 of 94 CBS hitters
  AVG_denom_multiplier  AVG_denominator  spearman_vs_CBS
-                 0.40           0.0009           0.6898
-                 0.50           0.0011           0.7551
-                 0.60           0.0014           0.7971
-                 0.75           0.0017           0.8445
-                 1.00           0.0023           0.8927
-                 1.25           0.0029           0.9107
-                 1.50           0.0034           0.9117
-                 2.00           0.0046           0.9011
+                 0.40           0.0009           0.7234
+                 0.50           0.0011           0.7836
+                 0.60           0.0014           0.8210
+                 0.75           0.0017           0.8612
+                 1.00           0.0023           0.9044
+                 1.25           0.0028           0.9135
+                 1.50           0.0034           0.9085
+                 2.00           0.0045           0.8940
 
-  best agreement at multiplier 1.5 (denominator 0.00345), rho = 0.912
-  current setting is 1.0, rho = 0.893
+  best agreement at multiplier 1.25 (denominator 0.00281), rho = 0.914
+  current setting is 1.0, rho = 0.904
   -> the curve is flat near 1.0; no material evidence the AVG
      denominator is mis-set. The CBS/model disagreement on
      average-vs-power is not explained by this parameter.
