@@ -3,6 +3,43 @@
 Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
+<details>
+<summary><strong>Contents</strong> (31 sections — click to expand)</summary>
+
+1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
+2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
+3. [The auction exchange rate is decaying fast](#3-the-auction-exchange-rate-is-decaying-fast)
+4. [Half the 5×5 categories barely repeat year to year](#4-half-the-55-categories-barely-repeat-year-to-year)
+5. [Denominators: what one standings point costs (2027)](#5-denominators-what-one-standings-point-costs-2027)
+6. [How much do the modelling choices actually matter?](#6-how-much-do-the-modelling-choices-actually-matter)
+7. [The exchange rate is NOT stably estimated (and I should have checked sooner)](#7-the-exchange-rate-is-not-stably-estimated-and-i-should-have-checked-sooner)
+8. [No evidence that bidders overpay for particular MLB teams](#8-no-evidence-that-bidders-overpay-for-particular-mlb-teams)
+9. [What separates the good teams: efficiency, not spending](#9-what-separates-the-good-teams-efficiency-not-spending)
+10. [Keep-vs-cash: cutting a player does not refund his value](#10-keep-vs-cash-cutting-a-player-does-not-refund-his-value)
+11. [The projection source matters as much as any modelling knob](#11-the-projection-source-matters-as-much-as-any-modelling-knob)
+12. [Which results use which seasons](#12-which-results-use-which-seasons)
+13. [Contracts are options, not obligations (bug, now fixed)](#13-contracts-are-options-not-obligations-bug-now-fixed)
+14. [Waiver value is now a three-way switch, and the high setting fails a smell test](#14-waiver-value-is-now-a-three-way-switch-and-the-high-setting-fails-a-smell-test)
+15. [Positional adjustment: built as a toggle, off, and currently unusable](#15-positional-adjustment-built-as-a-toggle-off-and-currently-unusable)
+16. [CORRECTION: the keeper-count "tension" was my error](#16-correction-the-keeper-count-tension-was-my-error)
+17. [The auctions did not happen in the same world](#17-the-auctions-did-not-happen-in-the-same-world)
+18. [Z-scores: an independent check, and a surprise about roster construction](#18-z-scores-an-independent-check-and-a-surprise-about-roster-construction)
+19. [RETRACTION: the keeper-count mechanism is not identified](#19-retraction-the-keeper-count-mechanism-is-not-identified)
+20. [Unrostered players worth having](#20-unrostered-players-worth-having)
+21. [External validation against CBS's own roto rank](#21-external-validation-against-cbss-own-roto-rank)
+22. [Experiments: real error bars on the headline numbers](#22-experiments-real-error-bars-on-the-headline-numbers)
+23. [The constitution, finally read — three rule corrections](#23-the-constitution-finally-read--three-rule-corrections)
+24. [The final-year extension was priced at one year when the rule allows two](#24-the-final-year-extension-was-priced-at-one-year-when-the-rule-allows-two)
+25. [Two final-year contracts don't reconcile against the draft record — unresolved](#25-two-final-year-contracts-dont-reconcile-against-the-draft-record--unresolved)
+26. [Partial-2026 denominator exclusion: the rate-vs-counting split was a proxy for something else](#26-partial-2026-denominator-exclusion-the-rate-vs-counting-split-was-a-proxy-for-something-else)
+27. [Replacement level, revisited: the field-standard comparison, a new sanity check, and confirming the clean test is still genuinely blocked](#27-replacement-level-revisited-the-field-standard-comparison-a-new-sanity-check-and-confirming-the-clean-test-is-still-genuinely-blocked)
+28. [Reliability refit found a real bug: BB and H were both silently set to WHIP's number](#28-reliability-refit-found-a-real-bug-bb-and-h-were-both-silently-set-to-whips-number)
+29. [Depth-vs-stars, redone with share of production](#29-depth-vs-stars-redone-with-share-of-production-the-hypothesized-cleanup-only-half-worked)
+30. [The headline ±38% uncertainty band was computed around the wrong point estimates](#30-the-headline-38-uncertainty-band-was-computed-around-the-wrong-point-estimates)
+31. [A second, live copy of the same season-set bug: `teams_per_category`](#31-a-second-live-copy-of-the-same-season-set-bug-teams_per_category)
+
+</details>
+
 ---
 
 ## 1. Saves look underpriced — but only if you assume you're competing in them
@@ -1108,8 +1145,7 @@ excluded set" as the best current evidence rather than a closed question —
 worth revisiting once 2026 is a complete season and there's a same-season
 comparison point instead of an in-progress one.
 
-## 27. Replacement level, revisited: the field-standard comparison, a new sanity
-check, and confirming the clean test is still genuinely blocked
+## 27. Replacement level, revisited: the field-standard comparison, a new sanity check, and confirming the clean test is still genuinely blocked
 
 `out/QA_ROUND.md` §A4 named a specific unrun test for replacement level
 ("take every player available on the wire on date X, measure realised

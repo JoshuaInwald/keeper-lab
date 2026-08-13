@@ -3,6 +3,26 @@
 Read this before changing a modelling decision. Most of the obvious
 alternatives were tried and rejected for reasons that are not obvious.
 
+<details>
+<summary><strong>Contents</strong> (13 sections — click to expand)</summary>
+
+1. [Denominators: four estimators tried, all unstable, fixed by pooling](#1-denominators-four-estimators-tried-all-unstable-fixed-by-pooling)
+2. [Contract codes: the correction, and how it was established](#2-contract-codes-the-correction-and-how-it-was-established)
+3. [Projections: three things that had to be right](#3-projections-three-things-that-had-to-be-right)
+4. [Bugs found and fixed (in order of severity)](#4-bugs-found-and-fixed-in-order-of-severity)
+5. [Open forks — the things a sensitivity analysis needs to test](#5-open-forks--the-things-a-sensitivity-analysis-needs-to-test)
+6. [Things deliberately not done](#6-things-deliberately-not-done)
+7. [External review (2026-08-13) — what it found and what changed](#7-external-review-2026-08-13--what-it-found-and-what-changed)
+   - [Building the interface (session 5)](#building-the-interface-session-5)
+8. [Publishing to GitHub (2026-08-13) — two false alarms, one real gap](#8-publishing-to-github-2026-08-13--two-false-alarms-one-real-gap)
+9. [Rejected: "re-drafted players get a fresh 3-year clock"](#9-rejected-re-drafted-players-get-a-fresh-3-year-clock-2026-08-13)
+10. [The partial-season exclusion rule generalized from 5 of 10 categories](#10-the-partial-season-exclusion-rule-generalized-from-5-of-10-categories-2026-08-13)
+11. [Rejected: median of the full free-agent pool as a survivorship-free replacement estimate](#11-rejected-median-of-the-full-free-agent-pool-as-a-survivorship-free-replacement-estimate-2026-08-13)
+12. [BB and H reliability were copy-pasted from WHIP](#12-bb-and-h-reliability-were-copy-pasted-from-whip-2026-08-13)
+13. [Fixing #26 didn't fix all of #26](#13-fixing-26-didnt-fix-all-of-26-2026-08-13)
+
+</details>
+
 ---
 
 ## 1. Denominators: four estimators tried, all unstable, fixed by pooling
