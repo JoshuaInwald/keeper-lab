@@ -815,3 +815,35 @@ specifically because something ran across the FULL player pool instead of
 a hand-picked test case (`_pick_challenge`'s tie-break, #41's ~28-of-45
 pairs, was the first) -- both were "worked fine on the players I checked
 by hand, broke on player #340."
+
+## 23. UI audit: a screenshot technique that lies about mobile, twice (2026-08-13)
+
+Requested pass over the whole app before Josh tests it himself
+(`out/FINDINGS.md` #44). Two real bugs found (a stale "extension +$5"
+status string surviving the #39 correction; the player-card drawer never
+showed IL/LOCKED tags at all, unlike the board table) -- both fixed and
+worth remembering on their own. The more useful thing to write down here
+is a tooling lesson: Playwright's `fullPage: true` screenshot option
+produced TWO convincing-looking false alarms in a row, both from the same
+root cause.
+
+First: a 390px mobile screenshot of the board table looked like a totally
+broken, illegibly-crushed 14-column table. Second: a free agent's drawer
+looked like it was missing two whole panels, cut off mid-page. Both were
+elements with their own internal scroll/overflow (`.wrap{overflow:auto}`
+on the table; `#drawer{position:fixed;overflow:auto}` on the drawer) --
+and in both cases, a `fullPage` capture didn't reflect what a real user
+would actually see. Confirmed by (1) re-screenshotting at the true
+viewport size without `fullPage`, which showed the correct, clean,
+already-working rendering in both cases, and (2) directly querying the
+live DOM (`getComputedStyle`, `innerHTML.includes(...)`) rather than
+trusting any screenshot at all for the free-agent case.
+
+The lesson isn't "don't use fullPage screenshots" -- it's "when a
+screenshot shows something surprising, verify against the DOM/computed
+styles before writing it up as a bug." Two out of four things this audit
+flagged as "wrong" were artifacts of the audit's OWN tooling, not of the
+app. Reported as bugs anyway without that check, this session would have
+"fixed" a mobile layout and a missing panel that were never actually
+broken -- wasted work chasing the audit method's blind spot instead of the
+app's.

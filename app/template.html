@@ -333,7 +333,10 @@ function sortRows(rows){
   });
 }
 function sortBy(k){ if(S.sort===k) S.desc=!S.desc; else {S.sort=k;S.desc=true;} refilter(); }
-const FA_NOTE = "unrostered, priced at their live draft contract";
+const FA_NOTE = "unrostered, priced at their live draft contract. "
+  + "\"Likely range\" and \"Sure?\" are blank here on purpose -- the uncertainty "
+  + "bootstrap (klab/uncertainty.py) only scores the 275 rostered players' real "
+  + "contracts, not free agents' hypothetical ones";
 const curRows = ()=> sortRows(filtered(S.tab==="fa"?FA:BOARD));
 // Re-render only the table. Keeps the search box focused and the caret where
 // the user left it, which a full re-render does not.
@@ -470,8 +473,14 @@ function showPlayer(id){
   const yrs = [["2027","surplus_y2027"],["2028","surplus_y2028"],["2029","surplus_y2029"]]
     .filter(([y,k])=>g(r,k)!==0)
     .map(([y,k])=>`<div class="k">${y} surplus</div><div class="v">${sgn(adj(g(r,k)),1,"$")}</div>`).join("");
+  // Same KEEP/IL/LOCKED tags as the board table (playerRow()) -- the
+  // drawer had no way to tell a viewer a player was hurt except by closing
+  // it and checking the table row instead. Caught in a 2026-08-13 UI audit.
+  const tags = (g(r,"keep_2027")?'<span class="tag keep" title="in the recommended keeper set">KEEP</span>':"")
+    + (g(r,"il")?'<span class="tag il" title="on the injured list">IL</span>':"")
+    + (g(r,"keepable")===false?'<span class="tag il" title="confirmed free agent after 2026 -- the extension window closes before this player\'s own walk-year draft, and it already has">LOCKED</span>':"");
   $("dbody").innerHTML=`
-    <h2>${esc(g(r,"name"))}</h2>
+    <h2>${esc(g(r,"name"))}${tags}</h2>
     <div class="sub dim">${esc(g(r,"team"))} · ${esc(g(r,"keeper_status"))}
       ${g(r,"extension_used")?" · extension already used":""}</div>
     <div class="panel" style="margin-top:14px">

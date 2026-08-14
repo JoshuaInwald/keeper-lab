@@ -49,6 +49,7 @@ in `LAB_NOTEBOOK.md`.
 41. [The trade finder was non-deterministic across identical reruns — caught checking auto-refresh safety](#41-the-trade-finder-was-non-deterministic-across-identical-reruns--caught-checking-auto-refresh-safety)
 42. [A projection-basis selector — three payloads, swapped client-side, no rebuild](#42-a-projection-basis-selector--three-payloads-swapped-client-side-no-rebuild)
 43. [Auction-estimator UI integration — a player-card panel, and a real bug it exposed on the way in](#43-auction-estimator-ui-integration--a-player-card-panel-and-a-real-bug-it-exposed-on-the-way-in)
+44. [UI audit: a stale pre-#39 status string, a missing IL/LOCKED tag, and two confirmed false alarms](#44-ui-audit-a-stale-pre-39-status-string-a-missing-illocked-tag-and-two-confirmed-false-alarms)
 
 </details>
 
@@ -2166,3 +2167,78 @@ rows for a player who has an estimate, is absent for one who doesn't, and
 its displayed fair value actually changes when the basis switches
 (confirming the per-basis wiring above actually took effect, not just that
 the code runs without crashing).
+
+## 44. UI audit: a stale pre-#39 status string, a missing IL/LOCKED tag, and two confirmed false alarms
+
+Requested directly ("really work hard on making sure that's solid, that
+info is accessible") ahead of Josh testing the UI himself. Method: screenshot
+every tab at desktop and mobile widths, exercise every filter/toggle/sort
+combination, open the drawer for one example of each player archetype
+(two-way, IL, F-contract, extension-eligible, free agent), fill out the
+trade tab, and read every screenshot rather than trusting `verify.mjs`'s
+green output alone — the same method that caught #42's stale settings
+display. Two real bugs found and fixed; two more things looked wrong and
+turned out not to be, worth recording so they aren't "found" again.
+
+**Bug 1 — `keeper_status()` never got the #39 memo.** Opening an F-contract
+player's card (Salvador Perez) showed the subheader "All-Stars · extension
++$5" directly under the team name — a live, specific extension price — while
+the Money panel two inches below correctly showed `extension_option: $0.0`
+and `multi-year surplus: $0.0`. Root cause: `klab/board.py`'s
+`keeper_status()` returns a hardcoded `"extension +$5"` string for every
+`C.EXTENSION_REQUIRED` contract code, unchanged since before #39's
+correction that F-contract players are never extendable. #39 fixed every
+*numeric* consequence of the wrong premise (`keepable`, `extension_option`,
+`surplus_multiyear` all correctly zero) but nobody re-checked the *string*
+against the corrected model, because it only surfaces in the app's own
+prose, not in any number a test would compare. Fixed to `"free agent after
+2026 (not extendable)"`, matching the `COL_HELP.contract` tooltip's own
+language. New test: `test_f_contract_status_label_does_not_claim_an_extension_exists`
+(`tests/test_invariants.py`) asserts no F-contract player's status string
+contains a `$` sign, specifically so a future edit that reintroduces a
+dollar figure here fails loudly.
+
+**Bug 2 — the drawer had no IL/LOCKED indicator at all.** The board table
+(`playerRow()`) has always shown `KEEP`/`IL`/`LOCKED`/`EXT`/`USED` tags next
+to a player's name; the player-card drawer (`showPlayer()`) showed none of
+them — opening a player's own detail view was the one place in the app that
+couldn't tell you he was hurt or unkeepable without going back to the table
+row. Fixed by adding the identical tag logic to the drawer's `<h2>`.
+
+**False alarm 1 — mobile board table looked crushed and unreadable in a
+`fullPage: true` Playwright screenshot.** A 390px-wide capture showed all 14
+columns squeezed into illegible text across a ~9000px-tall page. Investigated
+before concluding it was real: measured the actual rendered DOM (`th`
+elements are present but `display:none`'d correctly by the existing
+`@media(max-width:700px)` rule) and took a viewport-only (non-fullPage)
+screenshot instead, which showed exactly the intended reduced column set
+(`Player`/`Sal`/`Cost`/`Worth '27`), clean and legible. `fullPage`
+screenshots of a page with an internally-scrolling/overflowing element
+apparently don't reliably reflect the live-viewport rendering — worth
+remembering for any future UI audit that leans on this technique.
+
+**False alarm 2 — a free agent's drawer appeared to be missing the
+"Next-auction estimate" and "Rest of 2026" panels entirely** in the same
+kind of `fullPage` screenshot, cut off mid-page with a large blank area
+below. Same root cause: `#drawer` is `position:fixed` with its own
+`overflow:auto`, and a `fullPage` body screenshot doesn't capture that
+element's internal scroll correctly. Confirmed via direct DOM inspection
+(`$("dbody").innerHTML.includes(...)`) that both panels were present and
+correctly populated all along — nothing to fix.
+
+**Real gap surfaced but not fixed: free agents never get uncertainty
+bands.** The free-agent table's "Likely range" and "Sure?" columns are
+blank for all 400 rows — not a display bug, but a genuine, pre-existing
+scope limit in `klab/uncertainty.py`'s `bootstrap_bands()`: it derives
+`keep_ids` from `board["fg_id"]` (rostered players only) because it needs
+each player's real contract (`keeper_cost`, `years_controlled`, `salary`,
+`keepable`), fields a free agent's hypothetical "live draft contract" only
+partially resembles. Extending it to free agents is a real modelling
+decision (does a FA's listed salary mean the same thing a rostered
+player's contract does, for this specific calculation?), not a UI fix, so
+it wasn't attempted here. What *was* fixed: the blank dash previously had
+no explanation anywhere a user could find it — `FA_NOTE` (shown under the
+free-agent table) now states directly why those two columns are empty,
+so it reads as a stated limitation instead of a possible bug. Logged as a
+candidate for a future modelling session, not added to `out/ROADMAP.md`'s
+numbered list since it's not yet scoped enough to size.

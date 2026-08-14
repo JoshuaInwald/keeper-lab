@@ -470,3 +470,19 @@ def test_f_contract_players_are_never_keepable(board):
     assert not f_players["keep_2027"].any()
     assert (f_players["extension_option"] == 0).all()
     assert (f_players["surplus_multiyear"] == 0).all()
+
+
+def test_f_contract_status_label_does_not_claim_an_extension_exists(board):
+    """Real bug, caught in a 2026-08-13 UI audit, not by any prior test:
+    board.py's `keepable` logic was fixed for #39, but `keeper_status()`
+    (klab/board.py) still returned the literal string "extension +$5" for
+    every F-contract player -- exactly the pre-#39 claim the rest of the
+    board had already stopped believing. Anyone reading the app's player
+    card (which displays this string directly) would see a live extension
+    price next to a player the model had already zeroed out. See
+    out/FINDINGS.md #44."""
+    b, _, _ = board
+    f_players = b[b["contract"].astype(str).str.upper() == "F"]
+    assert len(f_players) > 0, "test needs at least one F-contract player to exist"
+    assert not f_players["keeper_status"].str.contains(r"\$", regex=True).any()
+    assert f_players["keeper_status"].eq("free agent after 2026 (not extendable)").all()

@@ -229,7 +229,15 @@ def keeper_status(contract) -> str:
     if c in C.YEARS_REMAINING:
         return f"keepable x{C.YEARS_REMAINING[c]}yr"
     if c in C.EXTENSION_REQUIRED:
-        return "extension +$5"
+        # This used to read "extension +$5", true before the correction in
+        # out/FINDINGS.md #39: an "F" observed here means the extension
+        # window (which closes before his own walk-year draft) has already
+        # passed, so there is no extension to buy. Left stale here even
+        # after board.py's `keepable` logic was fixed -- nothing re-checked
+        # this string against the corrected model, and it only surfaced
+        # visually in the app's player-card subheader. Caught 2026-08-13
+        # UI audit; see out/FINDINGS.md #44.
+        return "free agent after 2026 (not extendable)"
     return "unknown"
 
 
