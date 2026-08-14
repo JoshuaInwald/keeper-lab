@@ -134,6 +134,7 @@ should be read alongside every dollar figure.
 | `market_analysis.py` | market biases, team characteristics, keep-vs-cash |
 | `backtest.py` | does the engine explain seasons other than 2026 |
 | `build_app.py` | serialise the snapshot into `out/keeper_lab.html` |
+| `estimate_auction_price.py "Name"` | comp-based next-auction price range — a deliberately separate estimate from `redraft_value`, see `out/FINDINGS.md` #35 |
 
 Cold run ≈ 2.7s; a second build in the same process ≈ 0.08s.
 

@@ -1618,3 +1618,71 @@ prorated replacement comparison — and is a roadmap item, not something
 built this session. `ros_value_over_replacement` is the honest, smaller
 piece: a fair player-vs-player comparison for "how good is this rest of
 this year," decoupled from any specific trade partner's standings context.
+
+## 35. A comp-based next-auction price estimator — a deliberately separate tool
+
+Built at Josh's explicit request, and explicitly **not** integrated with or
+allowed to change anything else: `klab/auction_estimator.py`,
+`scripts/estimate_auction_price.py`, `tests/test_auction_estimator.py`.
+Nothing in `board.py`, `auction.py`, or `keeper.py` was touched, and
+`redraft_value` means exactly what it meant before this section.
+
+**The question it answers, which `redraft_value` deliberately doesn't**:
+`redraft_value` is a regression-based *fair-value* estimate — what a player
+with this production *should* cost, on average, given this league's own
+auction history. It has no way to know that a name, a big recent year, or
+this league's own specific taste moves real prices around that fair value.
+This tool finds the 15 nearest historical comps (by role, position group,
+and per-category production profile) from all 677 real purchases across
+2022-2026, and asks: did players who looked like this typically sell for
+more or less than a pure production regression predicted, *in the season
+they were actually bought*? That premium, applied to the target's own
+`redraft_value`, is the comp-adjusted estimate.
+
+**Freddie Freeman, worked example** (`regression_fair_value` = $15.42):
+comp-adjusted range **$14.15–$38.46**, median **$23.18**. The single most
+informative comp is *Freeman himself, one year ago* — drafted at $28 in
+2025 against a $8.55 production-only prediction, a +192% premium. Two more
+comps (Guerrero Jr. +265%, Devers +211%) show the same pattern for
+name-brand corner-infield bats. That's a real, specific signal this
+league's market pays a track-record premium for players like him that the
+pure regression has no way to see — exactly the gap this tool exists to
+surface. Tarik Skubal's range came back very wide ($3.60–$79.20) for a
+different, equally honest reason: checked the actual comps, and elite
+starting-pitcher prices in this league's history genuinely span from $1
+(injury-discounted) to $33 (name value) at similar production levels — the
+width is real market variance, not a bad match (closest comps were
+Wheeler/Musgrove/Verlander/Kershaw, all sensible).
+
+**Known limitation, by design, not an oversight**: no age or debut-year
+data exists anywhere in `data/` (checked directly), so this can't do
+age-based comps at all — a real, standard input for this kind of estimate.
+Position and realized production level are the only axes available.
+
+**Two potential improvements to *existing, established* code, found while
+building this and deliberately not applied, per instruction:**
+
+1. **A regression-methodology lesson that may generalize.** Building the
+   season-by-season regression this tool needs, a plain OLS on raw-dollar
+   salary gave a systematically negative median residual every season
+   (typical player looked overpriced by 8-22%, balanced to a near-zero mean
+   only by a handful of $30+ stars). Switching to log-salary flipped the
+   bias to systematically *positive* instead (the standard
+   retransformation/Jensen's-inequality effect of exponentiating a log-scale
+   fit back to dollars). Fixed *for this tool* by recentering each season's
+   residual to its own median rather than trusting either regression's
+   absolute calibration. Whether `klab/auction.py`'s exchange-rate
+   regression (`fit_exchange_rate`, which the whole board's dollar scale
+   depends on) has a comparable issue was **not checked** — it uses a
+   different, already-validated construction (production regressed on
+   price, not price on production, specifically to handle attenuation bias
+   the other direction) — but the general lesson, that this league's salary
+   distribution doesn't sit nicely around a linear-in-dollars fit, seems
+   worth a deliberate look sometime, not an assumption either way.
+2. **111 of 668 historical purchases (17%) have no position data** in
+   `out/auction_sample.csv` (`pos` is null) and fall back to role-only
+   comps here. Whether this is fixable (a name-based lookup against a
+   position source not currently joined in) or a genuine gap in what
+   the auction exports carry was not investigated — flagging it because
+   it silently affects comp-pool size for every position-specific search
+   this tool runs, and would affect anything else built on that file later.

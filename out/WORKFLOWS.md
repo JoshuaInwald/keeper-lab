@@ -120,7 +120,26 @@ league will inflate 43%," present it as "if everyone keeps optimally, a
 remaining draft dollar buys 0.7 roto points, versus 1.0 in a
 no-keeper world."
 
-## 4. If you changed any code in `klab/` — get it into the app
+## 4. "What would this player actually go for at next year's auction?"
+
+Different question from #2/#3 above, and `redraft_value` deliberately
+doesn't answer it — that's a fair-value regression, not a market-price
+prediction. Use the comp-based estimator instead:
+
+```bash
+PYTHONPATH=. python3 scripts/estimate_auction_price.py "Player Name"
+```
+
+This is a genuinely separate tool (`klab/auction_estimator.py`) built
+2026-08-13 — see `out/FINDINGS.md` #35 for the full writeup, including a
+worked example where the top comp for a real 2027 target was that same
+player's *own* price from a year ago. It has a real, known blind spot: no
+age/debut-year data exists anywhere in `data/`, so it can't do age-based
+comps at all, only position and production level. **Not wired into the app
+yet** — it's designed to be addable later (see `out/ROADMAP.md`), but for
+now it's CLI-only.
+
+## 5. If you changed any code in `klab/` — get it into the app
 
 The app (`out/keeper_lab.html`) is generated from the same `klab/` code
 every script uses (see `out/ARCHITECTURE.md` §"One entry point") — there is

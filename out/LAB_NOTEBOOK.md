@@ -559,3 +559,43 @@ consistent the whole time. The defense for that class of bug is exactly
 what happened here — a domain expert (the actual commissioner-level
 knowledge of the rule) checking the code against their own understanding,
 not the code checking itself. Neither method substitutes for the other.
+
+## 15. Building the auction-price estimator: two forks tried and rejected in the regression itself
+
+Building `klab/auction_estimator.py` (`out/FINDINGS.md` #35), the first
+version of `comp_pool()`'s per-season regression used raw-dollar OLS
+(`salary ~ roto_points`). Sanity-checked the resulting `premium_frac`
+before trusting it and found every season's median sitting at -8% to -22%
+— the typical historical purchase looked systematically overpriced, with
+only a handful of $30+ stars pulling the mean back toward zero. That's not
+a real market pattern, it's OLS on a right-skewed, $1-floored salary
+distribution getting dominated by its own outliers.
+
+**Fork 1, rejected: log-salary OLS.** Fit `log(salary) ~ roto_points`
+instead, expecting a better-behaved residual. Checked it before trusting
+it too: the bias flipped sign instead of disappearing — every season's
+median premium came back systematically *positive* (median comp looked
+underpriced). This is the standard retransformation bias from
+exponentiating a log-scale fit back to dollars (`E[exp(x)] != exp(E[x])`)
+— textbook, not a coding mistake, but still not a usable center.
+
+**What actually worked: stop trying to get the regression's intercept
+right, and recenter each season's residuals to their own median.** This
+sidesteps the raw-vs-log distributional argument entirely — "premium
+relative to the typical comp at this production level" is well-defined
+regardless of which functional form the underlying fit uses, as long as
+you don't lean on its absolute calibration. Kept the log-salary version as
+the base fit (better residual shape even if the center needed correcting)
+purely because it can't predict a negative dollar price for a bad line,
+which a raw-dollar OLS can.
+
+**A separate bug, not a modeling fork:** the first working version of
+`_distance()` crashed with `'numpy.float64' object has no attribute
+sqrt'`. Cause: `target` is a row sliced out of a mixed-dtype DataFrame
+(name/role are strings), so the Series itself silently comes back
+`dtype=object` even though the specific values being read out of it are
+floats — the object dtype propagated into the subtraction and `np.sqrt`
+choked trying to call `.sqrt()` as a method on a plain float. Fixed with an
+explicit `.astype(float)`. Worth remembering as a category of bug distinct
+from the modeling ones above: pandas silently downgrading a numeric slice
+to `object` because *some other column in the same row* was a string.

@@ -145,6 +145,29 @@ scraping CBS. Unlocks: historical acquisition-channel analysis back to 2022,
 manager skill evaluation (who converts draft dollars into production best),
 and true "value added by trade" per manager.
 
+**3.6 Auction-price-estimator UI integration (0.5-1 session).** Built
+2026-08-13 as a standalone tool (`klab/auction_estimator.py`,
+`scripts/estimate_auction_price.py`, `out/FINDINGS.md` #35) — comp-based
+next-auction price range, deliberately separate from `redraft_value`.
+Currently CLI-only. Adding it to the app means: a player-card panel
+showing the comp-adjusted range next to the regression fair value, and the
+comp list itself (transparency — the estimate should never look like a
+black box). Real blind spot to fix or document prominently in the UI: no
+age/debut-year data anywhere in `data/`, so it can't do age-based comps.
+
+**3.7 Young/rookie-player projection modeling (0.5-1 session to scope,
+more to build).** Researched 2026-08-13, not implemented: the current
+`RELIABILITY` blend weights (`klab/project.py`) were fit exclusively on
+players with an existing multi-year MLB track record, then applied
+uniformly to first-full-season players too. The research (cited sources in
+`out/FINDINGS.md`'s session log) doesn't support a simple "trust rookies
+more" fix — the credible direction is routing noisy outcome stats like ERA
+through their more-reliable components (K/BB/H) for players without a
+qualifying prior season, or refitting a second reliability table
+specifically on debut-year transitions. Concrete test case:
+Christian Scott, whose model-blended 2027 ERA lands closer to a
+conservative ZiPS forecast than to his own strong 78-inning 2026 sample.
+
 ---
 
 ## Phase 4 — Portfolio polish. ~1–2 sessions
