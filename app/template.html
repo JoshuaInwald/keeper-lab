@@ -67,6 +67,8 @@ tbody tr.sel{background:var(--sel)}
 .tag.il{border-color:var(--neg);color:var(--neg)}
 .tag.ext{border-color:var(--accent2);color:var(--accent2)}
 .tag.role{border-color:var(--link);color:var(--link)}
+.mlbteam{font-size:10.5px;color:var(--dimmer);border:1px solid var(--line);border-radius:3px;
+  padding:0 4px}
 .wrap{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:11px;margin-bottom:18px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;
@@ -364,7 +366,7 @@ const BOARD_COLS=[
   ["salary","Sal"],["contract","Yr"],["keeper_cost","Cost"],
   ["roto_points","Roto pts"],["redraft_value","Worth '27"],
   ["value_lo","likely range"],
-  ["surplus_y2027","Gain '27"],["surplus_multiyear","Gain, all yrs"],
+  ["surplus_y2027","Surplus '27"],["surplus_multiyear","Surplus, all yrs"],
   ["p_surplus_positive","Sure?"],
   ["redraft_value_2028","Worth '28"],["upside_ft","If full-time"],
   ["ros_value","ROS value"],
@@ -388,10 +390,10 @@ const COL_HELP = {
   roto_points:"Projected 2027 standings points he adds, all ten categories.",
   redraft_value:"What he'd be worth in a 2027 auction, in dollars.",
   value_lo:"80% of bootstrap draws landed inside this range.",
-  surplus_y2027:"Worth '27 minus cost. What you gain by keeping him for 2027.",
-  surplus_multiyear:"The same gain summed over every year you control him, "
+  surplus_y2027:"Worth '27 minus cost -- the surplus value you get by keeping him for 2027.",
+  surplus_multiyear:"The same surplus summed over every year you control him, "
     +"later years discounted 15%/yr and floored at zero, plus the extension option.",
-  p_surplus_positive:"How often the gain stayed positive across the draws. "
+  p_surplus_positive:"How often the surplus stayed positive across the draws. "
     +"Under 80% means the keep is a coin flip, not a decision.",
   redraft_value_2028:"Same dollar value, one year further out.",
   upside_ft:"Extra value if he plays a full season rather than his projected workload. "
@@ -459,6 +461,25 @@ function refilter(){
 }
 function money(v){ return usd(adj(v)); }
 
+// Per-category breakdown for the board's Roto pts / Worth '27 cells --
+// native title tooltips (no custom hover component in this app), but
+// multi-line via \n works fine, same trick playerTooltip() already uses.
+function valueBreakdownTooltip(r){
+  const role = g(r,"role");
+  const cats = role==="HIT" ? D.hit_cats : role==="PIT" ? D.pit_cats : CATS;
+  const rate = D.constants.usd_per_roto_point_redraft;
+  const lines = cats.map(c=>{
+    const rp = g(r,"rp_"+c) || 0;
+    return `${c}: ${rp>=0?"+":""}${rp.toFixed(2)} pts  →  ${rp>=0?"+":"-"}$${Math.abs(rp*rate).toFixed(0)}`;
+  });
+  const replAdj = -D.constants.replacement_roto_points*rate + 1;
+  lines.push(`(everyone's price also has −${nf(D.constants.replacement_roto_points,2)} pts of `
+    + `replacement level folded in, ${replAdj>=0?"+":"-"}$${Math.abs(replAdj).toFixed(0)} -- `
+    + `not shown per row since it isn't a category)`);
+  return `Where Worth '27 comes from (same $/pt rate every category -- click the name for the full table):\n`
+    + lines.join("\n");
+}
+
 function playerRow(r){
   const keep=g(r,"keep_2027"), il=g(r,"il");
   const opt=g(r,"extension_option")>0, used=g(r,"extension_used"),
@@ -472,13 +493,13 @@ function playerRow(r){
         + (String(g(r,"contract")).toUpperCase()==="F"?"EXT×2":"OPT") + `</span>`:"")
   + (used&&!block?'<span class="tag" title="extension already used on this contract">USED</span>':"")
   + `</td>
-  <td class="l dim">${esc(g(r,"team"))}</td>
+  <td class="l dim">${esc(g(r,"team"))} <span class="mlbteam">${esc(g(r,"mlb_team"))}</span></td>
   <td class="dim">${g(r,"role")==="PIT"?"P":g(r,"role")==="TWO"?"H/P":"H"}</td>
   <td>${usd(g(r,"salary"))}</td>
   <td class="dim">${esc(g(r,"contract"))}</td>
   <td>${usd(g(r,"keeper_cost"))}</td>
-  <td>${nf(g(r,"roto_points"))}</td>
-  <td>${money(g(r,"redraft_value"))}</td>
+  <td title="${esc(valueBreakdownTooltip(r))}">${nf(g(r,"roto_points"))}</td>
+  <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"redraft_value"))}</td>
   <td>${band(r,"value_lo","value_hi")}</td>
   <td>${sgn(adj(g(r,"surplus_y2027")),0,"$")}</td>
   <td>${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</td>
@@ -582,7 +603,17 @@ function auctionEstPanel(r){
 }
 function showPlayer(id){
   const r=byId[id]; if(!r) return;
-  const cat = c=>`<div class="k">${c}</div><div class="v">${nf(g(r,"rp_"+c),2)}</div>`;
+  const rpRate = D.constants.usd_per_roto_point_redraft;
+  const catRow = c=>{
+    const rp = g(r,"rp_"+c) || 0;
+    return `<tr><td class="l">${c}</td><td>${nf(rp,2)}</td><td>${sgn(rp*rpRate,0,"$")}</td></tr>`;
+  };
+  // dollars() is (roto_points - replacement)*rate + $1, not roto_points*rate --
+  // so a per-category rp*rate split undercounts the subtraction and looks
+  // like it doesn't add up to Worth '27. This row makes the table actually
+  // reconcile: category rows sum to roto_points*rate; this one folds in the
+  // -replacement*rate and the +$1 floor everyone's price is anchored to.
+  const replAdj = -D.constants.replacement_roto_points*rpRate + 1;
   const role=g(r,"role"), hits=role!=="PIT", pits=role!=="HIT";
   const hLine = `<div class="k">PA</div><div class="v">${nf(g(r,"PA"),0)}</div>
        <div class="k">R</div><div class="v">${nf(g(r,"R"),0)}</div>
@@ -609,13 +640,26 @@ function showPlayer(id){
     + (g(r,"keepable")===false?'<span class="tag il" title="confirmed free agent after 2026 -- the extension window closes before this player\'s own walk-year draft, and it already has">LOCKED</span>':"");
   $("dbody").innerHTML=`
     <h2>${esc(g(r,"name"))}${tags}</h2>
-    <div class="sub dim">${esc(g(r,"team"))} · ${esc(g(r,"keeper_status"))}
+    <div class="sub dim">${esc(g(r,"team"))} <span class="mlbteam">${esc(g(r,"mlb_team"))}</span> · ${esc(g(r,"keeper_status"))}
       ${g(r,"extension_used")?" · extension already used":""}</div>
     <div class="panel" style="margin-top:14px">
       <h3>2027 projection${g(r,"pt_scale")>1.001?` · playing time scaled ×${nf(g(r,"pt_scale"),2)}`:""}</h3>
       ${line}
       <h3 style="margin-top:12px">Roto points by category</h3>
-      <div class="kv">${cats.map(cat).join("")}
+      <div class="note">How much of his 2027 dollar value each category is carrying -- same $/point
+        rate for every category, so a below-average one (shown in red) is a real drag on his price,
+        not just a weak spot on the stat line. Rows sum exactly to Worth '27, except for a player
+        priced at the $0 floor, where the real figure is clipped higher than this table's raw sum.</div>
+      <table style="margin-top:6px"><thead><tr>
+        <th class="l">Cat</th>
+        <th title="Standings points this category alone contributes, positive or negative.">Roto pts</th>
+        <th title="Roto points × this league's $/point rate -- the same rate for every category.">$ of Worth '27</th>
+      </tr></thead><tbody>${cats.map(catRow).join("")}
+        <tr><td class="l dim" title="Every player's price is anchored the same way: subtract what a free replacement player would produce, then floor at a $1 minimum bid. This isn't a category -- it's the same fixed adjustment for everyone, folded in here so this table's own numbers add up to Worth '27 exactly.">− replacement level, + $1 floor</td>
+          <td class="dim">−${nf(D.constants.replacement_roto_points,2)}</td>
+          <td class="dim">${sgn(replAdj,0,"$")}</td></tr>
+      </tbody></table>
+      <div class="kv" style="margin-top:8px">
         <div class="k" style="color:var(--ink)">total</div>
         <div class="v">${nf(g(r,"roto_points"),2)}</div>
         <div class="k">above replacement</div><div class="v">${nf(g(r,"rp_above_repl"),2)}</div></div>
@@ -722,9 +766,13 @@ function teamsView(){
       "Current roster rolled forward on rest-of-season projections, all ten teams re-ranked."],
     ["n_keep","Keepers","",x=>x.n_keep,"How many players the model says to keep."],
     ["keeper_salary","Keeper cost","",x=>usd(x.keeper_salary),"Total 2027 salary of that keeper set."],
-    ["keeper_value","Keeper worth","",x=>money(x.keeper_value),"What those players would fetch at auction."],
-    ["surplus","Gain","",x=>sgn(adj(x.surplus),0,"$"),
-      "Worth minus cost — the only thing that survives into next season."],
+    ["keeper_value","Keeper worth","",x=>money(x.keeper_value),
+      "The RAW dollar value of this team's keeper set — what those players would fetch in an "
+      +"open 2027 auction, full stop, ignoring what this team is actually paying for them."],
+    ["surplus","Surplus","",x=>sgn(adj(x.surplus),0,"$"),
+      "Keeper worth MINUS keeper cost — the edge this team's keeper picks actually bought over "
+      +"just paying full auction price for the same players. This, not \"keeper worth,\" is the "
+      +"number that measures how good the keeper DECISIONS were, not just how good the players are."],
     ["per_dollar","Worth per $","",x=>x.per_dollar==null?"—":nf(x.per_dollar,2)+"×",
       "Keeper worth divided by keeper cost. How efficient the set is, independent of its size."],
     ["auction_budget","Auction $","",x=>usd(x.auction_budget),"$260 minus keeper cost."],
@@ -860,7 +908,8 @@ function tradeView(){
       <div class="picker">${roster.map(r=>{
         const id=g(r,"fg_id");
         return `<div class="${taken.has(id)?"taken":""}" onclick="add('${key}',${id})">
-          <span>${esc(g(r,"name"))} <span class="dim">${g(r,"role")==="PIT"?"P":"H"}</span></span>
+          <span>${esc(g(r,"name"))} <span class="dim">${g(r,"role")==="PIT"?"P":"H"}</span>
+          <span class="mlbteam">${esc(g(r,"mlb_team"))}</span></span>
           <span class="dim">${usd(g(r,"keeper_cost"))} → ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</span></div>`;
       }).join("")}</div></div>`;
   };
@@ -995,7 +1044,7 @@ function tradeResult(){
 const CONST_HELP = {
   "usd_per_roto_point_auction": "What one standings point costs in a live auction, estimated by regressing what teams actually paid for players against how many points those players delivered. This is the number the trade evaluator uses to compare a dollar of value against a standings point.",
   "usd_per_roto_point_redraft": "A slightly different scale for the player-card “Worth” figures: what a point is worth if you drafted the player fresh today, not what an actual auction (with its own quirks, like saves being underpaid) says a specific player costs.",
-  "auction_intercept": "A second, independent estimate of replacement level: what the auction-price regression predicts a $0 player would produce, in roto points. Deliberately never fit to match the “replacement level” number below — when the two agree, that's a real cross-check, not a coincidence.",
+  "auction_intercept": "A second, independent estimate of replacement level: what the auction-price regression predicts a $0 player would produce, in roto points. No one has ever actually paid $0 in this league (the minimum bid is $1) -- this is a straight-line extrapolation one dollar past the edge of the real data, which is exactly why out/FINDINGS.md #27 treats it as a LOWER-BOUND estimate, not the number the model actually prices players against (that's \"replacement level\" below, fit a different way). Deliberately never fit to match that number — when the two roughly agree, that's a real cross-check, not a coincidence.",
   "replacement_level": "How many roto points the best player you could add for free (off any team's bench or the waiver wire) actually produces. Every rostered player's dollar value is measured relative to this baseline, not to zero.",
   "budget_check": "A sanity check on the whole scale: this league has 10 teams × 23 active roster spots = 230 rostered players, and 10 teams × $260 = $2,600 total. If the top 230 projected players' dollar values don't sum close to $2,600, something upstream is miscalibrated.",
   "inflation": "How much more a dollar of talent costs in the real 2027 auction than the “fair value” redraft scale says — because keeper-league owners have already locked up a lot of cheap production, leaving less available talent chasing the same total budget.",
@@ -1073,11 +1122,11 @@ function playerTooltip(r){
     : `ROS: ${nf(g(r,"ros_AB"),0)} AB, ${nf(g(r,"ros_R"),0)}R/${nf(g(r,"ros_HR"),0)}HR/`
       +`${nf(g(r,"ros_RBI"),0)}RBI/${nf(g(r,"ros_SB"),0)}SB`;
   const lockNote = g(r,"keepable")===false ? " -- confirmed free agent, not extendable" : "";
-  return `${g(r,"name")} · ${g(r,"team")} · ${g(r,"position")||"?"}\n`
+  return `${g(r,"name")} · ${g(r,"team")} (${g(r,"mlb_team")||"?"}) · ${g(r,"position")||"?"}\n`
     +`Contract: ${g(r,"contract")}${lockNote}\n`
     +`2027 roto pts: ${nf(g(r,"roto_points"),2)} (${catLine})\n`
     +rosLine+`\n`
-    +`Worth '27: ${money(g(r,"redraft_value"))} · Gain, all yrs: ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}`;
+    +`Worth '27: ${money(g(r,"redraft_value"))} · Surplus, all yrs: ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}`;
 }
 
 function addShadedPlayer(id){
@@ -1122,7 +1171,7 @@ function intuitionView(){
       <th></th>
     </tr></thead><tbody>${rows.map(({r,s})=>`<tr>
       <td class="l"><span class="name" title="${esc(playerTooltip(r))}" onclick="showPlayer(${g(r,'fg_id')})">${esc(g(r,'name'))}</span></td>
-      <td class="l dim">${esc(g(r,'team'))}</td>
+      <td class="l dim">${esc(g(r,'team'))} <span class="mlbteam">${esc(g(r,'mlb_team'))}</span></td>
       <td><button class="act" onclick="bumpTalent(${g(r,'fg_id')},-1)">−</button>
         <span style="display:inline-block;width:46px;text-align:center;font-family:var(--mono)">${s.talent>0?"+":""}${(s.talent*100).toFixed(0)}%</span>
         <button class="act" onclick="bumpTalent(${g(r,'fg_id')},1)">+</button></td>
@@ -1162,7 +1211,7 @@ function intuitionView(){
           model. Treat this as a rough feel for direction and magnitude, not a new official number.</div>
         <table style="margin-top:8px"><thead><tr>
           <th class="l">Player</th><th>Worth '27 before</th><th>Worth '27 after</th>
-          <th>Gain, all yrs before</th><th>Gain, all yrs after</th>
+          <th>Surplus, all yrs before</th><th>Surplus, all yrs after</th>
         </tr></thead><tbody>${dollarRows.map(x=>`<tr>
           <td class="l">${esc(g(x.r,'name'))}</td><td>${money(g(x.r,'redraft_value'))}</td>
           <td>${money(x.shadedVal)}</td>
@@ -1197,15 +1246,17 @@ function intuitionView(){
 }
 
 function modelView(){
-  const c=D.constants, den=c.denominators;
+  const c=D.constants, den=c.denominators, denSe=c.denominators_se||{};
   // Was a two-way test that labelled anything not in NEG_CATS a counting stat,
   // which called AVG a counting stat. It is a rate, and higher is better.
   const RATE=new Set(["AVG","ERA","WHIP"]);
   const kind = x => !RATE.has(x) ? "counting · higher is better"
     : NEG.has(x) ? "rate · lower is better" : "rate · higher is better";
   const rows=CATS.map(x=>{
-    const d=den[x];
-    return `<tr><td class="l">${x}</td><td>${nf(d, d<1?4:2)}</td>
+    const d=den[x], se=denSe[x];
+    const dp = d<1?4:2;
+    return `<tr><td class="l">${x}</td>
+      <td title="1 standard error, propagated from this category's dispersion estimate (out/FINDINGS.md #26) through the same units-per-point conversion. Roughly a 68% interval; double it for something closer to 95%.">${nf(d,dp)} <span class="dim">± ${nf(se,dp)}</span></td>
       <td class="l dim">${kind(x)}</td></tr>`;}).join("");
   // PROJECTION_BASIS is overridden with the live S.basis, not the
   // build-time D.settings value -- the selector in the header can change
@@ -1229,7 +1280,13 @@ function modelView(){
       <tbody>${rows}</tbody></table>
       <div class="note">Estimated from pooled relative dispersion across
         ${D.settings.DENOM_SEASONS} team-seasons, scaled by the expected range of a
-        ${D.league.n_teams}-team sample. Saves use an 8-team field because two teams punt.</div>
+        ${D.league.n_teams}-team sample. Saves use an 8-team field because two teams punt.
+        The ± figure is that estimate's own standard error, propagated through the same
+        conversion -- most categories pool 30 team-seasons and land within about ±13% of
+        their own value; SV (17 team-seasons, two punting teams already excluded) and
+        ERA/WHIP (20, partial seasons excluded) pool fewer and run wider, around ±16-18%.
+        This describes how settled the category's roto-point SCALE itself is, not how
+        trustworthy any one player's own projection is.</div>
     </div>
     <div class="panel"><h3>Fitted constants</h3>
       <div class="kv">

@@ -41,10 +41,19 @@ def build_2027_scorer():
     sigma = pooled_relative_dispersion(seasons=C.DENOM_SEASONS)
     levels = season_levels()
     lvl27 = projected_2027_levels(levels)
-    D = denominators_for_level(sigma, lvl27, n_by_cat=teams_per_category())
+    n_by_cat = teams_per_category()
+    D = denominators_for_level(sigma, lvl27, n_by_cat=n_by_cat)
+    # Standard error on each denominator, same units as D ("units per
+    # point"), for the Model tab's error bars. denom = sigma_rel * level * k
+    # is linear in sigma_rel, so its standard error scales the same way --
+    # swap se_sigma_rel in for the point estimate and run it through the
+    # exact same conversion rather than re-deriving the algebra separately,
+    # which would risk the two silently drifting apart on a future change.
+    D_se = denominators_for_level(sigma.assign(sigma_rel=sigma["se_sigma_rel"]),
+                                  lvl27, n_by_cat=n_by_cat)
     bl = team_baselines(C.LEVEL_SEASONS)
     base = bl.drop(columns=["season"]).mean().to_dict()
-    return RotoScorer(D, base), D, base, sigma
+    return RotoScorer(D, base), D, base, D_se
 
 
 @cached
@@ -107,7 +116,7 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
     """
     from .keeper import to_full_time
 
-    scorer, D, base, sigma = build_2027_scorer()
+    scorer, D, base, D_se = build_2027_scorer()
     sm_ = fit_save_model()
     H = project_hitters()
     P = project_pitchers(sm_)
@@ -154,7 +163,7 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
     # numeric flags instead of a per-group lambda; same answer, far cheaper
     out["role"] = np.where(out["_hit"] & out["_pit"], "TWO",
                            np.where(out["_hit"] > 0, "HIT", "PIT"))
-    return out.drop(columns=["_hit", "_pit"]), D, base
+    return out.drop(columns=["_hit", "_pit"]), D, base, D_se
 
 
 @cached
@@ -189,8 +198,8 @@ def value_players(exch: dict | None = None, positional: bool = False
     top-230 pool has, and the $/point scale has to be refit to that or the
     top-230-sums-to-$2,600 budget identity breaks.
     """
-    base_players, D, base = project_all_players(full_time=False)
-    ft_players, _, _ = project_all_players(full_time=True)
+    base_players, D, base, D_se = project_all_players(full_time=False)
+    ft_players, _, _, _ = project_all_players(full_time=True)
     if exch is None:
         exch, _ = fit_exchange_rate()
 
@@ -294,7 +303,7 @@ def value_players(exch: dict | None = None, positional: bool = False
             "positional_replacement": pos_repl,
             "budget_check_top230": float(
                 players.nlargest(n_rostered, "roto_points")["redraft_value"].sum())}
-    return players, exch, {"denominators": D, "baseline": base, **meta}
+    return players, exch, {"denominators": D, "denominators_se": D_se, "baseline": base, **meta}
 
 
 from .keeper import keeper_cost, years_controlled     # noqa: E402

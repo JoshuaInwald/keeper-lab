@@ -103,6 +103,7 @@ def snapshot(positional: bool = False) -> Snapshot:
         "replacement_roto_points": meta["replacement_rp"],
         "budget_check_top230": meta["budget_check_top230"],
         "denominators": meta["denominators"],
+        "denominators_se": meta["denominators_se"],
         "exchange_basis": exch.get("basis"),
         **_inflation(board),
     }

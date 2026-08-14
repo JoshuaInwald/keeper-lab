@@ -113,6 +113,25 @@ def load_pitchers_history() -> pd.DataFrame:
     return df
 
 
+@cached
+def mlb_team_map() -> pd.Series:
+    """fg_id -> current (2026) real MLB team, for display only -- never used
+    in valuation. FanGraphs' multi-year leaderboard rows a mid-season trade
+    as one "- - -" combined row plus one row per team; the combined row is
+    dropped here and, for a player traded more than once in 2026, whichever
+    single-team row has the most games wins. Right for the common case
+    (untraded, or traded once with time to accumulate games on the new
+    team); an approximation for a very recent trade, same caveat
+    `data/README.md` already notes for the FA pool -- no transaction-date
+    file exists to resolve it exactly."""
+    h = load_hitters_history()
+    p = load_pitchers_history()
+    both = pd.concat([h[h["season"] == 2026], p[p["season"] == 2026]], ignore_index=True)
+    both = both[both["Team"] != "- - -"]
+    both = both.sort_values("G", ascending=False)
+    return both.drop_duplicates("fg_id", keep="first").set_index("fg_id")["Team"]
+
+
 def _read_fg_projection(path) -> pd.DataFrame:
     df = pd.read_csv(path)
     df.columns = [c.replace("﻿", "").strip() for c in df.columns]

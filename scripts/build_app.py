@@ -41,7 +41,7 @@ BASES = ["blend", "projection", "actuals"]
 # Columns carried into the payload, in order. Kept explicit rather than
 # "everything" so the file stays small and the schema is reviewable.
 PLAYER_COLS = [
-    "fg_id", "name", "team", "role", "il", "position",
+    "fg_id", "name", "team", "role", "il", "position", "mlb_team",
     "salary", "contract", "keeper_status", "keeper_cost", "years_controlled",
     "keepable", "extension_used", "extension_option", "extension_years", "keep_2027",
     "roto_points", "rp_above_repl", "redraft_value", "keep_value",
@@ -283,7 +283,7 @@ def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
 
 
 def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: list,
-                              pos_map: pd.Series) -> dict:
+                              pos_map: pd.Series, team_map: pd.Series) -> dict:
     """Board, free agents, team summaries and constants for one
     `positional` setting (out/FINDINGS.md #52), within the PROJECTION_BASIS
     ambient in this process. Factored out of `_variant_payload()` so it can
@@ -293,6 +293,7 @@ def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: lis
     board = s.board.merge(ros, on="fg_id", how="left")
     board[ros_cols] = board[ros_cols].fillna(0.0)
     board["position"] = board["fg_id"].map(pos_map).fillna("?")
+    board["mlb_team"] = board["fg_id"].map(team_map).fillna("?")
     # Bands come from resampling the team-seasons the denominators are fit on,
     # so every dollar figure can be shown as a range instead of a point.
     # NOT positional-aware (a documented scope limit, not an oversight): the
@@ -315,6 +316,7 @@ def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: lis
     fa = fa.merge(ros, on="fg_id", how="left")
     fa[ros_cols] = fa[ros_cols].fillna(0.0)
     fa["position"] = fa["fg_id"].map(pos_map).fillna("?")
+    fa["mlb_team"] = fa["fg_id"].map(team_map).fillna("?")
 
     cols = PLAYER_COLS + ros_cols
     return {
@@ -371,8 +373,13 @@ def _variant_payload() -> dict:
     # lookup, still just for display; "?" where there's no draft record.
     from klab.keeper import position_map
     pos_map = position_map()
+    # Real MLB team, display only, never used in valuation (klab/io.py's
+    # mlb_team_map()) -- distinct from `board["team"]`, which is the CBS
+    # fantasy roster.
+    from klab.io import mlb_team_map
+    team_map = mlb_team_map()
 
-    variants = {pos: _board_fa_teams_constants(pos, ros, ros_cols, pos_map)
+    variants = {pos: _board_fa_teams_constants(pos, ros, ros_cols, pos_map, team_map)
                for pos in (False, True)}
     default = variants[False]
 
