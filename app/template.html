@@ -836,6 +836,29 @@ function tradeResult(){
 }
 
 // ---------- model ----------
+// Plain-English gloss for every Model-tab label, aimed at someone who
+// isn't fluent in this project's jargon. Requested directly, 2026-08-13.
+const CONST_HELP = {
+  "usd_per_roto_point_auction": "What one standings point costs in a live auction, estimated by regressing what teams actually paid for players against how many points those players delivered. This is the number the trade evaluator uses to compare a dollar of value against a standings point.",
+  "usd_per_roto_point_redraft": "A slightly different scale for the player-card “Worth” figures: what a point is worth if you drafted the player fresh today, not what an actual auction (with its own quirks, like saves being underpaid) says a specific player costs.",
+  "auction_intercept": "A second, independent estimate of replacement level: what the auction-price regression predicts a $0 player would produce, in roto points. Deliberately never fit to match the “replacement level” number below — when the two agree, that's a real cross-check, not a coincidence.",
+  "replacement_level": "How many roto points the best player you could add for free (off any team's bench or the waiver wire) actually produces. Every rostered player's dollar value is measured relative to this baseline, not to zero.",
+  "budget_check": "A sanity check on the whole scale: this league has 10 teams × 23 active roster spots = 230 rostered players, and 10 teams × $260 = $2,600 total. If the top 230 projected players' dollar values don't sum close to $2,600, something upstream is miscalibrated.",
+  "inflation": "How much more a dollar of talent costs in the real 2027 auction than the “fair value” redraft scale says — because keeper-league owners have already locked up a lot of cheap production, leaving less available talent chasing the same total budget.",
+  "dollar_buys": "The flip side of inflation: how much redraft-scale value one real 2027 auction dollar actually buys, given that squeeze. Below 1.0× means a dollar buys less than face value.",
+};
+const SETTING_HELP = {
+  "denom seasons": "Which past seasons' final standings are pooled to work out how many stats it takes to buy one standings point in each category.",
+  "auction seasons": "Which past seasons' real auction prices are used to fit the $-per-roto-point conversion rate.",
+  "exchange basis": "How the $/roto-point rate is fit. “keeper_adjusted” (default) accounts for how many players were already off the board as keepers in each of those past auctions, so the rate reflects the world 2027's auction will actually happen in, not an average of very different years.",
+  "projection basis": "Which source drives every 2027 number on this page right now — the same fork as the header's “projection basis” dropdown. “blend” mixes 2026 form with the ZiPS 2027 projection; “projection” trusts ZiPS alone; “actuals” extrapolates 2026 alone.",
+  "waiver value": "Which anchor sets replacement level, i.e. how good a “free” player is assumed to be. “low” (default, most generous to your own roster) uses the 230th-best projected player — one per active roster spot leaguewide. “high” uses what free-agent pickups actually produced in 2026, which overstates it since those players were picked up AFTER they got hot.",
+  "positional adjustment": "Whether a scarce position (catcher, middle infield) gets a value bump over a common one for identical production. Off by default — not an oversight: tested directly, and the published evidence (FanGraphs' 13-system test, Razzball's four-stance test) both found it hurts more than it helps in a format like this one.",
+  "future year discount": "How much a future season's keeper surplus is discounted per year further out (0.85 = 15% per year), because a contract you're free to decline is an option, not a locked-in obligation, and rosters/leagues drift.",
+  "sv punt threshold": "Teams with fewer saves than this are assumed to be intentionally punting the category and are excluded before fitting how many saves buy a standings point — otherwise a couple of non-competing teams would distort what a save is worth for everyone else.",
+  "max pt scale": "The most a player's projected playing time can be scaled up for the “if he plays a full season” upside figure on his player card. Beyond this, a bigger role isn't a reasonable extrapolation of this player — it'd effectively be projecting a different player.",
+};
+
 function modelView(){
   const c=D.constants, den=c.denominators;
   // Was a two-way test that labelled anything not in NEG_CATS a counting stat,
@@ -851,8 +874,14 @@ function modelView(){
   // build-time D.settings value -- the selector in the header can change
   // it without a rebuild, and this panel needs to say what's actually
   // showing, not what shipped in the file.
-  const set=Object.entries({...D.settings, PROJECTION_BASIS: S.basis}).map(([k,v])=>
-    `<div class="k">${k.toLowerCase().replace(/_/g," ")}</div><div class="v">${esc(Array.isArray(v)?v.join(", "):v)}</div>`).join("");
+  const set=Object.entries({...D.settings, PROJECTION_BASIS: S.basis}).map(([k,v])=>{
+    const label=k.toLowerCase().replace(/_/g," ");
+    const help=esc(SETTING_HELP[label]||"");
+    return `<div class="k" title="${help}">${label}</div>`
+      + `<div class="v" title="${help}">${esc(Array.isArray(v)?v.join(", "):v)}</div>`;
+  }).join("");
+  const kvHelp=(label,valueHtml,help)=>
+    `<div class="k" title="${esc(help)}">${label}</div><div class="v" title="${esc(help)}">${valueHtml}</div>`;
   return `<div class="grid2">
     <div class="panel"><h3>Denominators — units per standings point</h3>
       <table><thead><tr>
@@ -867,13 +896,13 @@ function modelView(){
     </div>
     <div class="panel"><h3>Fitted constants</h3>
       <div class="kv">
-        <div class="k">$ / roto point, auction scale</div><div class="v">$${nf(c.usd_per_roto_point_auction,2)}</div>
-        <div class="k">$ / roto point, redraft scale</div><div class="v">$${nf(c.usd_per_roto_point_redraft,2)}</div>
-        <div class="k">auction intercept, roto pts</div><div class="v">${nf(c.auction_intercept,2)}</div>
-        <div class="k">replacement level, roto pts</div><div class="v">${nf(c.replacement_roto_points,2)}</div>
-        <div class="k">top-230 budget check</div><div class="v">$${nf(c.budget_check_top230,0)}</div>
-        <div class="k">projected 2027 inflation</div><div class="v">${nf(INFL,3)}×</div>
-        <div class="k">a 2027 dollar buys</div><div class="v">${nf(c.dollar_buys,3)}</div>
+        ${kvHelp("$ / roto point, auction scale", `$${nf(c.usd_per_roto_point_auction,2)}`, CONST_HELP.usd_per_roto_point_auction)}
+        ${kvHelp("$ / roto point, redraft scale", `$${nf(c.usd_per_roto_point_redraft,2)}`, CONST_HELP.usd_per_roto_point_redraft)}
+        ${kvHelp("auction intercept, roto pts", nf(c.auction_intercept,2), CONST_HELP.auction_intercept)}
+        ${kvHelp("replacement level, roto pts", nf(c.replacement_roto_points,2), CONST_HELP.replacement_level)}
+        ${kvHelp("top-230 budget check", `$${nf(c.budget_check_top230,0)}`, CONST_HELP.budget_check)}
+        ${kvHelp("projected 2027 inflation", `${nf(INFL,3)}×`, CONST_HELP.inflation)}
+        ${kvHelp("a 2027 dollar buys", nf(c.dollar_buys,3), CONST_HELP.dollar_buys)}
       </div>
       <div class="note">The intercept is a second, independent read on replacement level: a
         $0 player returns ${nf(c.auction_intercept,2)} roto points, against ${nf(c.replacement_roto_points,2)}
