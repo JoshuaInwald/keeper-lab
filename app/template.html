@@ -176,7 +176,7 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 // ---------- shared state ----------
 const S = {tab:"board", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
            desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
-           rosBasis: D.ros_basis_default || "ros"};
+           rosBasis: D.ros_basis_default || "ros", standSeason: "live"};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
 
@@ -676,7 +676,39 @@ function rosBasisPicker(){
     </select></label>`;
 }
 
+// Final standings, 2022-2025 (2026 is still live -- see the "live + projected"
+// branch below). Team names are already normalised to the CURRENT franchise
+// name server-side (scripts/build_app.py's _historical_standings()) even
+// where this league renamed a team since -- e.g. 2025's "Moben" shows as
+// Orange and Black Attack, so a franchise's history reads as one continuous
+// arc instead of requiring the viewer to track five renames themselves.
+const HISTORY = D.history_standings || {};
+const HISTORY_YEARS = Object.keys(HISTORY).map(Number).sort((a,b)=>b-a);
+function seasonPicker(){
+  return `<select onchange="S.standSeason=this.value;render()">
+    <option value="live" ${S.standSeason==="live"?"selected":""}>2026 — live + projected</option>
+    ${HISTORY_YEARS.map(y=>
+      `<option value="${y}" ${String(S.standSeason)===String(y)?"selected":""}>${y} — final standings</option>`).join("")}
+  </select>`;
+}
+function historyStandingsView(yr){
+  const rows = HISTORY[yr] || [];
+  const cols = [
+    ["team","Team","l",r=>esc(r.team),
+      "Fantasy team. Shown under its CURRENT name even if this franchise was named differently in "+yr+"."],
+    ["points","Final points","",r=>nf(r.points,1),
+      "Final roto points that season, 10 for first place down to 1 for last in each category."],
+    ...CATS.map(c=>[c,c,"",r=>`<span class="dim">${nf(r[c],CAT_DP(c))}</span>`,
+      `${yr} final ${c} total (${C_UNIT(c)}).`])
+  ];
+  return `<div class="bar">${seasonPicker()}</div>`
+    + sortableTable(rows, cols, "sortStandHist"+yr,
+        `${yr} final standings, ${rows.length} teams. Every column sorts.`);
+}
+
 function standingsView(){
+  if(S.standSeason !== "live") return historyStandingsView(S.standSeason);
+
   const now={}; D.standings.forEach(s=>now[s.team]=s);
   const rows=TEAMS.map(t=>{
     const r={team:t, now:now[t].points_2026, proj:PROJ_PTS[t].TOTAL};
@@ -698,6 +730,7 @@ function standingsView(){
                 : `Projected roto points in ${c}. Hover a cell for the total.`])
   ];
   return `<div class="bar">
+      ${seasonPicker()}
       <button class="act" onclick="S.totals=!S.totals;render()">
         showing: <b>${S.totals?"category totals":"roto points"}</b> — click to switch</button>
       ${rosBasisPicker()}

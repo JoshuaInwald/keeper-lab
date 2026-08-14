@@ -53,6 +53,7 @@ in `LAB_NOTEBOOK.md`.
 45. [A blended 2026 rest-of-season signal, and a real bug in the first version](#45-a-blended-2026-rest-of-season-signal-and-a-real-bug-in-the-first-version)
 46. [A rest-of-2026 basis toggle in the app — Standings and Trade only, never a dollar value](#46-a-rest-of-2026-basis-toggle-in-the-app--standings-and-trade-only-never-a-dollar-value)
 47. [ROS value on the Keeper Board / Free Agents tables — a second toggle stacked on the first](#47-ros-value-on-the-keeper-board--free-agents-tables--a-second-toggle-stacked-on-the-first)
+48. [Historical standings, 2022-2025, normalised to current franchise names](#48-historical-standings-2022-2025-normalised-to-current-franchise-names)
 
 </details>
 
@@ -2392,3 +2393,23 @@ actually testing the sort, not just that the column renders.
 Payload cost: +~123 KB (small — one float per player per ROS-basis, not a
 whole row). `app/verify.mjs` gained a permanent check for the sort
 correctness and basis-responsiveness together.
+
+## 48. Historical standings, 2022-2025, normalised to current franchise names
+
+Requested directly — `data/standings_long_all.csv` already covers
+2022-2026 and nothing surfaced the past seasons anywhere in the app.
+Added a season picker on the Standings tab: "2026 — live + projected"
+(the existing view, unchanged) plus one final-standings table per
+completed season, computed once in `scripts/build_app.py`'s
+`_historical_standings()` (basis-invariant — history doesn't move with
+either toggle, so it isn't nested in the per-basis subprocess machinery
+like #43/#47).
+
+**Team names are shown under their CURRENT franchise name, not whatever
+they were called that season**, using `data/franchise_map.csv`. This
+league has renamed five franchises since 2021 (e.g. 2025's "Moben" is
+today's Orange and Black Attack). Showing the historical name would be
+literally accurate but useless for the actual question a history view
+answers — "how has this team done over time" — since a viewer would have
+to already know the rename chain to follow their own team's arc. Every
+row is grouped by `franchise_id`, not by name.

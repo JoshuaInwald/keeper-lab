@@ -80,6 +80,41 @@ def _rows(df: pd.DataFrame, cols: list[str]) -> list[list]:
 ROS_BASES = ["ros", "prorated", "blend"]
 
 
+def _historical_standings() -> dict:
+    """Final standings for every completed season on record (2022-2025;
+    2026 is still live and already has its own payload section), keyed by
+    season. Basis-invariant -- history doesn't change with either toggle --
+    so computed once, not nested in _variant_payload().
+
+    Team names are normalised to the CURRENT franchise name via
+    data/franchise_map.csv, not shown under whatever name a franchise was
+    playing under that year: this league has renamed teams five times
+    (e.g. "Moben" -> "Orange and Black Attack"), and the point of a
+    history view is seeing one franchise's arc across that, not making a
+    viewer mentally track name changes themselves."""
+    fm = pd.read_csv(C.DATA / "franchise_map.csv")
+    current_name = fm[fm["last_season"] == 2026].set_index("franchise_id")["team_name"]
+    name_map = {row["team_name"]: current_name.get(row["franchise_id"], row["team_name"])
+               for _, row in fm.iterrows()}
+
+    st = load_standings_long()
+    out = {}
+    for season in sorted(s for s in st["season"].unique() if s < 2026):
+        wide = st[st["season"] == season].pivot(index="team", columns="category",
+                                                 values="total")
+        wide.index = wide.index.map(lambda t: name_map.get(t, t))
+        wide = wide.groupby(level=0).first()
+        pts = standings_points(wide[C.CATS])
+        ranked = pts.sort_values("TOTAL", ascending=False)
+        rows = []
+        for team, p in ranked.iterrows():
+            row = {"team": team, "points": _round(p["TOTAL"])}
+            row.update({c: _round(wide.loc[team, c]) for c in C.CATS})
+            rows.append(row)
+        out[int(season)] = rows
+    return out
+
+
 def _ros_variants(fg_ids) -> dict:
     """Alternates to the default 2026 rest-of-season signal
     (klab.trade.ros_lines()), for the Standings-tab / Trade-tab win-now
@@ -320,6 +355,7 @@ def build_payload() -> dict:
         "auction_estimates": variants[default]["auction_estimates"],  # (default basis)
         "ros_values": variants[default]["ros_values"],      # (default proj basis; keyed by [rosBasis][fg_id])
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
+        "history_standings": _historical_standings(),
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
                        for t in cur.index},
         "base26": {"AB": _round(b26["team_AB"]), "IP": _round(b26["team_IP"])},

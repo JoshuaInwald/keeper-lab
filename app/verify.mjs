@@ -199,6 +199,26 @@ const boardRosResult = await page.evaluate(() => {
 const boardRosBad = !boardRosResult.isDescending || !boardRosResult.changedOnToggle;
 if (boardRosBad) console.log('  BOARD ROS-VALUE COLUMN MISMATCH:', JSON.stringify(boardRosResult));
 
+// Historical standings (out/FINDINGS.md #48): season picker must render a
+// real table for a past year and cleanly return to the live view.
+const historyResult = await page.evaluate(() => {
+  go('standings');
+  const years = HISTORY_YEARS.slice();
+  if (!years.length) return { skipped: true };
+  const yr = years[0];
+  S.standSeason = String(yr);
+  render();
+  const rowsShown = document.querySelectorAll('#view tbody tr').length;
+  const expected = (HISTORY[yr] || []).length;
+  S.standSeason = 'live';
+  render();
+  const backToLive = document.querySelector('#view .bar select')?.value === 'live';
+  return { skipped: false, rowsShown, expected, backToLive };
+});
+const historyBad = !historyResult.skipped
+  && (historyResult.rowsShown !== historyResult.expected || !historyResult.backToLive);
+if (historyBad) console.log('  HISTORICAL STANDINGS MISMATCH:', JSON.stringify(historyResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -226,5 +246,7 @@ console.log(rosBasisBad ? 'FAIL  ROS-basis toggle did not recompute, round-trip,
                         : 'PASS  ROS-basis toggle recomputes standings, round-trips, and survives a basis switch');
 console.log(boardRosBad ? 'FAIL  board ROS-value column does not sort correctly or ignores the toggle'
                         : 'PASS  board ROS-value column sorts correctly and tracks the rest-of-2026 toggle');
+console.log(historyBad ? 'FAIL  historical standings did not render or did not return to the live view'
+                       : 'PASS  historical standings render and return to the live view cleanly');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad || boardRosBad ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad || boardRosBad || historyBad ? 1 : 0);
