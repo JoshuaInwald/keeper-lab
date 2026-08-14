@@ -128,6 +128,18 @@ every fitted constant that depends on the board (inflation, replacement
 level, $/roto point) all swap together; live 2026 standings don't, correctly,
 since they're not a projection. See `out/FINDINGS.md` #42.
 
+**2.5 Rest-of-2026 basis toggle — done, 2026-08-13.** A second, independent
+toggle from 2.2 above: which signal projects the REST of 2026 (Standings
+tab, Trade tab's win-now delta) — ZiPS's own rest-of-season system
+(default), each player's season-to-date pace extended over the games left
+in the season, or a 50/50 blend of the two. Never touches a dollar value,
+so it's scoped to those two tabs only, not the header. See
+`out/FINDINGS.md` #45-46 for the new `klab/trade.py` functions
+(`prorated_to_date_lines()`, `ros_lines_for_basis()`) and a real bug caught
+in each layer (a starting pitcher's innings could get projected 5-6x too
+high; the two toggles could silently fight each other on state).
+No "pre-season 2026" option: no file in `data/` has one.
+
 **2.4 Auto-refresh — build pipeline is cron-safe, data ingestion is not
 (checked 2026-08-13, not scheduled on purpose, still manual by choice).**
 Two separate questions, worth not conflating:

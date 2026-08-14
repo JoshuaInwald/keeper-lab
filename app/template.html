@@ -147,6 +147,12 @@ const idByName = {}; BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
 // for every player, unlike BOARD/FA which always have full row coverage.
 let AUCTION_EST = D.auction_estimates || {};
 const TRADE_SUGGESTIONS = D.trade_suggestions || [];
+// Alternate 2026 rest-of-season signals (out/FINDINGS.md #45/#46): "ros"
+// (ZiPS alone, default), "prorated" (season-to-date pace), "blend" (50/50).
+// Independent of the projection-basis selector above -- this never touches
+// a dollar value, only the ros_* fields rosterAgg() reads for the
+// Standings tab and the Trade tab's win-now calc.
+const ROS_VARIANTS = D.ros_variants || {};
 
 // ---------- formatting ----------
 const $ = (id)=>document.getElementById(id);
@@ -162,7 +168,8 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 
 // ---------- shared state ----------
 const S = {tab:"board", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
-           desc:true, fa:false, infl:false, basis: D.projection_basis || "blend"};
+           desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
+           rosBasis: D.ros_basis_default || "ros"};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
 
@@ -195,6 +202,23 @@ function setBasis(b){
   INFL = D.constants.inflation || 1;
   AUCTION_EST = v.auction_estimates || {};
   renderHeader();
+  // New board/fa rows always carry the default ("ros") rest-of-season
+  // signal -- reapply whichever ros-basis toggle was active, or a switch
+  // here would silently discard it. setRosBasis() renders, so this is the
+  // last step.
+  setRosBasis(S.rosBasis);
+}
+
+function setRosBasis(basis){
+  if(!ROS_VARIANTS[basis]) return;
+  S.rosBasis = basis;
+  const v = ROS_VARIANTS[basis];
+  for(const r of BOARD.concat(FA)){
+    const rec = v[g(r,"fg_id")];
+    if(!rec) continue;
+    for(const c of ROS) r[IX["ros_"+c]] = rec[c] ?? 0;
+  }
+  recomputeProjections();
   render();
 }
 
@@ -240,8 +264,12 @@ function rotoPoints(tot){
   }
   return pts;
 }
-const PROJ_PTS = rotoPoints(catTotals(rosterAgg(null)));
-const PROJ_TOT = catTotals(rosterAgg(null));
+let PROJ_PTS = rotoPoints(catTotals(rosterAgg(null)));
+let PROJ_TOT = catTotals(rosterAgg(null));
+function recomputeProjections(){   // re-run after setRosBasis() changes ros_* fields
+  PROJ_TOT = catTotals(rosterAgg(null));
+  PROJ_PTS = rotoPoints(PROJ_TOT);
+}
 
 // ---------- nav ----------
 const TABS=[["board","Keeper board"],["teams","League"],["trade","Trade"],
@@ -607,6 +635,23 @@ function teamsView(){
 
 // ---------- standings ----------
 const CAT_DP = c=> c==="AVG" ? 3 : (c==="ERA"||c==="WHIP") ? 2 : 0;
+// Which signal projects the REST of 2026 -- Standings and the Trade tab's
+// win-now numbers only, nothing with a dollar sign (out/FINDINGS.md #45/#46).
+const ROS_BASIS_LABEL = {ros: "ZiPS rest-of-season", prorated: "season-to-date pace", blend: "blend (50/50)"};
+const ROS_BASIS_HELP = "Which signal projects the REST of 2026 on this screen. "
+  + "\"ZiPS rest-of-season\" (default) is FanGraphs' own projection system. "
+  + "\"season-to-date pace\" extends each player's current per-team-game rate "
+  + "over however many games are left in the season, with no notion of role "
+  + "or injury. \"blend\" averages the two 50/50. This has no effect on any "
+  + "dollar value anywhere in the app -- only on rest-of-2026 standings math.";
+function rosBasisPicker(){
+  return `<label class="chk" title="${esc(ROS_BASIS_HELP)}">rest-of-2026 basis
+    <select onchange="setRosBasis(this.value)">
+      ${Object.keys(ROS_BASIS_LABEL).map(b=>
+        `<option value="${b}" ${b===S.rosBasis?"selected":""}>${ROS_BASIS_LABEL[b]}</option>`).join("")}
+    </select></label>`;
+}
+
 function standingsView(){
   const now={}; D.standings.forEach(s=>now[s.team]=s);
   const rows=TEAMS.map(t=>{
@@ -631,6 +676,7 @@ function standingsView(){
   return `<div class="bar">
       <button class="act" onclick="S.totals=!S.totals;render()">
         showing: <b>${S.totals?"category totals":"roto points"}</b> — click to switch</button>
+      ${rosBasisPicker()}
     </div>`
     + sortableTable(rows, cols, "sortStand",
         S.totals
@@ -667,6 +713,7 @@ function tradeView(){
   return `<div class="bar">
       <label class="chk"><input type="checkbox" ${S.infl?"checked":""}
         onchange="S.infl=this.checked;render()"> inflation-adjusted</label>
+      ${rosBasisPicker()}
       <button class="act" onclick="T.aOut=[];T.bOut=[];render()">clear</button>
     </div>
     ${suggestedTradesPanel()}

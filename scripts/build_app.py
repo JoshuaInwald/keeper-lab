@@ -77,6 +77,32 @@ def _rows(df: pd.DataFrame, cols: list[str]) -> list[list]:
     return [[_round(v) for v in rec] for rec in d.itertuples(index=False, name=None)]
 
 
+ROS_BASES = ["ros", "prorated", "blend"]
+
+
+def _ros_variants(fg_ids) -> dict:
+    """Alternates to the default 2026 rest-of-season signal
+    (klab.trade.ros_lines()), for the Standings-tab / Trade-tab win-now
+    toggle. Computed ONCE, not per PROJECTION_BASIS variant -- unlike
+    `_auction_estimates()`, nothing here touches a dollar value, so there's
+    no basis-consistency hazard to guard against (see out/FINDINGS.md #45).
+    Keyed by fg_id (string) then column, so the browser can overwrite a
+    board row's `ros_*` fields in place when the toggle switches, the same
+    pattern setBasis() already uses for the projection-basis payload."""
+    from klab.trade import ros_lines_for_basis
+    out = {}
+    for basis in ROS_BASES:
+        r = ros_lines_for_basis(basis).set_index("fg_id").reindex(
+            columns=ROS_COLS, fill_value=0.0)
+        d = {}
+        for fid in fg_ids:
+            row = r.loc[fid] if fid in r.index else None
+            d[str(fid)] = {c: (_round(row[c]) if row is not None else 0.0)
+                          for c in ROS_COLS}
+        out[basis] = d
+    return out
+
+
 def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
     """Comp-based next-auction price estimate for every player with a
     projection, keyed by fg_id (as a string -- JSON object keys are always
@@ -225,6 +251,10 @@ def build_payload() -> dict:
     sugg_path = C.OUT / "trade_suggestions.json"
     trade_suggestions = json.loads(sugg_path.read_text()) if sugg_path.exists() else []
 
+    fid_i = variants[default]["cols"].index("fg_id")
+    fg_ids = {r[fid_i] for r in variants[default]["board"] + variants[default]["fa"]}
+    ros_variants = _ros_variants(fg_ids)
+
     return {
         "built": date.today().isoformat(),
         "projection_basis": default,
@@ -238,6 +268,8 @@ def build_payload() -> dict:
                                "auction_estimates": v["auction_estimates"]}
                            for b, v in variants.items()},
         "trade_suggestions": trade_suggestions,
+        "ros_variants": ros_variants,
+        "ros_basis_default": "ros",
         "band": {"lo": 10, "hi": 90, "draws": BOOTSTRAP_DRAWS},
         "cats": C.CATS,
         "neg_cats": sorted(C.NEG_CATS),

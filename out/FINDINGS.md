@@ -51,6 +51,7 @@ in `LAB_NOTEBOOK.md`.
 43. [Auction-estimator UI integration — a player-card panel, and a real bug it exposed on the way in](#43-auction-estimator-ui-integration--a-player-card-panel-and-a-real-bug-it-exposed-on-the-way-in)
 44. [UI audit: a stale pre-#39 status string, a missing IL/LOCKED tag, and two confirmed false alarms](#44-ui-audit-a-stale-pre-39-status-string-a-missing-illocked-tag-and-two-confirmed-false-alarms)
 45. [A blended 2026 rest-of-season signal, and a real bug in the first version](#45-a-blended-2026-rest-of-season-signal-and-a-real-bug-in-the-first-version)
+46. [A rest-of-2026 basis toggle in the app — Standings and Trade only, never a dollar value](#46-a-rest-of-2026-basis-toggle-in-the-app--standings-and-trade-only-never-a-dollar-value)
 
 </details>
 
@@ -2305,3 +2306,51 @@ average-team basis via `d_roto_points_2027`) is written up in the
 session log rather than here, since it's advice on specific trades, not a
 model finding — matching how the earlier NPB/Spehr's Army and
 Skubal/Pookie 2.0 explorations this session were handled.
+
+## 46. A rest-of-2026 basis toggle in the app — Standings and Trade only, never a dollar value
+
+Shipped #45's blended signal as a UI control rather than only a script
+parameter, requested directly alongside it. Design questions worth stating,
+since none were discussed in advance:
+
+**Scope: which screens.** Only `#tbl`-adjacent rest-of-season math —
+the Standings tab's projected-finish columns, and the Trade tab's win-now
+delta — reads `ros_*` fields at all. Everything else (Keeper board, League,
+Free agents, Model, and every dollar figure everywhere) is downstream of
+`redraft_value`/`surplus_multiyear`, which come from the *2027* pipeline
+and never touch this. So the control lives contextually in those two tabs'
+own `.bar`, not the global header next to the projection-basis selector —
+putting it there would imply it does something on every tab, which would
+be wrong on four of six.
+
+**Payload: independent of PROJECTION_BASIS, not multiplied by it.**
+`scripts/build_app.py`'s `_ros_variants()` computes the three ROS bases
+ONCE, not once per projection basis — unlike `_auction_estimates()`
+(#43), nothing here is a function of a dollar value, so there's no
+per-basis staleness hazard to guard against, and tripling it would have
+been pure waste. Keyed by fg_id so the browser can overwrite a board row's
+`ros_*` fields in place, the same pattern `setBasis()` already uses.
+Payload cost: +~290 KB (out of 4.03 MB after this) — 3 variants × ~675
+players × 13 fields, negligible next to the auction estimator's comps.
+
+**Real interaction bug, caught before shipping — not a modelling bug this
+time, a state-management one.** `setBasis()` (the projection-basis
+selector) replaces `BOARD`/`FA` wholesale with a new basis-variant's rows,
+and every basis-variant's board is built by merging the SAME default
+(`"ros"`) rest-of-season signal — `PROJECTION_BASIS` has nothing to do
+with which ROS basis is active. So switching projection basis while a
+non-default ROS basis was selected would silently overwrite the `ros_*`
+fields back to ZiPS-only, discarding the user's toggle choice with no
+indication anything changed. Fixed by having `setBasis()` call
+`setRosBasis(S.rosBasis)` as its last step, reapplying whatever was
+active rather than assuming the reset. `app/verify.mjs`'s new check
+covers exactly this: set ROS basis to "prorated", switch projection basis
+to something else, assert `S.rosBasis` is still `"prorated"` — this is
+the one case in the whole check that would have passed a naive "does the
+toggle work" test and still shipped broken, since testing either toggle
+in isolation looks fine.
+
+**Testing.** `app/verify.mjs` gained a fifth permanent check: the toggle
+recomputes `PROJ_PTS` (proves `recomputeProjections()` ran, not just that
+the underlying data changed), round-trips back to the default exactly, and
+survives an unrelated basis switch as described above.

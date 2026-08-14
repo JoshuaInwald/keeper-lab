@@ -155,6 +155,33 @@ const auctionBad = !auctionResult.hasPanel || auctionResult.nCompRows === 0
   || !auctionResult.noPanelForMissing || !auctionResult.basisAware;
 if (auctionBad) console.log('  AUCTION ESTIMATOR PANEL MISMATCH:', JSON.stringify(auctionResult));
 
+// ROS-basis toggle (out/FINDINGS.md #45/#46): switching it must move
+// PROJ_PTS (proves recomputeProjections() ran), round-trip exactly, and --
+// the real bug this specifically guards against -- survive a PROJECTION_BASIS
+// switch afterward, since setBasis() replaces BOARD/FA wholesale with rows
+// that carry the default ros_* signal and has to reapply S.rosBasis or a
+// user's choice silently reverts.
+const rosBasisResult = await page.evaluate(() => {
+  go('standings');
+  const totalPts = () => TEAMS.reduce((s, t) => s + PROJ_PTS[t].TOTAL, 0);
+  const before = totalPts();
+  const perTeamBefore = Object.fromEntries(TEAMS.map(t => [t, PROJ_PTS[t].TOTAL]));
+  setRosBasis('prorated');
+  const afterProrated = totalPts();
+  const perTeamChanged = TEAMS.some(t => PROJ_PTS[t].TOTAL !== perTeamBefore[t]);
+  setBasis('projection');   // an unrelated toggle -- must not silently reset rosBasis
+  const survivedBasisSwitch = S.rosBasis === 'prorated';
+  setRosBasis('ros');
+  const back = totalPts();
+  setBasis('blend'); setRosBasis('ros');   // restore defaults for later checks in this file
+  const selValue = document.querySelector('.bar select[onchange^="setRosBasis"]')?.value;
+  return { before, afterProrated, back, perTeamChanged, survivedBasisSwitch, selValue };
+});
+const rosBasisBad = !rosBasisResult.perTeamChanged
+  || Math.abs(rosBasisResult.back - rosBasisResult.before) > 1e-6
+  || !rosBasisResult.survivedBasisSwitch || rosBasisResult.selValue !== 'ros';
+if (rosBasisBad) console.log('  ROS-BASIS TOGGLE MISMATCH:', JSON.stringify(rosBasisResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -178,5 +205,7 @@ console.log(basisBad ? 'FAIL  projection-basis selector did not swap/round-trip 
                        + `players on switch and round-trips back exactly`);
 console.log(auctionBad ? 'FAIL  auction-estimator panel missing, empty, or not basis-aware'
                        : 'PASS  auction-estimator panel renders, hides when absent, tracks basis');
+console.log(rosBasisBad ? 'FAIL  ROS-basis toggle did not recompute, round-trip, or survive a basis switch'
+                        : 'PASS  ROS-basis toggle recomputes standings, round-trips, and survives a basis switch');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad ? 1 : 0);
