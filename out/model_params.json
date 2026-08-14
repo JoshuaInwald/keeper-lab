@@ -46,9 +46,9 @@
     "team_ERA": 3.6131999999999995,
     "team_WHIP": 1.17585
   },
-  "replacement_rp": 4.777551837698108,
+  "replacement_rp": 4.798149416825285,
   "usd_per_rp_keep": 9.17241069402044,
-  "usd_per_rp_redraft": 6.289614885596438,
+  "usd_per_rp_redraft": 6.576545220558631,
   "config": {
     "N_TEAMS": 10,
     "BUDGET": 260,
@@ -118,6 +118,8 @@
     },
     "KEEPER_PA_FLOOR": 600,
     "KEEPER_IP_FLOOR": 150,
+    "SEASON_GAMES": 162,
+    "GAMES_PLAYED_PCTILE": 0.95,
     "KEEPER_SV_FLOOR": 25,
     "KEEPER_RP_IP_FLOOR": 65,
     "MAX_PT_SCALE": 2.0,
@@ -174,6 +176,8 @@
     "PROJECTION_BASIS": "blend",
     "BLEND_W_2026": 0.5,
     "BLEND_W_ZIPS27": 0.5,
+    "PT_BLEND_CAP_HITTER": 0.3,
+    "PT_BLEND_CAP_PITCHER": 0.15,
     "CONTENTION_WEIGHT": 0.25
   }
 }

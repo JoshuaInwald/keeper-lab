@@ -56,6 +56,7 @@ in `LAB_NOTEBOOK.md`.
 48. [Historical standings, 2022-2025, normalised to current franchise names](#48-historical-standings-2022-2025-normalised-to-current-franchise-names)
 49. [2027 standings from keeper sets alone — and a bad replacement-line pick caught before shipping](#49-2027-standings-from-keeper-sets-alone--and-a-bad-replacement-line-pick-caught-before-shipping)
 50. [The Intuition tab — manual player shading, sandboxed, split into an exact half and an approximate half](#50-the-intuition-tab--manual-player-shading-sandboxed-split-into-an-exact-half-and-an-approximate-half)
+51. [Playing time gets its own weight, decoupled from the rate/talent blend](#51-playing-time-gets-its-own-weight-decoupled-from-the-ratetalent-blend)
 
 </details>
 
@@ -2500,3 +2501,58 @@ doesn't mistake "the standings math is genuinely insensitive to a small
 shade" for "the feature doesn't work."
 
 **Two small, real additions along the way**: defensive position (`board.position`, from `klab.keeper.position_map()` — an auction-history match, so it's `"?"` for anyone with no draft record on file, an honest gap rather than a guess) and a `playerTooltip()` helper showing 2027 roto points by category, ROS line, contract status, and position on hover — requested as a general design rule, not just for this tab: **sortable/scannable numbers belong in columns; everything else belongs in a tooltip**, so a table doesn't get cluttered with context nobody's comparing across rows. No age anywhere — no file in `data/` has one, same gap already stated for the auction estimator (#35).
+
+## 51. Playing time gets its own weight, decoupled from the rate/talent blend
+
+Found chasing down why Hunter Brown's 2027 value ($10.68) looked so much
+lower than his 2028 value ($20.08) despite ZiPS's own raw 2027 and 2028
+lines being nearly identical (163.3 IP / 3.09 ERA vs 162.7 IP / 3.15 ERA —
+ZiPS isn't projecting improvement). The mechanism: `klab/project.py`'s
+`_blend_weight()` computed **one weight** from 2026 sample size and used
+it for both the rate blend (talent) and the playing-time blend (PA/IP) at
+once. Brown made only 12 starts (63.2 IP) before the export date; his
+2026-actual-plus-ROS full-season estimate came out to 107.2 IP against
+ZiPS's own healthy 163.3 IP opinion for him. Because his sample already
+cleared the (previously shared) 50%-weight cap, the blend landed at a flat
+50/50 split — 135.25 IP — regardless of *why* his 2026 was short. The
+model had no way to distinguish "he's just not a big-workload guy" from
+"he got hurt and will be fine next year," and it was quietly assuming the
+former for every shortened pitcher season in the league.
+
+**Fix**: playing time now gets its own weight, capped separately and lower
+than the rate/talent weight (`PT_BLEND_CAP_HITTER` = 0.30,
+`PT_BLEND_CAP_PITCHER` = 0.15 — Josh's judgment calls, not fit from data,
+stated as tunable in the config comment). The rate blend (and its existing
+per-stat `RELIABILITY` discount, #28) is untouched — a short sample is
+still real evidence about how good a player is; it's now treated as much
+weaker evidence about how much he'll play in a healthy 2027. Pitchers get
+a lower cap than hitters on purpose: an interrupted pitcher-season skews
+injury-driven, while a shortened hitter-season is more often
+role/platoon/performance-driven — information actually worth keeping
+weight on. Verified directly: Brown's blended IP moved from 135.25 → 154.9
+(much closer to ZiPS's 163.3), ERA/WHIP unchanged (3.15 / 1.19 exactly —
+confirms the rate blend wasn't touched), `redraft_value` $10.68 → $16.92,
+closing most of the gap to his $20.81 2028 figure.
+
+**League-wide impact, measured**: 10 keep/cut flips (Oneil Cruz and Wyatt
+Langford flip IN; Mike Trout, Yandy Díaz, Cam Smith, and others flip OUT,
+among hitters too — this isn't pitcher-only, since hitters got the same
+decoupling with a higher but still-lower cap). Total `surplus_multiyear`
+shift across the rostered pool: **−$13.71**. Worth stating plainly: this
+fix is **not one-directional**. It helps players whose 2026 playing time
+undershot ZiPS's own expectation (Hunter Brown, Logan Webb — flips into
+keep) and *hurts* players who threw/played *more* than ZiPS expected
+(Yoshinobu Yamamoto — flips out of keep), since the model now trusts
+ZiPS's playing-time opinion more in both directions, not just the
+sympathetic one. That's the intended, symmetric consequence of "trust the
+projection system's role expectation," not a one-sided patch — a
+workhorse outperforming his own durability forecast is regressed toward
+it exactly as an injured pitcher is.
+
+**Deliberately not done in this pass**: using the `il` roster flag (merged
+onto the board already, currently used only for the UI's "IL" tag) as a
+targeted signal to push playing-time weight toward ZiPS specifically for
+currently-injured players. That would need threading roster/IL status
+into `klab/project.py`, which doesn't currently see it at all — a real,
+scoped follow-up, not implemented here because it wasn't part of what was
+explicitly asked for this pass.

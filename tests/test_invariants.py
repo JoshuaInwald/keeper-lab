@@ -17,6 +17,7 @@ from klab.denoms import teams_per_category
 from klab.keeper import keeper_cost, years_controlled
 from klab.trade import evaluate_trade, ros_value_over_replacement, standings_points
 from klab.io import load_hitters_history, load_pitchers_history
+from klab.project import _blend_weight
 
 
 @pytest.fixture(scope="module")
@@ -568,3 +569,52 @@ def test_f_contract_status_label_does_not_claim_an_extension_exists(board):
     assert len(f_players) > 0, "test needs at least one F-contract player to exist"
     assert not f_players["keeper_status"].str.contains(r"\$", regex=True).any()
     assert f_players["keeper_status"].eq("free agent after 2026 (not extendable)").all()
+
+
+# --- playing-time / rate decoupling (out/FINDINGS.md #51) -------------------
+
+def test_playing_time_weight_capped_lower_than_rate_weight_for_pitchers():
+    """The whole point of the fix: for the same 2026 innings sample, the
+    PLAYING TIME weight must be capped well below the RATE weight for
+    pitchers specifically -- that gap is what stops a shortened,
+    injury-affected season from docking a healthy pitcher's projected 2027
+    innings the way it silently did for Hunter Brown before this fix."""
+    ip_a = pd.Series([200.0])   # a large sample, so both weights hit their cap
+    rate_w = _blend_weight(ip_a, 70.0, cap=C.BLEND_W_2026)
+    pt_w = _blend_weight(ip_a, 70.0, cap=C.PT_BLEND_CAP_PITCHER)
+    assert pt_w.iloc[0] < rate_w.iloc[0]
+    assert pt_w.iloc[0] == pytest.approx(C.PT_BLEND_CAP_PITCHER)
+
+
+def test_pitcher_playing_time_cap_is_lower_than_hitter_cap():
+    """Josh's explicit reasoning: a shortened pitcher-season skews
+    injury-driven (expected to be fine next year); a shortened hitter
+    season is more often role/platoon-driven, which IS informative about
+    2027. Pitchers should trust ZiPS's own playing-time opinion more."""
+    assert C.PT_BLEND_CAP_PITCHER < C.PT_BLEND_CAP_HITTER
+
+
+def test_short_season_pitcher_projected_innings_lean_toward_zips(board):
+    """End-to-end version of the same check, on real data: a pitcher whose
+    2026 (actual + rest-of-season) innings project well short of a normal
+    workload should land, in the final 2027 blend, closer to ZiPS's own
+    healthy innings total than to the 50/50 midpoint the old shared-weight
+    blend would have produced. Doesn't hardcode Hunter Brown by name --
+    finds whichever qualifying short-season starter exists in the current
+    data, so this keeps working as rosters change."""
+    from klab.project import project_pitchers
+    from klab.io import load_zips27_pitchers
+    p = project_pitchers()
+    z = load_zips27_pitchers().groupby("fg_id", as_index=False)["IP"].sum()
+    m = p.merge(z, on="fg_id", suffixes=("", "_zips"))
+    # a starter ZiPS expects to throw a full workload, but whose blended IP
+    # implies real 2026 shortfall was priced in at all (w_2026 < 1, i.e. some
+    # 2026 evidence exists) and who isn't a reliever
+    candidates = m[(~m["reliever"]) & (m["IP_zips"] > 140) & (m["w_2026"] < 0.99)
+                  & (m["w_2026"] > 0.01) & (m["IP"] < m["IP_zips"] * 0.9)]
+    assert len(candidates) > 0, "test needs at least one short-season qualifying starter"
+    r = candidates.iloc[0]
+    # the actual invariant: a lower PT cap must keep the blended IP close to
+    # ZiPS's own total, not dragged down toward a shortened 2026 sample
+    assert abs(r["IP"] - r["IP_zips"]) < r["IP_zips"] * 0.35, \
+        f"{r['name']}: blended IP {r['IP']:.1f} strayed too far from ZiPS's {r['IP_zips']:.1f}"

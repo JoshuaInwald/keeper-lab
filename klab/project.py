@@ -107,16 +107,22 @@ def project_saves(sv_2026: pd.Series, model: dict,
 
 # --- helpers ----------------------------------------------------------------
 
-def _blend_weight(pt_a: pd.Series, shrink: float) -> pd.Series:
+def _blend_weight(pt_a: pd.Series, shrink: float, cap: float = C.BLEND_W_2026) -> pd.Series:
     """Weight on source A (2026 form): rises with its own sample size, capped
-    at the configured ceiling. PROJECTION_BASIS can force it to either pole so
-    the same board can be rebuilt on a pure projection or on 2026 alone."""
+    at `cap`. PROJECTION_BASIS can force it to either pole so the same board
+    can be rebuilt on a pure projection or on 2026 alone.
+
+    `cap` is a parameter, not always `C.BLEND_W_2026`, because playing time
+    and rate stats need different caps -- see `PT_BLEND_CAP_HITTER`/
+    `PT_BLEND_CAP_PITCHER` in klab/config.py and out/FINDINGS.md #51. Rate
+    calls (the talent blend) keep the original shared cap; PA/IP calls pass
+    a lower one."""
     if C.PROJECTION_BASIS == "projection":
         return pd.Series(0.0, index=pt_a.index)
     if C.PROJECTION_BASIS == "actuals":
         return pd.Series(1.0, index=pt_a.index)
     w = pt_a.fillna(0.0) / (pt_a.fillna(0.0) + shrink)
-    return w.clip(upper=C.BLEND_W_2026)
+    return w.clip(upper=cap)
 
 
 def _safe_div(a, b):
@@ -160,8 +166,15 @@ def project_hitters() -> pd.DataFrame:
     w = w.where(has_a, 0.0)            # no 2026 line -> lean fully on ZiPS
     m["w_2026"] = w
 
-    # playing time
-    m["PA"] = w * m["PA_a"].fillna(0) + (1 - w) * m["PA_b"].fillna(0)
+    # Playing time gets its OWN, lower-capped weight -- decoupled from the
+    # rate/talent weight above on purpose (out/FINDINGS.md #51). A short
+    # 2026 is real evidence about how good a player is (already priced in
+    # via `w` + RELIABILITY); it's much weaker evidence about how much he'll
+    # play in a healthy 2027, which is closer to what ZiPS's own PA
+    # projection already assumes.
+    w_pt = _blend_weight(m["PA_a"], SHRINK_PA, cap=C.PT_BLEND_CAP_HITTER)
+    w_pt = w_pt.where(has_b, 1.0).where(has_a, 0.0)
+    m["PA"] = w_pt * m["PA_a"].fillna(0) + (1 - w_pt) * m["PA_b"].fillna(0)
     ab_rate = (w * _safe_div(m["AB_a"], m["PA_a"]).fillna(0.91)
                + (1 - w) * _safe_div(m["AB_b"], m["PA_b"]).fillna(0.91))
     m["AB"] = m["PA"] * ab_rate
@@ -224,7 +237,17 @@ def project_pitchers(save_model: dict | None = None) -> pd.DataFrame:
     w = w.where(has_a, 0.0)
     m["w_2026"] = w
 
-    m["IP"] = w * m["IP_a"].fillna(0) + (1 - w) * m["IP_b"].fillna(0)
+    # Own, lower-capped weight for playing time -- see project_hitters()'s
+    # comment and out/FINDINGS.md #51. Pitchers get a lower cap than
+    # hitters: a shortened pitcher-season skews injury-driven (hurt in June,
+    # expected to be fine next year), which shouldn't dock his 2027 innings
+    # the way it currently did for e.g. Hunter Brown -- 107 IP actual+ROS
+    # blended 50/50 with ZiPS's own healthy 163 IP opinion landed at 135,
+    # understating him. Hitters keep more weight because a short hitter
+    # season is more often role/platoon-driven, which IS informative.
+    w_pt = _blend_weight(m["IP_a"], SHRINK_IP, cap=C.PT_BLEND_CAP_PITCHER)
+    w_pt = w_pt.where(has_b, 1.0).where(has_a, 0.0)
+    m["IP"] = w_pt * m["IP_a"].fillna(0) + (1 - w_pt) * m["IP_b"].fillna(0)
     for c in ["W", "K", "ER", "BB", "H"]:
         ra = _safe_div(m[f"{c}_a"], m["IP_a"]).fillna(0.0)
         rb = _safe_div(m[f"{c}_b"], m["IP_b"]).fillna(0.0)

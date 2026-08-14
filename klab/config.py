@@ -266,8 +266,25 @@ PROJECTION_BASIS = os.environ.get("KLAB_PROJECTION_BASIS", "blend")
 
 # --- Projection knobs -------------------------------------------------------
 # 50/50 blend of (2026 actuals + ROS ZiPS) and pre-season ZiPS 2027.
+# This governs the RATE-stat blend only (talent) -- see PT_BLEND_CAP_* below
+# for playing time, which is intentionally a separate, lower-weighted knob.
 BLEND_W_2026 = 0.50
 BLEND_W_ZIPS27 = 0.50
+
+# How much of the 2026 leg's PLAYING TIME (not rate) survives into the 2027
+# blend, capped separately and lower than BLEND_W_2026 on purpose (2026-08-14,
+# out/FINDINGS.md #51). A short 2026 season is evidence about TALENT (small
+# sample, already discounted per-stat by RELIABILITY) but is much weaker
+# evidence about a healthy 2027 ROLE -- a pitcher who got hurt in June is not
+# thereby projected to throw fewer innings next year, and the un-decoupled
+# blend used to do exactly that (see the Tarik Skubal / Hunter Brown
+# writeups this session). Pitchers get a lower cap than hitters: an
+# interrupted pitcher-season skews injury-driven, while a short hitter
+# season is more often role/platoon/performance-driven -- information
+# actually worth keeping some weight on. Both are Josh's judgment calls,
+# not fit from data, and are meant to be tuned.
+PT_BLEND_CAP_HITTER = 0.30
+PT_BLEND_CAP_PITCHER = 0.15
 
 # --- Decision weights -------------------------------------------------------
 # Rebuilder default: 2027 surplus dominates, 2026 stretch-run production is
