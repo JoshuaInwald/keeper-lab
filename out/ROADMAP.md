@@ -424,3 +424,61 @@ your league's own realised auction prices, and none model multi-year keeper
 surplus against a specific contract structure.** That gap is the reason this
 project is worth finishing — and it's the part that makes it a portfolio piece
 rather than a reimplementation.
+
+---
+
+## Phase 5 — Threshold-aware valuation (top-2-only payouts). Proposed 2026-08-14, unscoped, nothing built
+
+This league only pays out for 1st and 2nd place. Every number this tool
+produces (`roto_points`, `redraft_value`, the $/point exchange rate) treats
+a marginal standings point as worth the same amount everywhere in the
+distribution -- correct only if the payoff is linear in final rank, which
+it isn't when only two spots pay. The real payoff is closer to a step
+function: crossing 3rd into 2nd is worth real money, moving from 5th to 4th
+is worth nothing, and piling up points once comfortably in 1st is close to
+worthless too. That means the RIGHT strategy is team-state-dependent
+(minimize variance if safely ahead, seek variance if just below the
+cutoff, ignore this year's standings entirely if hopelessly behind), and
+nothing in the current pipeline knows which state any given team is in --
+every team is priced off the same flat rate. Full reasoning and a concrete
+illustration (2nd and 3rd currently separated by half a point) in this
+session's chat log.
+
+**5.1 P(finish top 2) simulator — the foundational piece, everything else
+depends on it.** Extends the existing bootstrap machinery (already
+resamples category dispersion 1000x for player-level value bands) to
+simulate full-season standings across all 10 teams simultaneously and
+tally how often each team lands top 2, instead of the single point-estimate
+"projected finish" the Standings tab currently shows.
+
+**5.2 A team-situation classifier** (contender / bubble / rebuild), derived
+from 5.1, refreshed on every rebuild.
+
+**5.3 Team-conditional marginal value**, replacing the single flat $/point
+rate for team-specific views. Generalizes RESEARCH.md's already-identified
+top open priority (§8 #1, team-specific category value) into team-specific
+*standings-threshold* value -- a bigger version of the same underlying gap
+(§6.2: roto points add up linearly today with no notion of where a team
+actually sits in a category, let alone in the standings overall).
+
+**5.4 Surface player-level variance as a first-class stat.** ZiPS's own
+P10-P90 bands exist in the export and have gone unused (RESEARCH.md §6.3,
+still open). Pairing that with 5.2/5.3 lets a bubble team filter for "high
+variance, borderline talent" and a leader filter for "safest floor" --
+the whole point once team situation is known. Directly reframes the
+deprioritized closer/reliever upside item (3.10): a bubble team specifically
+may value that exact kind of asset far more than the "doesn't matter much"
+framing that deprioritized it assumed, since it wasn't conditioned on team
+state. Not reopening 3.10 by itself -- just noting the two are connected.
+
+**5.5 Trade evaluator upgrade: report Δ P(top-2) for a proposed trade, not
+just Δ points.** The most literal translation of "does this actually help
+me win," once 5.1 exists to compute it from.
+
+**5.6 Research note, not a build item: revisit the flat-exchange-rate
+finding (chat log, the FanGraphs comparison discussion) through this lens.**
+Real hypothesis worth writing up once 5.1 gives real P(top-2) numbers to
+check it against: with only 2 of 10 spots paying, the average team in most
+seasons isn't a contender, so broad value-accumulation instead of
+star-chasing may be this league's rational aggregate bidding behavior for
+its own payout structure -- not a market inefficiency to correct.
