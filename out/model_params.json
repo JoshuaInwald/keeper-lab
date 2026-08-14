@@ -55,6 +55,13 @@
     "N_HIT_SLOTS": 14,
     "N_PIT_SLOTS": 9,
     "N_ACTIVE": 23,
+    "PAYOUT_SPOTS": 4,
+    "PAYOUT_SHARE": {
+      "1": 0.5,
+      "2": 0.25,
+      "3": 0.15,
+      "4": 0.0
+    },
     "HIT_CATS": [
       "R",
       "HR",

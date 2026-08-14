@@ -18,7 +18,7 @@ from klab.keeper import keeper_cost, years_controlled
 from klab.trade import evaluate_trade, ros_value_over_replacement, standings_points
 from klab.io import load_hitters_history, load_pitchers_history
 from klab.project import _blend_weight
-from klab.standings_sim import simulate_top2_odds
+from klab.standings_sim import simulate_finish_odds
 
 
 @pytest.fixture(scope="module")
@@ -794,34 +794,36 @@ def test_positional_adjustment_2028_actually_uses_the_position_specific_bar():
 
 # --- Monte Carlo standings simulator (out/ROADMAP.md Phase 5) --------------
 
-def test_top2_probabilities_are_internally_consistent(board):
-    """p_top2 must equal p_first + p_second exactly (it's computed that way,
-    but this catches a future refactor breaking the identity), every
-    probability must be a valid [0,1] value, and across all ten teams the
-    p_first column must sum to ~1.0 -- exactly one team finishes first in
-    every draw, so summing "how often was team X first" across every team
-    must recover the total draw count, within Monte Carlo noise."""
+def test_money_probabilities_are_internally_consistent(board):
+    """p_money must equal the sum of p_finish_1..p_finish_PAYOUT_SPOTS
+    exactly (it's computed that way, but this catches a future refactor
+    breaking the identity), every probability must be a valid [0,1] value,
+    and across all ten teams each p_finish_N column must sum to ~1.0 --
+    exactly one team finishes in each place in every draw, so summing "how
+    often was team X in place N" across every team must recover the total
+    draw count, within Monte Carlo noise."""
     b, _, _ = board
-    out = simulate_top2_odds(b, B=500, seed=0)
+    out = simulate_finish_odds(b, B=500, seed=0)
     assert len(out) == C.N_TEAMS
-    assert out["p_top2"].to_numpy() == pytest.approx((out["p_first"] + out["p_second"]).to_numpy())
-    assert ((out[["p_first", "p_second", "p_top2"]] >= 0).all().all())
-    assert ((out[["p_first", "p_second", "p_top2"]] <= 1).all().all())
-    assert out["p_first"].sum() == pytest.approx(1.0, abs=1e-9)
-    assert out["p_second"].sum() == pytest.approx(1.0, abs=1e-9)
+    finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
+    assert out["p_money"].to_numpy() == pytest.approx(out[finish_cols].sum(axis=1).to_numpy())
+    assert ((out[finish_cols + ["p_money"]] >= 0).all().all())
+    assert ((out[finish_cols + ["p_money"]] <= 1).all().all())
+    for col in finish_cols:
+        assert out[col].sum() == pytest.approx(1.0, abs=1e-9)
 
 
 def test_current_standings_leader_favored_over_last_place(board):
     """A team that's already well ahead in the real, already-accumulated
-    2026 standings must come out with materially higher top-2 odds than the
-    team that's well behind -- the simulator only jitters what's LEFT to
-    play, so a big enough real head start should dominate simulated
-    rest-of-season noise, not get washed out by it."""
+    2026 standings must come out with materially higher odds of finishing
+    in the money than the team that's well behind -- the simulator only
+    jitters what's LEFT to play, so a big enough real head start should
+    dominate simulated rest-of-season noise, not get washed out by it."""
     b, _, _ = board
-    out = simulate_top2_odds(b, B=500, seed=0)
+    out = simulate_finish_odds(b, B=500, seed=0)
     leader = out.loc[out["current_points"].idxmax()]
     last = out.loc[out["current_points"].idxmin()]
-    assert leader["p_top2"] > last["p_top2"]
+    assert leader["p_money"] > last["p_money"]
 
 
 def test_same_seed_is_reproducible(board):
@@ -830,42 +832,43 @@ def test_same_seed_is_reproducible(board):
     check needs a stable Python reference to compare against, not a moving
     target."""
     b, _, _ = board
-    a = simulate_top2_odds(b, B=300, seed=7)
-    c = simulate_top2_odds(b, B=300, seed=7)
-    assert a["p_top2"].equals(c["p_top2"])
+    a = simulate_finish_odds(b, B=300, seed=7)
+    c = simulate_finish_odds(b, B=300, seed=7)
+    assert a["p_money"].equals(c["p_money"])
 
 
 def test_zero_shock_scale_is_fully_deterministic(board):
     """With shock_scale=0 every draw jitters nothing, so the same team must
-    finish first and the same team second in literally every draw -- the
-    most direct confirmation that the jitter mechanism, not something else,
-    is what's producing variance in the normal (shock_scale>0) case."""
+    finish in each payout place in literally every draw -- the most direct
+    confirmation that the jitter mechanism, not something else, is what's
+    producing variance in the normal (shock_scale>0) case."""
     b, _, _ = board
-    out = simulate_top2_odds(b, B=50, seed=0, shock_scale=0.0)
-    assert (out["p_first"].isin([0.0, 1.0])).all()
-    assert (out["p_second"].isin([0.0, 1.0])).all()
-    assert out["p_first"].sum() == pytest.approx(1.0)
+    out = simulate_finish_odds(b, B=50, seed=0, shock_scale=0.0)
+    assert (out["p_finish_1"].isin([0.0, 1.0])).all()
+    assert out["p_finish_1"].sum() == pytest.approx(1.0)
 
 
 def test_swap_changes_the_odds_in_the_expected_direction(board):
     """Moving a real, valuable player from one team to another must raise
-    the acquiring team's top-2 odds and lower the sending team's -- the
-    same `swap` mechanism `win_now_delta()` uses, exercised through the
-    simulator instead. Uses the CURRENT standings' 2nd- and 3rd-place teams
-    specifically (not the outright leader, who's already near a 100%
-    ceiling with little room to move further) and doesn't hardcode which
-    teams or players those are, so this keeps working as the season and
-    rosters change."""
+    the acquiring team's odds of finishing in the money and lower the
+    sending team's -- the same `swap` mechanism `win_now_delta()` uses,
+    exercised through the simulator instead. Picks the two teams with the
+    most genuine uncertainty (p_money closest to 0.5) rather than hardcoding
+    which teams -- with PAYOUT_SPOTS=4 (a much easier bar than the original
+    top-2-only build), the current standings' 2nd/3rd place teams are
+    already near a 100% ceiling with no room left to move; the real
+    uncertainty sits lower in the standings, around whichever teams are
+    fighting for the last payout spot, which changes as rosters do."""
     b, _, _ = board
-    before = simulate_top2_odds(b, B=800, seed=3)
-    by_current = before.sort_values("current_points", ascending=False)
-    recipient, donor_team = by_current["team"].iloc[1], by_current["team"].iloc[2]
+    before = simulate_finish_odds(b, B=800, seed=3)
+    by_uncertainty = before.assign(dist=(before["p_money"] - 0.5).abs()).sort_values("dist")
+    recipient, donor_team = by_uncertainty["team"].iloc[0], by_uncertainty["team"].iloc[1]
     donor = b[b["team"] == donor_team].nlargest(1, "roto_points").iloc[0]
     fid = int(donor["fg_id"])
 
-    after = simulate_top2_odds(b, swap={fid: recipient}, B=800, seed=3)
+    after = simulate_finish_odds(b, swap={fid: recipient}, B=800, seed=3)
 
-    p_before = before.set_index("team")["p_top2"]
-    p_after = after.set_index("team")["p_top2"]
+    p_before = before.set_index("team")["p_money"]
+    p_after = after.set_index("team")["p_money"]
     assert p_after[recipient] > p_before[recipient]
     assert p_after[donor_team] < p_before[donor_team]

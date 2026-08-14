@@ -59,9 +59,9 @@ ROS_COLS = ["AB", "H", "HR", "R", "RBI", "SB",
             "IP", "W", "SV", "K", "ER", "BB", "H_allowed"]
 
 BOOTSTRAP_DRAWS = 1000      # ~11s; the bands are stable well below this
-TOP2_SIM_DRAWS = 2000       # ~10s per ROS basis, x3 bases -- klab/standings_sim.py
-TOP2_SHOCK_SCALE = 0.35     # klab.standings_sim.DEFAULT_SHOCK_SCALE, made explicit here
-                            # so the payload's "top2_sim" metadata can't drift from
+FINISH_SIM_DRAWS = 2000     # ~10s per ROS basis, x3 bases -- klab/standings_sim.py
+FINISH_SHOCK_SCALE = 0.35   # klab.standings_sim.DEFAULT_SHOCK_SCALE, made explicit here
+                            # so the payload's "finish_sim" metadata can't drift from
                             # what was actually run
 
 
@@ -241,11 +241,13 @@ def _ros_values(board: pd.DataFrame, fa: pd.DataFrame, D: dict, base: dict,
     return out
 
 
-def _top2_odds(board: pd.DataFrame, B: int = TOP2_SIM_DRAWS,
-               shock_scale: float = TOP2_SHOCK_SCALE) -> dict:
-    """Monte Carlo top-2-finish odds (klab.standings_sim, out/ROADMAP.md
-    Phase 5), one run per ROS basis, for the Contention tab's precomputed
-    current-roster view.
+def _finish_odds(board: pd.DataFrame, B: int = FINISH_SIM_DRAWS,
+                 shock_scale: float = FINISH_SHOCK_SCALE) -> dict:
+    """Monte Carlo in-the-money-finish odds (klab.standings_sim,
+    out/ROADMAP.md Phase 5), one run per ROS basis, for the Contention
+    tab's precomputed current-roster view. Payout structure is
+    50%/25%/15%/breakeven for 1st-4th (C.PAYOUT_SPOTS/C.PAYOUT_SHARE) --
+    corrected 2026-08-14 from an earlier, wrong top-2-only build.
 
     Computed ONCE, not nested per PROJECTION_BASIS the way `_ros_values()`
     is: the simulator only touches rest-of-season stat lines and the
@@ -255,13 +257,14 @@ def _top2_odds(board: pd.DataFrame, B: int = TOP2_SIM_DRAWS,
     board variants works as the roster source (team/fg_id don't change
     across those toggles, only dollar VALUES do), so the ambient snapshot's
     board is fine."""
-    from klab.standings_sim import simulate_top2_odds
+    from klab.standings_sim import simulate_finish_odds
     out = {}
     for basis in ROS_BASES:
-        odds = simulate_top2_odds(board, ros_basis=basis, B=B, shock_scale=shock_scale)
+        odds = simulate_finish_odds(board, ros_basis=basis, B=B, shock_scale=shock_scale)
+        finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
         out[basis] = {row["team"]: {
-            "p_first": _round(row["p_first"]), "p_second": _round(row["p_second"]),
-            "p_top2": _round(row["p_top2"]), "current_points": _round(row["current_points"]),
+            **{c: _round(row[c]) for c in finish_cols},
+            "p_money": _round(row["p_money"]), "current_points": _round(row["current_points"]),
         } for _, row in odds.iterrows()}
     return out
 
@@ -526,8 +529,9 @@ def build_payload() -> dict:
         "keeper_standings_2027": variants[default]["keeper_standings_2027"],  # (default basis)
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "history_standings": _historical_standings(),
-        "top2_odds": _top2_odds(s.board, B=TOP2_SIM_DRAWS),
-        "top2_sim": {"draws": TOP2_SIM_DRAWS, "shock_scale": TOP2_SHOCK_SCALE},
+        "finish_odds": _finish_odds(s.board, B=FINISH_SIM_DRAWS),
+        "finish_sim": {"draws": FINISH_SIM_DRAWS, "shock_scale": FINISH_SHOCK_SCALE,
+                      "payout_spots": C.PAYOUT_SPOTS, "payout_share": C.PAYOUT_SHARE},
         # For the client-side port of klab.standings_sim's jitter (out/
         # ROADMAP.md Phase 5) -- ships the same numbers the Python
         # reference uses rather than hand-duplicating them in JS, so the

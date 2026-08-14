@@ -196,30 +196,33 @@ if (positionalBad) console.log('  POSITIONAL-ADJUSTMENT TOGGLE MISMATCH:', JSON.
 // pandas -- two different RNGs never produce the same draw sequence, so this
 // checks STATISTICAL agreement (within Monte Carlo noise) instead of exact
 // equality. Also re-runs the same swap sanity check klab/standings_sim.py's
-// own test suite runs: moving a real player to the current leader must
-// raise the leader's odds and lower the sender's.
-const top2Result = await page.evaluate(() => {
-  const js = simulateTopTwoOdds(null, 3000);
-  const py = D.top2_odds.ros;
-  const diffs = TEAMS.map(t => ({ team: t, js: js[t].p_top2, py: py[t].p_top2,
-                                  diff: Math.abs(js[t].p_top2 - py[t].p_top2) }));
+// own test suite runs: moving a real player to a team with genuine
+// uncertainty (p_money closest to 0.5, not the current standings leader --
+// with a 4-place payout the top teams sit at a near-100% ceiling with no
+// room left to move) must raise the recipient's odds and lower the sender's.
+const finishResult = await page.evaluate(() => {
+  const js = simulateFinishOdds(null, 3000);
+  const py = D.finish_odds.ros;
+  const diffs = TEAMS.map(t => ({ team: t, js: js[t].p_money, py: py[t].p_money,
+                                  diff: Math.abs(js[t].p_money - py[t].p_money) }));
   const maxDiff = Math.max(...diffs.map(d => d.diff));
 
   go('board');
-  const byPoints = TEAMS.map(t => [t, py[t].current_points]).sort((a, b) => b[1] - a[1]);
-  const leader = byPoints[0][0], second = byPoints[1][0];
-  const donor = BOARD.filter(r => g(r, 'team') === second)
+  const byUncertainty = TEAMS.map(t => [t, Math.abs(py[t].p_money - 0.5)])
+    .sort((a, b) => a[1] - b[1]);
+  const recipient = byUncertainty[0][0], donorTeam = byUncertainty[1][0];
+  const donor = BOARD.filter(r => g(r, 'team') === donorTeam)
     .sort((a, b) => g(b, 'roto_points') - g(a, 'roto_points'))[0];
-  const before = simulateTopTwoOdds(null, 2000);
-  const after = simulateTopTwoOdds({ [g(donor, 'fg_id')]: leader }, 2000);
-  const swapWorked = after[leader].p_top2 > before[leader].p_top2
-                   && after[second].p_top2 < before[second].p_top2;
+  const before = simulateFinishOdds(null, 2000);
+  const after = simulateFinishOdds({ [g(donor, 'fg_id')]: recipient }, 2000);
+  const swapWorked = after[recipient].p_money > before[recipient].p_money
+                   && after[donorTeam].p_money < before[donorTeam].p_money;
 
-  return { diffs, maxDiff, swapWorked, leader, second };
+  return { diffs, maxDiff, swapWorked, recipient, donorTeam };
 });
-const TOL_TOP2 = 0.08;
-const top2Bad = top2Result.maxDiff > TOL_TOP2 || !top2Result.swapWorked;
-if (top2Bad) console.log('  TOP-2 SIMULATOR MISMATCH:', JSON.stringify(top2Result));
+const TOL_FINISH_ODDS = 0.08;
+const finishBad = finishResult.maxDiff > TOL_FINISH_ODDS || !finishResult.swapWorked;
+if (finishBad) console.log('  FINISH-ODDS SIMULATOR MISMATCH:', JSON.stringify(finishResult));
 
 // Auction-estimator drawer panel (klab/auction_estimator.py): must render
 // for a player who has an estimate, must be absent (not crash) for one who
@@ -409,8 +412,8 @@ console.log(positionalBad ? 'FAIL  positional-adjustment toggle did not change v
                           : 'PASS  positional-adjustment toggle changes catcher value, round-trips, and survives a basis switch');
 console.log(homeBad ? 'FAIL  homepage question router disabled state or destination state is wrong'
                     : 'PASS  homepage opens first and each question lands on the right tab, pre-filtered');
-console.log(top2Bad ? `FAIL  top-2 simulator disagrees with Python by ${(top2Result.maxDiff*100).toFixed(1)}pp or swap direction is wrong`
-                    : `PASS  top-2 simulator agrees with Python within Monte Carlo noise (max ${(top2Result.maxDiff*100).toFixed(1)}pp) and reacts correctly to a trade`);
+console.log(finishBad ? `FAIL  finish-odds simulator disagrees with Python by ${(finishResult.maxDiff*100).toFixed(1)}pp or swap direction is wrong`
+                      : `PASS  finish-odds simulator agrees with Python within Monte Carlo noise (max ${(finishResult.maxDiff*100).toFixed(1)}pp) and reacts correctly to a trade`);
 console.log(auctionBad ? 'FAIL  auction-estimator panel missing, empty, or not basis-aware'
                        : 'PASS  auction-estimator panel renders, hides when absent, tracks basis');
 console.log(rosBasisBad ? 'FAIL  ROS-basis toggle did not recompute, round-trip, or survive a basis switch'
@@ -426,6 +429,6 @@ console.log(upsideKindBad ? 'FAIL  upside_ft role/health split missing a case or
 console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'
                          : 'PASS  Intuition tab shading moves both halves and stays sandboxed');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || homeBad || top2Bad || auctionBad
+process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || homeBad || finishBad || auctionBad
             || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || upsideKindBad
             || intuitionBad ? 1 : 0);

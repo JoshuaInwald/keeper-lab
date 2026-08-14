@@ -2,15 +2,21 @@
 
 `klab.trade.win_now_delta()` answers "what does a specific swap do to the
 point-estimate standings." This answers a different question: "how often
-does each team actually finish top 2," given real player-outcome
-uncertainty -- the question that matters in a league that only pays the
-top 2 places (out/ROADMAP.md Phase 5).
+does each team actually finish in the money," given real player-outcome
+uncertainty -- the question that matters in a league that only pays out
+for a top-`C.PAYOUT_SPOTS` finish (out/ROADMAP.md Phase 5).
 
 Deliberately does NOT reuse `klab.uncertainty`'s existing bootstrap: that
 resamples DENOMINATOR uncertainty (how many units of a stat buy a
 standings point), not player-OUTCOME uncertainty (how much a given player
 actually produces). Denominator uncertainty is the wrong source for "will
 my closer's saves hold up" -- the question this module exists to answer.
+
+`p_money` is P(finish in the top `C.PAYOUT_SPOTS` places), a single
+threshold. The real payout (50/25/15/breakeven -- `C.PAYOUT_SHARE`) isn't
+flat across those spots, and a single in-the-money probability discards
+that -- 4th is structurally a break-even outcome, not a scaled-down 1st.
+Not modeled here yet; see `out/ROADMAP.md` Phase 5's note on this.
 """
 
 from __future__ import annotations
@@ -73,11 +79,12 @@ def _jitter_ros(ros: pd.DataFrame, rng: np.random.Generator,
     return out
 
 
-def simulate_top2_odds(board: pd.DataFrame, swap: dict | None = None,
-                       ros_basis: str = "ros", B: int = DEFAULT_DRAWS,
-                       seed: int = 0, shock_scale: float = DEFAULT_SHOCK_SCALE
-                       ) -> pd.DataFrame:
-    """Monte Carlo odds of finishing 1st / 2nd / top-2 in the rest of 2026.
+def simulate_finish_odds(board: pd.DataFrame, swap: dict | None = None,
+                         ros_basis: str = "ros", B: int = DEFAULT_DRAWS,
+                         seed: int = 0, shock_scale: float = DEFAULT_SHOCK_SCALE,
+                         payout_spots: int = C.PAYOUT_SPOTS) -> pd.DataFrame:
+    """Monte Carlo odds of finishing in each of places 1..payout_spots, plus
+    p_money (finishing in ANY of them), in the rest of 2026.
 
     `swap` -- {fg_id: new_team}, fg_id as int -- lets this answer "what
     would a hypothetical trade do to my odds." Same override mechanism
@@ -106,22 +113,21 @@ def simulate_top2_odds(board: pd.DataFrame, swap: dict | None = None,
 
     rng = np.random.default_rng(seed)
     teams = list(cur.index)
-    finish_first = {t: 0 for t in teams}
-    finish_second = {t: 0 for t in teams}
+    finish_count = {place: {t: 0 for t in teams} for place in range(1, payout_spots + 1)}
 
     for _ in range(B):
         jittered = _jitter_ros(ros, rng, shock_scale)
         vol = pd.concat([_team_volume(rosters, jittered, cur.index), add_base], axis=1)
         w = _totals_from(cur, vol)
         order = standings_points(w[C.CATS])["TOTAL"].sort_values(ascending=False)
-        finish_first[order.index[0]] += 1
-        finish_second[order.index[1]] += 1
+        for place in range(1, payout_spots + 1):
+            finish_count[place][order.index[place - 1]] += 1
 
     out = pd.DataFrame({
         "team": teams,
         "current_points": [float(standings_points(cur[C.CATS])["TOTAL"][t]) for t in teams],
-        "p_first": [finish_first[t] / B for t in teams],
-        "p_second": [finish_second[t] / B for t in teams],
     })
-    out["p_top2"] = out["p_first"] + out["p_second"]
-    return out.sort_values("p_top2", ascending=False).reset_index(drop=True)
+    for place in range(1, payout_spots + 1):
+        out[f"p_finish_{place}"] = [finish_count[place][t] / B for t in teams]
+    out["p_money"] = out[[f"p_finish_{p}" for p in range(1, payout_spots + 1)]].sum(axis=1)
+    return out.sort_values("p_money", ascending=False).reset_index(drop=True)

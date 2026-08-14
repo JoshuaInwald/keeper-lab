@@ -18,6 +18,21 @@ N_HIT_SLOTS = 14          # C,1B,2B,3B,SS,CI,MI,5xOF,2xUTIL
 N_PIT_SLOTS = 9
 N_ACTIVE = N_HIT_SLOTS + N_PIT_SLOTS
 
+# Standings payout, corrected 2026-08-14 -- first built and shipped assuming
+# a flat top-2-only payout (out/FINDINGS.md #55), which was wrong: the real
+# structure is 50% pot for 1st, 25% for 2nd, 15% for 3rd, buy-in back for
+# 4th. PAYOUT_SPOTS is how many places matter AT ALL (the count, not the
+# weighting) -- klab/standings_sim.py's p_money is P(finish in one of the
+# top PAYOUT_SPOTS places). The weighting itself (50/25/15/breakeven) is
+# real information a single "in the money" threshold discards -- 4th is
+# structurally a different outcome (break even) from 1st (the bulk of the
+# pot), not a scaled-down version of the same thing. Not modeled yet; see
+# out/ROADMAP.md Phase 5's note on this. Kept as one named constant, not
+# hard-coded at each call site, specifically so getting this number wrong
+# a second time costs one edit, not a rename across the whole stack.
+PAYOUT_SPOTS = 4
+PAYOUT_SHARE = {1: 0.50, 2: 0.25, 3: 0.15, 4: 0.0}   # 4th = buy-in back, not a pot share
+
 HIT_CATS = ["R", "HR", "RBI", "SB", "AVG"]
 PIT_CATS = ["W", "SV", "K", "ERA", "WHIP"]
 CATS = HIT_CATS + PIT_CATS

@@ -60,7 +60,7 @@ in `LAB_NOTEBOOK.md`.
 52. [Positional adjustment for catchers and shortstops — and a surprise: both positions are deep, not scarce](#52-positional-adjustment-for-catchers-and-shortstops--and-a-surprise-both-positions-are-deep-not-scarce)
 53. [Direction-aware pitcher playing-time trust, an upside_ft split, and a second copy of #52's own bug](#53-direction-aware-pitcher-playing-time-trust-an-upside_ft-split-and-a-second-copy-of-52s-own-bug)
 54. [Checked against FanGraphs' own rest-of-season auction calculator — mostly agrees, systematically compressed at the top](#54-checked-against-fangraphs-own-rest-of-season-auction-calculator--mostly-agrees-systematically-compressed-at-the-top)
-55. [A Monte Carlo top-2 simulator — the tool now answers the question this league's payout structure actually asks](#55-a-monte-carlo-top-2-simulator--the-tool-now-answers-the-question-this-leagues-payout-structure-actually-asks)
+55. [A Monte Carlo finish-odds simulator — the tool now answers the question this league's payout structure actually asks](#55-a-monte-carlo-finish-odds-simulator--the-tool-now-answers-the-question-this-leagues-payout-structure-actually-asks)
 
 </details>
 
@@ -2879,57 +2879,75 @@ generic pool assumption) — so the honest read is "expected, not alarming,"
 while flagging plainly that it rests on an unconfirmed guess about
 FanGraphs' own league settings.
 
-## 55. A Monte Carlo top-2 simulator — the tool now answers the question this league's payout structure actually asks
+## 55. A Monte Carlo finish-odds simulator — the tool now answers the question this league's payout structure actually asks
 
-This league only pays out for 1st and 2nd place. Every number the tool
-produced before this — `roto_points`, `redraft_value`, the $/point exchange
-rate, the Standings tab's "projected finish" — treats a marginal standings
-point as worth the same amount everywhere in the distribution. That's only
-correct if the payoff is linear in final rank, and it isn't: crossing 3rd
-into 2nd is worth real money, moving from 5th to 4th is worth nothing.
-Full reasoning in `out/ROADMAP.md` Phase 5's own writeup. This entry is the
-build.
+**Correction, 2026-08-14, same day this shipped**: the first version of
+this entry and the feature it documented assumed a flat top-2-only payout.
+Wrong — the real structure is 50% of the pot for 1st, 25% for 2nd, 15% for
+3rd, buy-in back for 4th (`klab.config.PAYOUT_SPOTS`/`PAYOUT_SHARE`).
+Generalized the same day, before this ever reached anyone as the wrong
+number: every place-count that used to say "2" is now driven by
+`PAYOUT_SPOTS`, so a third correction to the payout structure costs one
+config edit, not a rename across the stack. What follows describes the
+corrected, shipped version.
 
-**What it computes.** `klab/standings_sim.py`'s `simulate_top2_odds()`
+Every number the tool produced before this feature existed — `roto_points`,
+`redraft_value`, the $/point exchange rate, the Standings tab's "projected
+finish" — treats a marginal standings point as worth the same amount
+everywhere in the distribution. That's only correct if the payoff is
+linear in final rank, and it isn't: crossing 4th into 3rd is worth real
+money (15% of the pot), moving from 6th to 5th is worth nothing, and
+finishing exactly 4th is a break-even outcome, not a scaled-down version of
+winning. Full reasoning in `out/ROADMAP.md` Phase 5's own writeup. This
+entry is the build.
+
+**What it computes.** `klab/standings_sim.py`'s `simulate_finish_odds()`
 runs many hypothetical rest-of-2026 seasons, jittering real player-outcome
-uncertainty, and reports how *often* each team actually lands top 2 — not
-a single point-estimate finish. Deliberately does not reuse the existing
-bootstrap (`klab/uncertainty.py`): that resamples *denominator* uncertainty
-(how many units of a stat buy a point), which is the wrong source for "will
-my closer's saves hold up." This resamples *player-outcome* uncertainty
-instead, built on the `RELIABILITY` table already fit and trusted elsewhere
-in this project (the same reliability weights that drive the 2027 rate
-blend) rather than introducing a new, less-understood data source: one
-shared "hot/cold" draw per player per simulated season (a player running
-hot tends to run hot across HR/R/RBI together, not independently per stat),
-scaled per category by `1 - reliability` so a less-reliable stat (pitcher
-wins, r=0.15) swings further for the same underlying shock than a
-more-reliable one (stolen bases, r=0.74). Saves have no `RELIABILITY`
-entry (2027 saves come from a separate persistence model, never blended
-through `rel_weight()`) and borrow wins' reliability as the closest
-analogue — both are context/opportunity-driven, not skill-driven, and both
-are known to swing on a single role change. Playing time (AB/IP) is not
-jittered — this simulates performance variance, not injury/role variance,
-a separate and still-unbuilt question.
+uncertainty, and reports how *often* each team actually finishes in each
+of places 1 through `PAYOUT_SPOTS`, plus `p_money` (any of them combined)
+— not a single point-estimate finish. Deliberately does not reuse the
+existing bootstrap (`klab/uncertainty.py`): that resamples *denominator*
+uncertainty (how many units of a stat buy a point), which is the wrong
+source for "will my closer's saves hold up." This resamples
+*player-outcome* uncertainty instead, built on the `RELIABILITY` table
+already fit and trusted elsewhere in this project (the same reliability
+weights that drive the 2027 rate blend) rather than introducing a new,
+less-understood data source: one shared "hot/cold" draw per player per
+simulated season (a player running hot tends to run hot across HR/R/RBI
+together, not independently per stat), scaled per category by
+`1 - reliability` so a less-reliable stat (pitcher wins, r=0.15) swings
+further for the same underlying shock than a more-reliable one (stolen
+bases, r=0.74). Saves have no `RELIABILITY` entry (2027 saves come from a
+separate persistence model, never blended through `rel_weight()`) and
+borrow wins' reliability as the closest analogue — both are
+context/opportunity-driven, not skill-driven, and both are known to swing
+on a single role change. Playing time (AB/IP) is not jittered — this
+simulates performance variance, not injury/role variance, a separate and
+still-unbuilt question.
 
-**Verified on real current standings.** 2nd and 3rd currently sit half a
-point apart (Spehr's Army 67.0, McBlocks 66.5) — the simulator resolves
-that into genuinely different odds: Pookie 2.0 (1st, 76.0, a 9-point
-cushion) 92% to finish top 2; Spehr's Army 72%; McBlocks 36%; every team
-7+ points back effectively 0%. The half-point gap between 2nd and 3rd
-does NOT translate into similar odds for the two teams — Spehr's Army's
-established edge is worth far more than half a point of raw standings
-math suggests, which is exactly the kind of thing a point estimate can't
-show and a simulation can.
+**Verified on real current standings, and a real consequence of getting
+the payout count right.** Pookie 2.0 and Spehr's Army are effectively
+locked into the money already (100%, 100%), McBlocks close behind (99.9%)
+— but the 4th spot is a genuine race: Orange and Black Attack 43%,
+All-Stars 32%, The Fighting Phils 22%, Lisbon Long Balls 3%, everyone else
+0%. Under the original wrong top-2-only version, every one of those four
+teams showed ~0% — the tool would have had nothing useful to say about
+six of this league's ten teams. Getting the payout count right isn't just
+a labeling fix; it's the difference between a feature that's live for 3
+teams and one that's live for 6.
 
-**Real trade example, run directly**: swapping Spehr's Army's and
-McBlocks' best players raises Spehr's Army's 2027 surplus by $13-55 —
-looks like a clean win by every dollar figure this tool showed before —
-but *drops* their title odds 11.5 points (72%→60%), because it costs them
-2026 standings points right now. McBlocks is the mirror image: loses
-dollar value, gains 3.6 points of title odds (36%→39%). A trade that looks
-good in every number the tool showed before this build can be bad for the
-number that actually determines a payout, and vice versa.
+**Real trade example, run directly, dollar-neutral and title-odds-huge**:
+swapping Julio Rodríguez (Orange and Black Attack, $29.92) for Juan Soto
+(The Fighting Phils, $29.93) — a one-cent difference, a complete wash by
+the dollar figure — moves Orange and Black Attack's odds of finishing in
+the money from 43% down to 19% (−25 points) and The Fighting Phils' from
+22% up to 37% (+15 points). A trade that reads as a dead-even swap on
+every dollar number this tool shows is a massive mover for the number that
+actually determines a payout — because the two players' specific category
+profiles fit each team's specific standings needs very differently, which
+no dollar figure in this tool captures (the still-open gap named in
+`out/RESEARCH.md` §6.2 and `out/ROADMAP.md` 5.3: team-specific category
+value).
 
 **Architecture, and the one place this couldn't reuse the existing
 pattern.** Every other stochastic-feeling number in this app is exact,
@@ -2938,7 +2956,7 @@ A Monte Carlo simulator can't be byte-matched — two different RNGs never
 produce the same draw sequence. Verification here checks *statistical*
 agreement instead: both implementations run at high draw counts and must
 land within a tolerance sized to Monte Carlo noise (8 percentage points),
-not exact equality. Measured agreement in practice has run 0.4-1.0
+not exact equality. Measured agreement in practice has run 0.4-1.7
 percentage points apart across several rebuilds — comfortably inside
 tolerance, and a real confirmation the two independently-written
 implementations compute the same thing, not just a loose check that
@@ -2949,18 +2967,20 @@ per-category multiplier map (built for manual shading) simultaneously, so
 one simulator function serves both the standalone Contention tab
 (`swap=null`) and the Trade tab's live what-if view (`swap={fg_id:
 newTeam}`) with no new plumbing. Both are fast enough to be genuinely
-interactive: 2000 draws in JS runs in well under a second in the browser.
+interactive: 2000-3000 draws in JS runs in well under a second in the
+browser.
 
-**Shipped**: a new "Contention" tab (team, current points, P(1st)/P(2nd)/
-P(top 2), and a Contender/Bubble/Rebuild label at 50%/5% judgment-call
-thresholds), and a "Δ P(top 2), this trade" line added to both sides of
-the Trade tab's verdict panel — "before" reads the same precomputed figure
-the Contention tab shows, so the two screens can't disagree with each
-other; "after" is a live simulation of whatever trade is currently being
-built. `klab/trade.py` gained a small, safety-net refactor along the way:
-`win_now_delta()`'s standings-total arithmetic was pulled out of an inline
-closure into three module-level functions (`_season_baseline`,
-`_team_volume`, `_totals_from`) so the simulator computes team totals with
+**Shipped**: a new "Contention" tab (team, current points, P(1st) through
+P(`PAYOUT_SPOTS`), P(money), and a Contender/Bubble/Rebuild label at
+50%/5% judgment-call thresholds on `p_money`), and a "Δ P(money), this
+trade" line added to both sides of the Trade tab's verdict panel —
+"before" reads the same precomputed figure the Contention tab shows, so
+the two screens can't disagree with each other; "after" is a live
+simulation of whatever trade is currently being built. `klab/trade.py`
+gained a small, safety-net refactor along the way: `win_now_delta()`'s
+standings-total arithmetic was pulled out of an inline closure into three
+module-level functions (`_season_baseline`, `_team_volume`,
+`_totals_from`) so the simulator computes team totals with
 the *exact* same math, not a second hand-written copy that could drift.
 
 **Not done in this pass, on purpose**: Stage 3 from `out/ROADMAP.md` Phase

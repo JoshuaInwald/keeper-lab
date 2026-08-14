@@ -427,49 +427,64 @@ rather than a reimplementation.
 
 ---
 
-## Phase 5 — Threshold-aware valuation (top-2-only payouts). Proposed 2026-08-14; 5.1/5.2/5.5 done 2026-08-14
+## Phase 5 — Threshold-aware valuation (top-4 payout, 50/25/15/breakeven). Proposed 2026-08-14; 5.1/5.2/5.5 done 2026-08-14, corrected same day
 
-This league only pays out for 1st and 2nd place. Every number this tool
-produces (`roto_points`, `redraft_value`, the $/point exchange rate) treats
-a marginal standings point as worth the same amount everywhere in the
-distribution -- correct only if the payoff is linear in final rank, which
-it isn't when only two spots pay. The real payoff is closer to a step
-function: crossing 3rd into 2nd is worth real money, moving from 5th to 4th
-is worth nothing, and piling up points once comfortably in 1st is close to
-worthless too. That means the RIGHT strategy is team-state-dependent
-(minimize variance if safely ahead, seek variance if just below the
-cutoff, ignore this year's standings entirely if hopelessly behind).
+**Correction, 2026-08-14, same day 5.1/5.2/5.5 shipped**: this phase and
+the feature it describes were first built assuming a flat top-2-only
+payout. Wrong -- the real structure is 50% of the pot for 1st, 25% for
+2nd, 15% for 3rd, buy-in back for 4th. Caught and fixed the same day,
+generalized behind `klab.config.PAYOUT_SPOTS`/`PAYOUT_SHARE` so a third
+correction costs one config edit, not a rename across the stack -- see
+`out/FINDINGS.md` #55 for the full correction writeup and what changed
+about which teams the feature actually has something to say about (three
+teams had non-zero odds under the wrong top-2 version; six do under the
+correct one).
 
-**5.1 P(finish top 2) simulator — done, 2026-08-14.** `klab/standings_sim.py`.
-Built on the existing `RELIABILITY` table (already fit and trusted
-elsewhere -- the same weights driving the 2027 rate blend), NOT the
-existing bootstrap (`klab/uncertainty.py`, resamples denominator
-uncertainty -- the wrong source for "will my closer's saves hold up").
-One shared per-player "hot/cold" draw per simulated season, scaled per
-category by `1 - reliability`. Verified on real current standings: 2nd and
-3rd sit half a point apart in raw standings (Spehr's Army 67.0, McBlocks
-66.5) but resolve to very different odds (72% vs. 36%) once simulated --
-exactly the kind of thing a point estimate can't show. See
-`out/FINDINGS.md` #55 for the full writeup, including the one place this
-couldn't reuse the app's usual byte-diff verification pattern (a Monte
-Carlo result can't be exact-matched between two RNGs -- verified
-statistically instead, agreement measured at 0.4-1.0 percentage points in
-practice, well inside the 8-point tolerance).
+Every number this tool produces (`roto_points`, `redraft_value`, the
+$/point exchange rate) treats a marginal standings point as worth the same
+amount everywhere in the distribution -- correct only if the payoff is
+linear in final rank, which it isn't. The real payoff is closer to a step
+function: crossing 4th into 3rd is worth real money (15% of the pot),
+moving from 6th to 5th is worth nothing, and finishing exactly 4th is a
+break-even outcome, not a scaled-down version of winning. That means the
+RIGHT strategy is team-state-dependent (minimize variance if safely ahead,
+seek variance if fighting for the last money spot, ignore this year's
+standings entirely if hopelessly behind).
+
+**5.1 P(finish in the money) simulator — done, 2026-08-14.**
+`klab/standings_sim.py`'s `simulate_finish_odds()`. Built on the existing
+`RELIABILITY` table (already fit and trusted elsewhere -- the same weights
+driving the 2027 rate blend), NOT the existing bootstrap
+(`klab/uncertainty.py`, resamples denominator uncertainty -- the wrong
+source for "will my closer's saves hold up"). One shared per-player
+"hot/cold" draw per simulated season, scaled per category by
+`1 - reliability`. Tracks places 1 through `PAYOUT_SPOTS`, not just a
+binary threshold, so a team's shot at 1st specifically is visible, not
+just "in the money or not." See `out/FINDINGS.md` #55 for the full
+writeup, including the one place this couldn't reuse the app's usual
+byte-diff verification pattern (a Monte Carlo result can't be
+exact-matched between two RNGs -- verified statistically instead,
+agreement measured at 0.4-1.7 percentage points in practice, well inside
+the 8-point tolerance).
 
 **5.2 A team-situation classifier — done, 2026-08-14**, shipped as the new
-Contention tab: every team's P(1st)/P(2nd)/P(top 2) plus a Contender
-(50%+) / Bubble (5-50%) / Rebuild (under 5%) label. Judgment-call
-thresholds, not a hard boundary.
+Contention tab: every team's P(1st) through P(`PAYOUT_SPOTS`), P(money),
+and a Contender (50%+) / Bubble (5-50%) / Rebuild (under 5%) label on
+`p_money`. Judgment-call thresholds, not a hard boundary -- and a real
+simplification worth naming: this single figure doesn't distinguish a team
+fighting for 1st from one fighting to just break even in 4th, which the
+real payout structure treats very differently.
 
-**5.5 Trade evaluator upgrade — done, 2026-08-14.** A "Δ P(top 2), this
+**5.5 Trade evaluator upgrade — done, 2026-08-14.** A "Δ P(money), this
 trade" line on both sides of the Trade tab's verdict panel, live-simulated
 for whatever trade is currently being built. Real example run directly:
-swapping Spehr's Army's and McBlocks' best players raises Spehr's Army's
-2027 surplus $13-55 (looks like a clean win by every number the tool
-showed before this build) but drops their title odds 11.5 points
-(72%→60%), because it costs them 2026 standings points right now --
-McBlocks is the mirror image, losing dollar value while gaining title
-odds. Exactly the disconnect this whole phase exists to surface.
+swapping Julio Rodríguez for Juan Soto between two bubble teams is a
+one-cent difference in dollar value -- a complete wash by every number
+this tool showed before this build -- but moves one team's odds of
+finishing in the money from 43% to 19% and the other's from 22% to 37%.
+A trade that reads as dead-even in dollar terms can be a massive mover for
+the number that actually determines a payout. Exactly the disconnect this
+whole phase exists to surface.
 
 **5.3 Team-conditional marginal value — still open.** Replacing the single
 flat $/point rate for team-specific views. Generalizes RESEARCH.md's
@@ -478,6 +493,9 @@ into team-specific *standings-threshold* value -- a bigger version of the
 same underlying gap (§6.2: roto points add up linearly today with no
 notion of where a team actually sits in a category, let alone in the
 standings overall). 5.1's simulator is the foundation this would build on.
+The real trade example under 5.5 is exactly what this would explain: WHY
+a dollar-neutral swap moved two teams' odds so much (their specific
+category needs), not just THAT it did.
 
 **5.4 Surface player-level variance as a first-class stat — still open.**
 ZiPS's own P10-P90 bands exist in the export and have gone unused
@@ -491,14 +509,15 @@ itself -- just noting the two are connected.
 
 **5.6 Research note, not a build item: revisit the flat-exchange-rate
 finding (out/FINDINGS.md #54) through this lens -- still open.** Real
-hypothesis worth writing up now that 5.1 gives real P(top-2) numbers to
-check it against: with only 2 of 10 spots paying, the average team in most
-seasons isn't a contender, so broad value-accumulation instead of
-star-chasing may be this league's rational aggregate bidding behavior for
-its own payout structure -- not a market inefficiency to correct.
+hypothesis worth writing up now that 5.1 gives real P(money) numbers to
+check it against: with only 4 of 10 spots paying, and 4th itself only a
+break-even outcome, most teams in most seasons aren't playing for a real
+profit, so broad value-accumulation instead of star-chasing may be this
+league's rational aggregate bidding behavior for its own payout structure
+-- not a market inefficiency to correct.
 
-**Stage 3 (2027 keeper-core odds) -- still open, deliberately not attempted
-in the same pass as 5.1/5.2/5.5.** Needs its own baseline (keeper set +
-replacement-level fill, not current accumulated standings) and its own
-uncertainty layer (a full future season carries more uncertainty than a
-partial current one) -- a real extension of 5.1, not a trivial one.
+**Stage 3 (2027 keeper-core odds) -- still open, next up.** Needs its own
+baseline (keeper set + replacement-level fill, not current accumulated
+standings) and its own uncertainty layer (a full future season carries
+more uncertainty than a partial current one) -- a real extension of 5.1,
+not a trivial one.
