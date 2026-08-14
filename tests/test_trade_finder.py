@@ -63,6 +63,36 @@ def test_win_now_scenario_never_offers_a_worthless_return(board_and_pts):
     assert checked > 0, "test needs at least one pair with a found win_now trade"
 
 
+def test_shortlist_is_sorted(board_and_pts):
+    """Real bug: _shortlist used to return list(set_a | set_b) -- a set's
+    iteration order is randomised per Python process (string hash seeding),
+    so an identical board produced a different "best" trade on every rerun
+    in a fresh process whenever two candidates tied on a scenario's primary
+    score, which is common (many candidates move one side's standings by
+    the exact same amount). A single process reuses one hash seed for its
+    whole lifetime, so this couldn't be caught by comparing two in-process
+    calls -- it only showed up rerunning `scripts/build_trade_suggestions.py`
+    end to end with unchanged data and diffing the output. Fixed by sorting
+    the shortlist and adding a real secondary tie-break (sum of both deltas)
+    to the scenario pickers. See out/FINDINGS.md #41."""
+    board, _, _ = board_and_pts
+    sl = _shortlist(board, "Pookie 2.0")
+    assert sl == sorted(sl)
+
+
+def test_challenge_picks_pareto_better_candidate_on_a_tie():
+    """Two candidates tie on min(a_delta, b_delta) -- the primary score --
+    but one is strictly better for team_a. The sum-based tie-break must
+    prefer it, not whichever the caller happened to list first."""
+    from klab.trade_finder import _pick_challenge
+    worse = {"a_sends": "Worse", "b_sends": "Same",
+             "a_standings_delta": 3.5, "b_standings_delta": 1.5}
+    better = {"a_sends": "Better", "b_sends": "Same",
+              "a_standings_delta": 5.5, "b_standings_delta": 1.5}
+    assert _pick_challenge([worse, better], "A", "B")["a_sends"] == "Better"
+    assert _pick_challenge([better, worse], "A", "B")["a_sends"] == "Better"
+
+
 def test_challenge_and_mutual_value_never_favor_only_one_side():
     """Both scenarios are explicitly mutual -- if a candidate is returned,
     BOTH sides' relevant delta must be positive, not just the max of the two."""

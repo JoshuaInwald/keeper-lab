@@ -67,7 +67,12 @@ def _shortlist(board: pd.DataFrame, team: str, n: int = SHORTLIST_SIZE) -> list[
     t = board[board["team"] == team]
     by_talent = set(t.nlargest(n, "roto_points")["name"])
     by_value = set(t.nlargest(n, "surplus_multiyear")["name"])
-    return list(by_talent | by_value)
+    # Sorted, not just de-duplicated: iterating a raw set is order-unstable
+    # across processes (Python randomises string hashing per run), and the
+    # scenario pickers below break ties on first-seen-wins. An unsorted
+    # shortlist made suggest_trades() silently return a different, sometimes
+    # worse, "best" trade on every identical rerun -- see FINDINGS.md #41.
+    return sorted(by_talent | by_value)
 
 
 def _search_pair(board: pd.DataFrame, exch: dict, team_a: str, team_b: str,
@@ -117,23 +122,34 @@ def _pick_win_now(board: pd.DataFrame, results: list[dict], team_a: str, team_b:
         incoming_to_seller = r["b_sends"] if seller == team_a else r["a_sends"]
         if seller_gain <= 0 or surplus.get(incoming_to_seller, 0.0) <= 0:
             continue
-        if best is None or buyer_gain > best["_score"]:
-            best = {**r, "_score": buyer_gain, "buyer": buyer, "seller": seller}
-    if best is None or best["_score"] <= 0:
+        # Tie-break on seller_gain: buyer_gain alone ties often (many
+        # rentals move the buyer's standings by the same amount), and
+        # picking the first tie encountered means the shortlist's iteration
+        # order silently decides the answer. See FINDINGS.md #41.
+        score = (buyer_gain, seller_gain)
+        if best is None or score > best["_score"]:
+            best = {**r, "_score": score, "buyer": buyer, "seller": seller}
+    if best is None or best["_score"][0] <= 0:
         return None
     return {"scenario": "win_now_for_future", "buyer": best["buyer"], "seller": best["seller"],
             "a_sends": best["a_sends"], "b_sends": best["b_sends"],
-            "buyer_standings_gain": round(best["_score"], 2),
+            "buyer_standings_gain": round(best["_score"][0], 2),
             "seller_surplus_gain": round(
                 best["a_surplus_delta"] if best["seller"] == team_a else best["b_surplus_delta"], 2)}
 
 
 def _pick_challenge(results: list[dict], team_a: str, team_b: str) -> dict | None:
+    """Score is (min(a,b), sum(a,b)): min is the real criterion -- neither
+    side should be shortchanged -- but ties on min are common (many
+    candidates move one side's standings by the exact same amount), and the
+    sum breaks the tie toward the Pareto-better candidate instead of
+    whichever the shortlist happened to reach first. See FINDINGS.md #41."""
     best = None
     for r in results:
         if r["a_standings_delta"] <= 0 or r["b_standings_delta"] <= 0:
             continue
-        score = min(r["a_standings_delta"], r["b_standings_delta"])
+        score = (min(r["a_standings_delta"], r["b_standings_delta"]),
+                 r["a_standings_delta"] + r["b_standings_delta"])
         if best is None or score > best["_score"]:
             best = {**r, "_score": score}
     if best is None:
@@ -144,11 +160,13 @@ def _pick_challenge(results: list[dict], team_a: str, team_b: str) -> dict | Non
 
 
 def _pick_mutual_value(results: list[dict], team_a: str, team_b: str) -> dict | None:
+    """Same (min, sum) tie-break as _pick_challenge -- see its docstring."""
     best = None
     for r in results:
         if r["a_surplus_delta"] <= 0 or r["b_surplus_delta"] <= 0:
             continue
-        score = min(r["a_surplus_delta"], r["b_surplus_delta"])
+        score = (min(r["a_surplus_delta"], r["b_surplus_delta"]),
+                 r["a_surplus_delta"] + r["b_surplus_delta"])
         if best is None or score > best["_score"]:
             best = {**r, "_score": score}
     if best is None:

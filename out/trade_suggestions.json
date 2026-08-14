@@ -26,9 +26,9 @@
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Jes\u00fas Luzardo",
-      "b_sends": "Manny Machado",
-      "a_standings_gain": 3.0,
+      "a_sends": "Kenley Jansen",
+      "b_sends": "Isaac Paredes",
+      "a_standings_gain": 4.0,
       "b_standings_gain": 2.5
     },
     "mutual_value_swap": null
@@ -47,9 +47,9 @@
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Brandon Marsh",
-      "b_sends": "Tarik Skubal",
-      "a_standings_gain": 2.0,
+      "a_sends": "Otto Lopez",
+      "b_sends": "Spencer Torkelson",
+      "a_standings_gain": 3.5,
       "b_standings_gain": 2.0
     },
     "mutual_value_swap": null
@@ -60,10 +60,10 @@
     "win_now_for_future": null,
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Kazuma Okamoto",
+      "a_sends": "Oneil Cruz",
       "b_sends": "Logan Gilbert",
       "a_standings_gain": 1.0,
-      "b_standings_gain": 1.5
+      "b_standings_gain": 2.5
     },
     "mutual_value_swap": null
   },
@@ -75,9 +75,9 @@
       "buyer": "Orange and Black Attack",
       "seller": "All-Stars",
       "a_sends": "Jonathan Aranda",
-      "b_sends": "Drew Rasmussen",
+      "b_sends": "Bryan Woo",
       "buyer_standings_gain": 7.5,
-      "seller_surplus_gain": 15.64
+      "seller_surplus_gain": 26.27
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -96,9 +96,9 @@
       "buyer": "Pookie 2.0",
       "seller": "All-Stars",
       "a_sends": "Jes\u00fas Luzardo",
-      "b_sends": "Ozzie Albies",
+      "b_sends": "JJ Wetherholt",
       "buyer_standings_gain": 1.5,
-      "seller_surplus_gain": 7.46
+      "seller_surplus_gain": 10.39
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -116,10 +116,10 @@
       "scenario": "win_now_for_future",
       "buyer": "All-Stars",
       "seller": "Producers",
-      "a_sends": "Otto Lopez",
-      "b_sends": "Francisco Lindor",
+      "a_sends": "Brandon Lowe",
+      "b_sends": "Xavier Edwards",
       "buyer_standings_gain": 3.0,
-      "seller_surplus_gain": 3.42
+      "seller_surplus_gain": 4.37
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -145,8 +145,8 @@
     "challenge_trade": {
       "scenario": "challenge_trade",
       "a_sends": "Otto Lopez",
-      "b_sends": "Seiya Suzuki",
-      "a_standings_gain": 2.0,
+      "b_sends": "Ketel Marte",
+      "a_standings_gain": 3.0,
       "b_standings_gain": 1.5
     },
     "mutual_value_swap": null
@@ -157,9 +157,9 @@
     "win_now_for_future": null,
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Kazuma Okamoto",
-      "b_sends": "Juan Soto",
-      "a_standings_gain": 2.0,
+      "a_sends": "Salvador Perez",
+      "b_sends": "Bo Bichette",
+      "a_standings_gain": 3.5,
       "b_standings_gain": 1.5
     },
     "mutual_value_swap": null
@@ -178,10 +178,10 @@
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Aroldis Chapman",
-      "b_sends": "Hunter Goodman",
-      "a_standings_gain": 4.0,
-      "b_standings_gain": 3.5
+      "a_sends": "David Bednar",
+      "b_sends": "Isaac Paredes",
+      "a_standings_gain": 3.5,
+      "b_standings_gain": 4.5
     },
     "mutual_value_swap": null
   },
@@ -193,9 +193,9 @@
       "buyer": "Lisbon Long Balls",
       "seller": "NPB No Stars",
       "a_sends": "Aroldis Chapman",
-      "b_sends": "Bryan Reynolds",
+      "b_sends": "Vladimir Guerrero Jr.",
       "buyer_standings_gain": 4.0,
-      "seller_surplus_gain": 4.09
+      "seller_surplus_gain": 21.19
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -213,16 +213,16 @@
       "scenario": "win_now_for_future",
       "buyer": "Lisbon Long Balls",
       "seller": "New York Polar Bears",
-      "a_sends": "Aroldis Chapman",
-      "b_sends": "Michael Harris II",
+      "a_sends": "David Bednar",
+      "b_sends": "Wyatt Langford",
       "buyer_standings_gain": 5.5,
-      "seller_surplus_gain": 2.23
+      "seller_surplus_gain": 11.94
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Jacob Misiorowski",
+      "a_sends": "Cam Schlittler",
       "b_sends": "Geraldo Perdomo",
-      "a_standings_gain": 1.5,
+      "a_standings_gain": 2.5,
       "b_standings_gain": 0.5
     },
     "mutual_value_swap": null
@@ -233,10 +233,10 @@
     "win_now_for_future": null,
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Jacob Misiorowski",
-      "b_sends": "Josh Hader",
-      "a_standings_gain": 1.0,
-      "b_standings_gain": 0.5
+      "a_sends": "Cole Carrigg",
+      "b_sends": "Mickey Moniak",
+      "a_standings_gain": 0.5,
+      "b_standings_gain": 1.5
     },
     "mutual_value_swap": null
   },
@@ -255,9 +255,9 @@
     "challenge_trade": {
       "scenario": "challenge_trade",
       "a_sends": "Jacob Misiorowski",
-      "b_sends": "Dansby Swanson",
+      "b_sends": "JJ Wetherholt",
       "a_standings_gain": 1.0,
-      "b_standings_gain": 2.5
+      "b_standings_gain": 3.5
     },
     "mutual_value_swap": null
   },
@@ -268,15 +268,15 @@
       "scenario": "win_now_for_future",
       "buyer": "Lisbon Long Balls",
       "seller": "Producers",
-      "a_sends": "Aroldis Chapman",
-      "b_sends": "William Contreras",
+      "a_sends": "David Bednar",
+      "b_sends": "Cody Bellinger",
       "buyer_standings_gain": 4.0,
-      "seller_surplus_gain": 3.31
+      "seller_surplus_gain": 17.63
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
       "a_sends": "Aroldis Chapman",
-      "b_sends": "William Contreras",
+      "b_sends": "Alec Burleson",
       "a_standings_gain": 4.0,
       "b_standings_gain": 0.5
     },
@@ -297,7 +297,7 @@
     "challenge_trade": {
       "scenario": "challenge_trade",
       "a_sends": "Cole Carrigg",
-      "b_sends": "Seiya Suzuki",
+      "b_sends": "Ketel Marte",
       "a_standings_gain": 0.5,
       "b_standings_gain": 1.0
     },
@@ -351,9 +351,9 @@
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Manny Machado",
+      "a_sends": "Isaac Paredes",
       "b_sends": "Logan Gilbert",
-      "a_standings_gain": 1.5,
+      "a_standings_gain": 2.5,
       "b_standings_gain": 1.5
     },
     "mutual_value_swap": null
@@ -379,9 +379,9 @@
       "buyer": "Pookie 2.0",
       "seller": "McBlocks",
       "a_sends": "Chris Sale",
-      "b_sends": "Jake McCarthy",
+      "b_sends": "Nico Hoerner",
       "buyer_standings_gain": 3.0,
-      "seller_surplus_gain": 2.04
+      "seller_surplus_gain": 15.96
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -400,9 +400,9 @@
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Manny Machado",
+      "a_sends": "Hunter Goodman",
       "b_sends": "Kodai Senga",
-      "a_standings_gain": 1.0,
+      "a_standings_gain": 1.5,
       "b_standings_gain": 1.0
     },
     "mutual_value_swap": null
@@ -437,9 +437,9 @@
       "buyer": "New York Polar Bears",
       "seller": "NPB No Stars",
       "a_sends": "Vladimir Guerrero Jr.",
-      "b_sends": "Michael Harris II",
+      "b_sends": "Andy Pages",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 18.96
+      "seller_surplus_gain": 23.81
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -458,16 +458,16 @@
       "buyer": "Orange and Black Attack",
       "seller": "NPB No Stars",
       "a_sends": "Vladimir Guerrero Jr.",
-      "b_sends": "Drew Rasmussen",
+      "b_sends": "Bryan Woo",
       "buyer_standings_gain": 7.5,
-      "seller_surplus_gain": 20.07
+      "seller_surplus_gain": 30.71
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Bryan Reynolds",
+      "a_sends": "Freddie Freeman",
       "b_sends": "Josh Hader",
       "a_standings_gain": 1.0,
-      "b_standings_gain": 5.5
+      "b_standings_gain": 7.5
     },
     "mutual_value_swap": null
   },
@@ -521,7 +521,7 @@
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Vladimir Guerrero Jr.",
+      "a_sends": "Freddie Freeman",
       "b_sends": "Gunnar Henderson",
       "a_standings_gain": 1.0,
       "b_standings_gain": 1.0
@@ -556,15 +556,15 @@
       "scenario": "win_now_for_future",
       "buyer": "Orange and Black Attack",
       "seller": "New York Polar Bears",
-      "a_sends": "Michael Harris II",
-      "b_sends": "Drew Rasmussen",
+      "a_sends": "Wyatt Langford",
+      "b_sends": "Bryan Woo",
       "buyer_standings_gain": 7.5,
-      "seller_surplus_gain": 1.11
+      "seller_surplus_gain": 21.19
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
       "a_sends": "Geraldo Perdomo",
-      "b_sends": "Drew Rasmussen",
+      "b_sends": "Bryan Woo",
       "a_standings_gain": 0.5,
       "b_standings_gain": 5.5
     },
@@ -577,10 +577,10 @@
       "scenario": "win_now_for_future",
       "buyer": "Pookie 2.0",
       "seller": "New York Polar Bears",
-      "a_sends": "Michael Harris II",
-      "b_sends": "Dansby Swanson",
+      "a_sends": "George Kirby",
+      "b_sends": "Nico Hoerner",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 1.0
+      "seller_surplus_gain": 30.04
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -654,9 +654,9 @@
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Drew Rasmussen",
-      "b_sends": "Aaron Judge",
-      "a_standings_gain": 3.5,
+      "a_sends": "Bryan Woo",
+      "b_sends": "JJ Wetherholt",
+      "a_standings_gain": 5.5,
       "b_standings_gain": 1.5
     },
     "mutual_value_swap": null
@@ -722,10 +722,10 @@
       "scenario": "win_now_for_future",
       "buyer": "Pookie 2.0",
       "seller": "Spehr's Army",
-      "a_sends": "Jake McCarthy",
+      "a_sends": "Nico Hoerner",
       "b_sends": "Cristopher S\u00e1nchez",
       "buyer_standings_gain": 2.0,
-      "seller_surplus_gain": 2.04
+      "seller_surplus_gain": 15.96
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -737,10 +737,10 @@
       "scenario": "win_now_for_future",
       "buyer": "Pookie 2.0",
       "seller": "The Fighting Phils",
-      "a_sends": "Jake McCarthy",
+      "a_sends": "Nico Hoerner",
       "b_sends": "Yoshinobu Yamamoto",
       "buyer_standings_gain": 2.5,
-      "seller_surplus_gain": 1.39
+      "seller_surplus_gain": 15.32
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -795,14 +795,14 @@
       "buyer": "Spehr's Army",
       "seller": "The Fighting Phils",
       "a_sends": "Shea Langeliers",
-      "b_sends": "Corbin Carroll",
+      "b_sends": "Yordan Alvarez",
       "buyer_standings_gain": 2.0,
-      "seller_surplus_gain": 22.61
+      "seller_surplus_gain": 22.69
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
-      "a_sends": "Jordan Walker",
-      "b_sends": "Bo Bichette",
+      "a_sends": "Daylen Lile",
+      "b_sends": "A.J. Ewing",
       "a_standings_gain": 1.0,
       "b_standings_gain": 1.5
     },

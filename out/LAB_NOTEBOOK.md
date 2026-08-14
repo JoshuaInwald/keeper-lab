@@ -719,3 +719,43 @@ Wrote a targeted click-through check, confirmed it actually failed before
 the fix and passed after, then folded it permanently into `verify.mjs`
 rather than leaving it as a one-off script -- the whole point of a
 regression test is that the NEXT session gets it for free.
+
+## 20. Trade finder gave a different "best" trade on every identical rerun (2026-08-13)
+
+Not found by testing the trade finder -- found by checking a completely
+different thing, whether the build pipeline was safe to schedule
+unattended. Ran `build_trade_suggestions.py` -> `run_all.py` twice back to
+back on unchanged data as part of that check, diffed the two
+`trade_suggestions.json` outputs out of habit (CLAUDE.md: "don't rerun and
+commit different numbers without saying so"), and 28 of 45 pairs had
+actually changed. Some by a lot -- one candidate's standings gain moved
+from 3.5 to 5.5 points between runs with zero inputs different.
+
+Traced it to `_shortlist()` handing `list(a_set | b_set)` to the search
+loop. Set membership was provably stable (md5'd the board three ways,
+identical every time) but set *iteration order* isn't -- Python randomises
+string hashing per process -- and the three scenario pickers kept
+"whichever candidate beat the running best first," which only matters on a
+tie. Ties on the primary score turn out to be common (lots of different
+return players move a team's standings by the exact same round number).
+So the bug wasn't really "unstable order," it was "the tie-break logic
+never existed -- it was implicitly 'whatever iteration order says,' and
+nobody had written a real one."
+
+Fixed both halves: sorted the shortlist (removes the hash-seed dependency)
+and gave all three pickers a real secondary criterion -- sum of both
+sides' deltas -- so a tie now resolves toward the Pareto-better candidate
+instead of an arbitrary one. Reran the full chain twice more after the
+fix: byte-identical output both times. Full writeup in
+`out/FINDINGS.md` #41.
+
+Two things worth remembering about how this was caught: (1) it had nothing
+to do with what I was actually testing -- I was checking cron-safety, not
+trade-finder correctness, and the bug only surfaced because rerunning
+things twice and diffing is a cheap habit worth keeping even when it's not
+the point of the exercise; (2) an in-process regression test
+(`suggest_trades()` called twice in the same pytest run) would NOT have
+caught this, because one process reuses one hash seed for its whole
+lifetime -- the two tests I actually wrote instead check the sortedness
+directly and construct a synthetic tie to exercise the tie-break logic,
+which is the part that was actually wrong.

@@ -46,6 +46,7 @@ in `LAB_NOTEBOOK.md`.
 38. [Roster update — two real trades, one FA move, resolved cleanly against 268-of-277 players untouched](#38-roster-update--two-real-trades-one-fa-move-resolved-cleanly-against-268-of-277-players-untouched)
 39. [F-contract players were never actually extendable right now — a bigger correction than #33](#39-f-contract-players-were-never-actually-extendable-right-now--a-bigger-correction-than-33)
 40. [A trade-finder feature: precomputed suggestions, three scenarios, three real bugs caught building it](#40-a-trade-finder-feature-precomputed-suggestions-three-scenarios-three-real-bugs-caught-building-it)
+41. [The trade finder was non-deterministic across identical reruns — caught checking auto-refresh safety](#41-the-trade-finder-was-non-deterministic-across-identical-reruns--caught-checking-auto-refresh-safety)
 
 </details>
 
@@ -1956,3 +1957,62 @@ column's own tooltip both still said "±38%" / "F = final year: extend or
 lose him" — stale relative to #26/#39 earlier in this session. Neither was
 caught by `verify.mjs`, which checks for JS errors and JS/Python numeric
 parity, not prose content.
+
+## 41. The trade finder was non-deterministic across identical reruns — caught checking auto-refresh safety
+
+Found while verifying the build pipeline (`build_trade_suggestions.py` →
+`run_all.py` → `build_app.py`) is safe to run unattended on a schedule —
+not by testing the trade finder itself. Reran the full chain twice on
+identical `data/` with nothing changed, then diffed the two
+`out/trade_suggestions.json` outputs: 28 of 45 team pairs changed. Some
+diffs were bigger than cosmetic — one candidate for Orange and Black
+Attack ↔ Pookie 2.0's challenge trade moved from a 3.5-point standings gain
+to 5.5 between runs with no code or data change in between.
+
+**Root cause.** `_shortlist()` in `klab/trade_finder.py` returned
+`list(set_a | set_b)`. Set *membership* was stable — reran `build_board()`
+three times and md5'd the CSV, byte-identical every time — but set
+*iteration order* is not: Python randomises string hashing per process by
+default, so the same set of names came out in a different order each run.
+`_search_pair()` iterates the shortlist in that order, and the three
+scenario pickers (`_pick_win_now`, `_pick_challenge`, `_pick_mutual_value`)
+kept the first candidate that beat the running best on a strict `>`. That's
+fine when the true best is unique — but ties on the primary score are
+common (e.g. two different return players both move a team's standings by
+exactly 1.5 points), and on a tie, "first encountered" is exactly the part
+of the computation that iteration order controls. Confirmed directly:
+`_search_pair()`'s full 240-candidate result set was byte-identical (sorted
+md5) across three fresh-process reruns, so the candidate pool was never the
+problem — only which tied candidate the picker happened to keep.
+
+**Why this matters beyond auto-refresh.** This wasn't only a hypothetical
+cron-job concern. It meant `scripts/build_trade_suggestions.py`'s own
+documented usage — "run this after roster changes" — could hand back a
+different, sometimes strictly worse, "best" trade for the same roster
+depending on nothing but which process happened to run it. A tie-break
+that silently discards a Pareto-better candidate (same gain for one side,
+more for the other) is worse than an arbitrary one: it's not just unstable,
+it's occasionally wrong on its own terms.
+
+**Fix.** `_shortlist()` now returns `sorted(set_a | set_b)` — order no
+longer depends on the hash seed. More importantly, the three pickers now
+break ties on a real secondary criterion instead of first-seen: score is a
+tuple `(primary, secondary)` compared lexicographically, where secondary is
+the sum of both sides' deltas. That doesn't just make the output
+stable — it changes what gets picked: for the Orange and Black
+Attack/Pookie 2.0 case above, Bryan Woo↔JJ Wetherholt (5.5/1.5) Pareto-
+dominates Bryan Woo↔Aaron Judge (3.5/1.5) — identical for one side, better
+for the other — and is now the deterministic answer instead of a coin
+flip. Verified: reran the full build chain twice more after the fix and
+diffed `trade_suggestions.json` — byte-identical both times. Regression
+tests added: `test_shortlist_is_sorted` and
+`test_challenge_picks_pareto_better_candidate_on_a_tie` in
+`tests/test_trade_finder.py`; the second constructs a synthetic tie
+directly rather than relying on reproducing a hash-seed race, since a
+single test process reuses one hash seed for its whole lifetime and
+wouldn't reliably reproduce the original bug.
+
+**Scope check.** `_pick_win_now`'s tie-break (buyer_gain, seller_gain) was
+audited the same way but had no live example in this league's current data
+to reproduce against — added defensively, on the same reasoning, not
+because a concrete instance was found.

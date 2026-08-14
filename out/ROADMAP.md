@@ -122,9 +122,41 @@ it. Making it a control rather than a rebuild means shipping three payloads in
 one file — cheap, and it turns the model's biggest fork into something you can
 see rather than something you have to trust.
 
-**2.4 Auto-refresh (0.5 session).** Scheduled task pulls fresh FanGraphs ROS
-projections, rebuilds, writes a snapshot. Then the tool is live rather than a
-thing you rerun by hand.
+**2.4 Auto-refresh — build pipeline is cron-safe, data ingestion is not
+(checked 2026-08-13, not scheduled on purpose, still manual by choice).**
+Two separate questions, worth not conflating:
+
+- **Is the rebuild chain safe to run unattended?** Yes, verified directly:
+  `scripts/build_trade_suggestions.py` → `scripts/run_all.py` (which calls
+  `build_app.py` internally) ran end to end twice with no interactive
+  prompts, no crashes, ~2m20s total. `grep`ed `klab/` and `scripts/` for
+  `input()`/`sys.stdin` — none exist anywhere in the pipeline.
+- **Is there anything to schedule it to pull?** No — and this is the actual
+  gap, not a solved problem waiting for a cron entry. There is no FanGraphs
+  scraper or API client anywhere in this codebase; `data/` is a hand-copied
+  export from `~/Documents/Fantasy Baseball/` per `CLAUDE.md`'s three-places
+  note. "Auto-refresh" in the sense of *the numbers change on their own* is
+  not currently possible without writing an ingestion step that doesn't
+  exist yet — a materially bigger task than wiring up a scheduler, and out
+  of scope for now. Also worth knowing before scheduling anything:
+  `build_trade_suggestions.py` is deliberately not called from
+  `run_all.py` (its own docstring says why — it's the slow part), so a
+  cron entry that only calls `run_all.py` would silently serve
+  increasingly stale trade suggestions next to a freshly-rebuilt board.
+  Any future scheduler has to call both, in that order.
+
+Real bug found doing this check, unrelated to scheduling itself: rerunning
+the chain twice on *identical* data produced different trade suggestions
+for 28 of 45 team pairs — a non-determinism bug in `klab/trade_finder.py`'s
+tie-breaking, not anything to do with automation. Fixed same day; see
+`out/FINDINGS.md` #41. Good thing to have caught before ever running this
+unattended, since a human rerunning it by hand would at least notice "why
+did this change," while a cron job wouldn't.
+
+Conclusion: safe to schedule the *rebuild* today if a fresher `data/` ever
+shows up on disk by some other means; not worth scheduling anything until
+there's an actual ingestion step to trigger. Left manual, per Josh's
+preference (2026-08-13).
 
 ---
 
