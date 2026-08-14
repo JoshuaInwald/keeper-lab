@@ -120,12 +120,12 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
         H = to_full_time(H)
         P = to_full_time(P, exclude_ids=two_way)
     else:
-        H["pt_scale"] = 1.0; H["pt_extrapolated"] = False
-        P["pt_scale"] = 1.0; P["pt_extrapolated"] = False
+        H["pt_scale"] = 1.0; H["pt_extrapolated"] = False; H["pt_scale_kind"] = "health"
+        P["pt_scale"] = 1.0; P["pt_extrapolated"] = False; P["pt_scale_kind"] = "health"
 
     Hs = H.join(scorer.hitters(H))
     Ps = P.join(scorer.pitchers(P))
-    keep = ["fg_id", "name", "role", "w_2026", "pt_scale", "roto_points"] + \
+    keep = ["fg_id", "name", "role", "w_2026", "pt_scale", "pt_scale_kind", "roto_points"] + \
            [f"rp_{c}" for c in C.CATS]
     for df in (Hs, Ps):
         for c in keep:
@@ -147,6 +147,7 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
     out["_pit"] = (out["role"] == "PIT").astype(int)
     agg = {c: "sum" for c in num}
     agg.update({"name": "first", "w_2026": "mean", "pt_scale": "max",
+                "pt_scale_kind": "first",
                 "AVG": "max", "ERA": "min", "WHIP": "min",
                 "_hit": "max", "_pit": "max"})
     out = out.groupby("fg_id", as_index=False).agg(agg)
@@ -276,6 +277,15 @@ def value_players(exch: dict | None = None, positional: bool = False
     players["redraft_value_ft"] = dollars(players["roto_points_ft"].fillna(
         players["roto_points"]), repl_series)
     players["upside_ft"] = players["redraft_value_ft"] - players["redraft_value"]
+    # Which floor produced upside_ft (out/FINDINGS.md #53): "health" (hitter
+    # PA floor, starter IP floor, two-way bat, or a low/zero-save reliever's
+    # own IP floor) means "what if nothing kept him off the field" -- a
+    # grounded number. "role" (a reliever already at 5+ saves, scaled to
+    # KEEPER_SV_FLOOR) means "what if he's handed the closer job outright" --
+    # a bullpen-decision bet, not a health one. Conflating the two under one
+    # number made Griffin Jax and Grant Taylor's huge upside_ft look like
+    # hidden health value when it was really "if he becomes the closer."
+    players["upside_kind"] = players["fg_id"].map(ft["pt_scale_kind"]).fillna("health")
 
     meta = {"replacement_rp": repl_rp, "n_rostered": n_rostered,
             "pool_rp_above_repl": pool_rp,
@@ -332,11 +342,26 @@ def value_2028(exch: dict, meta: dict, saves_2027: pd.Series,
 
     repl = pd.Series(meta["replacement_rp"], index=out.index)
     if positional and meta.get("positional_replacement"):
+        # Same override/any_mask pattern as value_players() -- and the exact
+        # same bug this function had until caught here (out/FINDINGS.md #52,
+        # #53): `repl.where(~mask, np.minimum(repl, r))` compares the
+        # position-specific level against the POOLED one too, and since both
+        # adjusted positions come out ABOVE pooled on this league's data,
+        # `min()` always kept the pooled value -- silently making 2028
+        # positional adjustment a no-op (Bobby Witt Jr.'s 2028 dollar figure
+        # moved only from the leaguewide $/point rescale, never from his own
+        # shortstop-specific bar actually being applied). Caught by directly
+        # reverse-solving the replacement level implied by his 2028 dollar
+        # value and finding it equal to the pooled number, not the SS one.
         from .io import load_position_eligibility
         elig = load_position_eligibility()
+        override = pd.Series(np.inf, index=out.index)
+        any_mask = pd.Series(False, index=out.index)
         for pos, r in meta["positional_replacement"].items():
             mask = out["fg_id"].isin(elig.get(pos, set()))
-            repl = repl.where(~mask, np.minimum(repl, r))
+            override = np.minimum(override, np.where(mask, r, np.inf))
+            any_mask = any_mask | mask
+        repl = repl.where(~any_mask, override)
 
     out["redraft_value_2028"] = (
         (out["roto_points_2028"] - repl) * scale + 1.0).clip(lower=0.0)

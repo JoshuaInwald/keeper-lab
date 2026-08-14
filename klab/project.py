@@ -107,7 +107,8 @@ def project_saves(sv_2026: pd.Series, model: dict,
 
 # --- helpers ----------------------------------------------------------------
 
-def _blend_weight(pt_a: pd.Series, shrink: float, cap: float = C.BLEND_W_2026) -> pd.Series:
+def _blend_weight(pt_a: pd.Series, shrink: float,
+                  cap: float | pd.Series = C.BLEND_W_2026) -> pd.Series:
     """Weight on source A (2026 form): rises with its own sample size, capped
     at `cap`. PROJECTION_BASIS can force it to either pole so the same board
     can be rebuilt on a pure projection or on 2026 alone.
@@ -116,7 +117,10 @@ def _blend_weight(pt_a: pd.Series, shrink: float, cap: float = C.BLEND_W_2026) -
     and rate stats need different caps -- see `PT_BLEND_CAP_HITTER`/
     `PT_BLEND_CAP_PITCHER` in klab/config.py and out/FINDINGS.md #51. Rate
     calls (the talent blend) keep the original shared cap; PA/IP calls pass
-    a lower one."""
+    a lower one. `cap` may itself be a per-player Series (out/FINDINGS.md
+    #53) -- `pd.Series.clip` applies an elementwise bound just like a
+    scalar, so project_pitchers() can hand every player a different cap
+    depending on whether his own 2026 workload exceeded ZiPS's opinion."""
     if C.PROJECTION_BASIS == "projection":
         return pd.Series(0.0, index=pt_a.index)
     if C.PROJECTION_BASIS == "actuals":
@@ -245,7 +249,18 @@ def project_pitchers(save_model: dict | None = None) -> pd.DataFrame:
     # blended 50/50 with ZiPS's own healthy 163 IP opinion landed at 135,
     # understating him. Hitters keep more weight because a short hitter
     # season is more often role/platoon-driven, which IS informative.
-    w_pt = _blend_weight(m["IP_a"], SHRINK_IP, cap=C.PT_BLEND_CAP_PITCHER)
+    #
+    # Direction-aware exception (out/FINDINGS.md #53): the cap above assumes
+    # ZiPS's 2027 number is the better-informed one, which is backwards for
+    # a pitcher who already threw MORE 2026 innings than ZiPS projects for
+    # 2027 -- Cam Schlittler (187 actual vs. 128 ZiPS 2027), Jacob
+    # Misiorowski and Chase Burns (both proved a near-full workload that
+    # ZiPS is still conservative about repeating). "He already did this"
+    # gets the higher PT_BLEND_CAP_PITCHER_EXCEEDED instead.
+    exceeded = m["IP_a"].fillna(0) > m["IP_b"].fillna(0)
+    pt_cap = pd.Series(np.where(exceeded, C.PT_BLEND_CAP_PITCHER_EXCEEDED,
+                                C.PT_BLEND_CAP_PITCHER), index=m.index)
+    w_pt = _blend_weight(m["IP_a"], SHRINK_IP, cap=pt_cap)
     w_pt = w_pt.where(has_b, 1.0).where(has_a, 0.0)
     m["IP"] = w_pt * m["IP_a"].fillna(0) + (1 - w_pt) * m["IP_b"].fillna(0)
     for c in ["W", "K", "ER", "BB", "H"]:

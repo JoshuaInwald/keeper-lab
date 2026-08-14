@@ -166,6 +166,21 @@ server-side only, on purpose, to avoid a second implementation that can
 drift from the first. Fully sandboxed: never touches any other tab's
 numbers. See `out/FINDINGS.md` #50.
 
+**2.8 Direction-aware pitcher playing-time trust + an `upside_ft`
+role/health split — done, 2026-08-14.** A pitcher whose real 2026 workload
+already exceeds ZiPS's own 2027 opinion for him (Cam Schlittler, Jacob
+Misiorowski, Chase Burns) now trusts his own proven workload more than a
+pitcher who fell short of ZiPS's number (the #51 case) — a direction-aware
+exception to the pitcher playing-time cap, not a blanket increase. Also
+split `upside_ft` (the board's "if he's fully healthy" figure) into two
+kinds that were previously conflated under one number: "health" (a starter
+or hitter's own workload floor) and "role" (a reliever scaled to a full
+closer's save total — a bullpen-decision bet, not a health one), tagged
+inline on the board and in the drawer. Caught, incidentally, a second live
+copy of #52's own `min()`-based no-op bug — this time in `value_2028()`,
+which #52's fix never touched, silently making 2028 positional adjustment
+a no-op for a full extra day. See `out/FINDINGS.md` #53.
+
 **2.4 Auto-refresh — build pipeline is cron-safe, data ingestion is not
 (checked 2026-08-13, not scheduled on purpose, still manual by choice).**
 Two separate questions, worth not conflating:
@@ -298,7 +313,9 @@ done in the app for a while, extended to the board CSV and eval_trade.py
 2026-08-13), projection-basis selector (2.2, 2026-08-13), auto-refresh
 checked and documented (2.4, 2026-08-13 — the rebuild chain is cron-safe,
 but there's no ingestion step to schedule yet, so it stays manual),
-auction-estimator UI integration (3.6, 2026-08-13).
+auction-estimator UI integration (3.6, 2026-08-13), direction-aware
+pitcher playing-time trust + the `upside_ft` role/health split (2.8,
+2026-08-14).
 
 **Deprioritized by explicit decision (2026-08-13):** 3.7, young/rookie
 projection modeling. Josh's call: treat ZiPS as already capturing the

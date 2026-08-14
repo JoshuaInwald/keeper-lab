@@ -267,6 +267,27 @@ const keeper2027Result = await page.evaluate(() => {
 const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
+// upside_ft's role/health split (out/FINDINGS.md #53): a reliever whose
+// full-time upside comes from being scaled to a closer's save total must be
+// tagged "role" in both the board cell and the drawer, and at least one
+// real player in each bucket must exist so the badge logic is actually
+// exercised, not vacuously passing.
+const upsideKindResult = await page.evaluate(() => {
+  go('board');
+  const roleRow = BOARD.find(r => g(r, 'upside_kind') === 'role' && g(r, 'upside_ft') > 1);
+  const healthRow = BOARD.find(r => g(r, 'upside_kind') === 'health' && g(r, 'upside_ft') > 1);
+  const roleCellTagged = roleRow ? upsideCell(roleRow).includes('tag role') : false;
+  const healthCellUntagged = healthRow ? !upsideCell(healthRow).includes('tag role') : false;
+  showPlayer(g(roleRow, 'fg_id'));
+  const drawerTagged = $('dbody').innerHTML.includes("if he's the closer");
+  return { hasRoleCase: !!roleRow, hasHealthCase: !!healthRow, roleCellTagged,
+          healthCellUntagged, drawerTagged };
+});
+const upsideKindBad = !upsideKindResult.hasRoleCase || !upsideKindResult.hasHealthCase
+  || !upsideKindResult.roleCellTagged || !upsideKindResult.healthCellUntagged
+  || !upsideKindResult.drawerTagged;
+if (upsideKindBad) console.log('  UPSIDE_FT ROLE/HEALTH SPLIT MISMATCH:', JSON.stringify(upsideKindResult));
+
 // Intuition tab (out/FINDINGS.md #50): shading a player must (a) stay
 // sandboxed -- never mutate BOARD or PROJ_PTS -- and (b) actually move
 // both the 2026 standings recompute and the 2027 linear-scaled dollar
@@ -334,8 +355,11 @@ console.log(historyBad ? 'FAIL  historical standings did not render or did not r
                        : 'PASS  historical standings render and return to the live view cleanly');
 console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignores projection basis'
                           : 'PASS  2027 keeper standings render all 10 teams and track projection basis');
+console.log(upsideKindBad ? 'FAIL  upside_ft role/health split missing a case or not tagged correctly'
+                          : 'PASS  upside_ft tags closer-role upside separately from health upside');
 console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'
                          : 'PASS  Intuition tab shading moves both halves and stays sandboxed');
 await browser.close();
 process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || auctionBad
-            || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || intuitionBad ? 1 : 0);
+            || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || upsideKindBad
+            || intuitionBad ? 1 : 0);

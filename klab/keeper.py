@@ -111,6 +111,32 @@ def pt_scale(df: pd.DataFrame) -> pd.Series:
     return s.astype(float).fillna(1.0).clip(lower=1.0, upper=C.MAX_PT_SCALE)
 
 
+def pt_scale_kind(df: pd.DataFrame) -> pd.Series:
+    """Which floor `pt_scale()` actually applied, for the SAME masks in the
+    SAME order -- out/FINDINGS.md #53's second half. Everyone but one group
+    gets scaled to a full HEALTHY workload at their existing role (hitter PA
+    floor, starter IP floor, two-way bat, and a low/zero-save reliever's own
+    IP floor): "health" -- what he's worth if nothing keeps him off the
+    field. A reliever already sitting on 5+ saves gets scaled to
+    `KEEPER_SV_FLOOR` instead, which assumes he is HANDED the closer job
+    outright: "role" -- a bet on a bullpen decision, not on his health, and
+    a materially less grounded kind of upside. Conflating the two under one
+    `upside_ft` number was the thing Josh's board-review turned up (Griffin
+    Jax and Grant Taylor's huge `upside_ft` figures are both "if he becomes
+    the closer," not "if he stays healthy")."""
+    pa = df.get("PA", pd.Series(0.0, index=df.index)).fillna(0.0)
+    ip = df.get("IP", pd.Series(0.0, index=df.index)).fillna(0.0)
+    sv = df.get("SV", pd.Series(0.0, index=df.index)).fillna(0.0)
+    rel = df.get("reliever", pd.Series(False, index=df.index)).fillna(False).astype(bool)
+
+    is_rp = (ip > 0) & rel & (pa <= 0)   # `both` (two-way) is excluded below regardless
+    is_role = is_rp & (sv >= 5)
+
+    both = (pa > 0) & (ip > 0)
+    kind = pd.Series(np.where(is_role, "role", "health"), index=df.index)
+    return kind.where(~both, "health")
+
+
 COUNTING = ["PA", "AB", "H", "HR", "R", "RBI", "SB",
             "IP", "W", "SV", "K", "ER", "BB"]
 
@@ -123,10 +149,14 @@ def to_full_time(df: pd.DataFrame, exclude_ids: set | None = None) -> pd.DataFra
     """
     out = df.copy()
     s = pt_scale(df)
+    kind = pt_scale_kind(df)
     if exclude_ids:
-        s = s.where(~out["fg_id"].isin(exclude_ids), 1.0)
+        excluded = out["fg_id"].isin(exclude_ids)
+        s = s.where(~excluded, 1.0)
+        kind = kind.where(~excluded, "health")
     out["pt_scale"] = s
     out["pt_extrapolated"] = s > 1.05
+    out["pt_scale_kind"] = kind
     for c in COUNTING:
         if c in out:
             out[c] = out[c].fillna(0.0) * s

@@ -298,6 +298,25 @@ BLEND_W_ZIPS27 = 0.50
 PT_BLEND_CAP_HITTER = 0.30
 PT_BLEND_CAP_PITCHER = 0.15
 
+# Direction-aware exception to PT_BLEND_CAP_PITCHER (2026-08-14,
+# out/FINDINGS.md #53). The cap above assumes ZiPS's 2027 IP opinion is
+# always the better-informed number, which holds when a pitcher fell SHORT
+# of it -- hurt in 2026, ZiPS's healthy-year number is the right forward
+# guess (Hunter Brown, #51). It does not hold the other direction: a
+# pitcher who already EXCEEDED ZiPS's 2027 IP with his real 2026 workload
+# (Cam Schlittler threw 187 IP in 2026 against ZiPS's own cautious
+# sophomore-workload 128 for 2027; Jacob Misiorowski and Chase Burns show
+# the same pattern) has direct proof he can carry that workload, which is
+# stronger evidence than a system's generic caution about ramping a young
+# arm's innings. Applied only when IP_a > IP_b -- see project_pitchers().
+# Set above PT_BLEND_CAP_HITTER, not equal to it: "he already did this in
+# the same year" is more direct evidence than a hitter's short-season role
+# signal, but a team's actual workload-management plan is still real
+# information worth keeping a majority weight on, so this stops short of
+# fully trusting the 2026 number either. Josh's judgment call, not fit from
+# data, meant to be tuned.
+PT_BLEND_CAP_PITCHER_EXCEEDED = 0.40
+
 # --- Decision weights -------------------------------------------------------
 # Rebuilder default: 2027 surplus dominates, 2026 stretch-run production is
 # worth ~25% as much per roto point.

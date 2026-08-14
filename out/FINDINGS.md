@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (52 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (53 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -58,6 +58,7 @@ in `LAB_NOTEBOOK.md`.
 50. [The Intuition tab — manual player shading, sandboxed, split into an exact half and an approximate half](#50-the-intuition-tab--manual-player-shading-sandboxed-split-into-an-exact-half-and-an-approximate-half)
 51. [Playing time gets its own weight, decoupled from the rate/talent blend](#51-playing-time-gets-its-own-weight-decoupled-from-the-ratetalent-blend)
 52. [Positional adjustment for catchers and shortstops — and a surprise: both positions are deep, not scarce](#52-positional-adjustment-for-catchers-and-shortstops--and-a-surprise-both-positions-are-deep-not-scarce)
+53. [Direction-aware pitcher playing-time trust, an upside_ft split, and a second copy of #52's own bug](#53-direction-aware-pitcher-playing-time-trust-an-upside_ft-split-and-a-second-copy-of-52s-own-bug)
 
 </details>
 
@@ -2678,3 +2679,112 @@ toggle, a documented scope limit for cost reasons, consistent with how
 stays on the pooled line — `positional_replacement()`'s ~52%-coverage gap
 is unresolved, and closing it would need a similarly complete FanGraphs
 eligibility export for every position, not just the two requested here.
+
+## 53. Direction-aware pitcher playing-time trust, an upside_ft split, and a second copy of #52's own bug
+
+Prompted by a specific complaint: Gerrit Cole $0, Zack Wheeler $3.41,
+Cam Schlittler $4.91, next to Logan Webb at $26.68 — is good pitching
+systematically undervalued by playing-time caution? Splitting each
+pitcher's blended 2027 innings into its two ingredients (`IP_a` = 2026
+actual + ZiPS rest-of-season, `IP_b` = ZiPS's own 2027 preseason opinion)
+turned up two *different* mechanisms, not one:
+
+- **Established/TJ-recovery arms** (Cole, Sandy Alcantara, Wheeler, Jacob
+  deGrom): ZiPS's own 2027 opinion is *lower* than what they actually threw
+  in 2026 (Cole 129.2 actual vs. 102.0 ZiPS; Alcantara 213.2 vs. 149.0) —
+  real durability/decline skepticism baked into ZiPS itself, not something
+  the blend invented. Cole and Alcantara's low value isn't a playing-time
+  story at all: their blended *rate* stats are also below replacement (Cole
+  ERA 4.08), so `redraft_value_ft` (the full-workload case) is $0 for both
+  too. Trusting that is a real methodology choice, not a bug.
+- **Young pitchers who already threw a full workload**: Cam Schlittler (187
+  actual vs. 128 ZiPS), Jacob Misiorowski (175 vs. 116), Chase Burns (164
+  vs. 106) — the opposite pattern. ZiPS's 2027 opinion is *below* what they
+  already proved they could do, most likely a generic "don't jump a young
+  arm's innings too fast" caution rather than an injury read. "He already
+  did this in 2026" is stronger evidence than a system's generic caution
+  about a sophomore workload jump.
+
+**The fix (Josh's call, implemented as proposed): direction-aware trust.**
+`project_pitchers()` now checks `IP_a > IP_b` per player. When true — he
+already exceeded ZiPS's own number — the playing-time blend uses a new,
+higher cap (`PT_BLEND_CAP_PITCHER_EXCEEDED = 0.40`, above
+`PT_BLEND_CAP_HITTER`'s 0.30, since direct proof beats a hitter's
+short-season role signal, but still short of full trust, since a team's
+actual workload-management plan is real information too). When false —
+he fell short, the Hunter Brown/#51 case — the existing, lower
+`PT_BLEND_CAP_PITCHER` (0.15) is unchanged. `_blend_weight()`'s `cap`
+parameter now accepts a per-player Series, not only a scalar, which is
+what lets the two groups get different caps in the same pass.
+
+**Verified directly**: Cam Schlittler's blended IP rose from 137.1 → 151.9
+(`redraft_value` $4.91 → $8.53, closing his health-driven gap to
+`upside_ft` = $0 — he's now valued at essentially his own full-time
+number). Jacob Misiorowski $12.14 → $16.83, Chase Burns $1.82 → $5.74,
+Zack Wheeler $3.41 → $5.53. Cole and Alcantara are unchanged, correctly —
+`IP_a < IP_b` for both, so the exception never fires for them. **League-wide
+impact, measured against the pre-fix committed board**: modest — one
+keep/cut flip (Yoshinobu Yamamoto, $31.68 → $32.75, already a marginal
+keeper), total `surplus_multiyear` shift across the rostered pool
+**+$5.84** (a gain, the mirror image of #51's −$13.71, since this fix
+only *adds* trust in a player's own proven workload, never removes it).
+Smaller than #51 because it only touches the narrower group who already
+exceeded ZiPS's number, not every short-2026-season pitcher.
+
+**A caveat surfaced while building this, not part of the fix itself**:
+Griffin Jax showed a $28 `upside_ft` even before this change, which turned
+out to be a full-time-scaling artifact, not a playing-time story at all —
+his 2026 `GS`/`G` ratio apparently doesn't clear the `reliever` heuristic's
+threshold, so `pt_scale()` was treating him as a starter (150 IP floor)
+rather than a reliever (25-save floor). A separate, pre-existing
+data-quality question, not touched here.
+
+### upside_ft was conflating two different kinds of upside
+
+Investigating the board's `upside_ft`/`redraft_value_ft` columns (the
+"what if he's fully healthy" case, already shipped — see the board's own
+"IF FULL-TIME" column) turned up a second, distinct issue: for a reliever
+already sitting on 5+ projected saves, "full time" means scaling him to
+`KEEPER_SV_FLOOR` (25 saves) — a bet that he's **handed the closer job
+outright**, not a bet that he stays healthy at his current role. That's
+categorically different from a starter or hitter's health-driven upside,
+and the board showed both under one number: Griffin Jax ($28), Grant
+Taylor ($23–25 depending on the pitcher fix above), Devin Williams ($28–30),
+Josh Hader ($21), Andrés Muñoz/Daniel Palencia all led the `upside_ft`
+leaderboard for role reasons, not health ones.
+
+**Fix**: `klab/keeper.py`'s `pt_scale()` (which decides the scaling factor)
+now has a sibling, `pt_scale_kind()`, mirroring the exact same branch logic
+to label which floor actually applied — `"role"` only for a reliever at
+5+ saves scaled to the save floor, `"health"` for everyone else (hitter PA
+floor, starter IP floor, two-way bat, or a low/zero-save reliever's own IP
+floor). Threaded through `project_all_players()` → `value_players()` as a
+new `upside_kind` column, surfaced in the app as a small `role` tag next
+to the dollar figure (board cell and player drawer both), rather than a
+second column — consistent with this app's stated design philosophy of
+tooltips/tags over table clutter (#50). Column header tooltip updated to
+explain the split. Permanent `app/verify.mjs` check added: at least one
+real "role" case and one real "health" case must exist and be tagged
+correctly, so the check can't vacuously pass if the split logic breaks.
+
+### A second, live copy of #52's own bug, caught in the same pass
+
+While re-reading `klab/board.py` for this work, `value_2028()`'s
+positional-adjustment override turned out to still have the *exact* bug
+#52 found and fixed in `value_players()`: `repl.where(~mask,
+np.minimum(repl, r))` compares the position-specific replacement level
+against the pooled default too, and since both catcher and shortstop come
+out *above* pooled on this league's data, `np.minimum` always kept the
+pooled value. `positional=True` was silently a no-op for every player's
+**2028** valuation specifically — the 2027 fix in #52 never touched this
+function. Caught by reverse-solving the replacement level implied by
+Bobby Witt Jr.'s 2028 dollar figure under `positional=True` (came out to
+4.81, the pooled number, not his own 6.76 shortstop bar) rather than by
+any test failing, since nothing was testing `value_2028()`'s positional
+path at all before this. Fixed with the same override/`any_mask` pattern
+already used in `value_players()`; Witt's 2028 value correctly dropped
+$34.96 → $25.42 once fixed, the same direction and rough magnitude as his
+already-correct 2027 change. New regression test added
+(`test_positional_adjustment_2028_actually_uses_the_position_specific_bar`)
+so a third copy of this bug, if one gets introduced elsewhere, fails loudly
+instead of shipping silently a second time.

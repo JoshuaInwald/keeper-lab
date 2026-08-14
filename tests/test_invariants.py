@@ -620,6 +620,76 @@ def test_short_season_pitcher_projected_innings_lean_toward_zips(board):
         f"{r['name']}: blended IP {r['IP']:.1f} strayed too far from ZiPS's {r['IP_zips']:.1f}"
 
 
+# --- direction-aware pitcher playing-time trust (out/FINDINGS.md #53) ------
+
+def test_exceeded_pitcher_cap_is_higher_than_default_cap():
+    """Josh's approved fix: a pitcher whose real 2026 (actual + ROS) innings
+    already exceed ZiPS's own 2027 opinion for him has direct proof he can
+    carry that workload -- stronger evidence than a system's generic
+    caution about ramping a young arm's innings -- so he gets a higher cap
+    than the injury-shortfall default. Still below full trust: a team's
+    actual workload-management plan is real information too."""
+    assert C.PT_BLEND_CAP_PITCHER < C.PT_BLEND_CAP_PITCHER_EXCEEDED < 1.0
+
+
+def test_blend_weight_accepts_a_per_player_cap_series():
+    """_blend_weight()'s cap can now vary player-to-player (out/FINDINGS.md
+    #53) -- pandas' elementwise clip, not one scalar bound applied to
+    everyone alike, which is what lets project_pitchers() give only the
+    players who exceeded ZiPS's number the higher cap."""
+    ip_a = pd.Series([200.0, 200.0])   # same sample size for both
+    cap = pd.Series([C.PT_BLEND_CAP_PITCHER, C.PT_BLEND_CAP_PITCHER_EXCEEDED])
+    w = _blend_weight(ip_a, 70.0, cap=cap)
+    assert w.iloc[0] == pytest.approx(C.PT_BLEND_CAP_PITCHER)
+    assert w.iloc[1] == pytest.approx(C.PT_BLEND_CAP_PITCHER_EXCEEDED)
+
+
+def test_pitcher_who_exceeded_zips_leans_more_on_his_own_workload():
+    """End-to-end: for a pitcher whose real 2026 workload already exceeds
+    ZiPS's own 2027 IP opinion for him, the shipped blend must land closer
+    to his own total than the pre-#53 formula (a single PT_BLEND_CAP_PITCHER
+    for everyone) would have. Doesn't hardcode Cam Schlittler (187 actual vs.
+    128 ZiPS 2027 -- the case that motivated this) by name, so it keeps
+    working as rosters and projections change. Reimplements the same IP_a/
+    IP_b merge project_pitchers() does internally, since those columns
+    don't survive onto its returned frame."""
+    from klab.io import load_ros_pitchers, load_zips27_pitchers
+    from klab.project import SHRINK_IP
+
+    hist = load_pitchers_history()
+    a26 = hist[hist["season"] == 2026].copy()
+    ros = load_ros_pitchers()
+    cols = ["IP", "W", "SV", "K", "ER", "BB", "H"]
+    a = a26[["fg_id", "name", "G", "GS"] + cols].groupby("fg_id", as_index=False).agg(
+        {"name": "first", "G": "sum", "GS": "sum", **{c: "sum" for c in cols}})
+    r = ros.rename(columns={"SO": "K"})[["fg_id"] + cols].groupby(
+        "fg_id", as_index=False).sum()
+    A = a.merge(r, on="fg_id", how="outer", suffixes=("", "_ros"))
+    for c in cols:
+        A[c] = A[c].fillna(0.0) + A[f"{c}_ros"].fillna(0.0)
+    A["reliever"] = A["GS"].fillna(0) < 0.5 * A["G"].fillna(0).clip(lower=1)
+
+    z = load_zips27_pitchers().rename(columns={"SO": "K"})
+    B = z[["fg_id", "IP"]].groupby("fg_id", as_index=False).sum()
+    m = A.merge(B, on="fg_id", suffixes=("_a", "_b"))
+
+    exceeded = (~m["reliever"]) & (m["IP_a"] > m["IP_b"]) & (m["IP_b"] > 60)
+    assert exceeded.sum() > 0, "test needs at least one qualifying exceeded-workload starter"
+    cand = m[exceeded].iloc[0]
+
+    w_default = _blend_weight(pd.Series([cand["IP_a"]]), SHRINK_IP,
+                              cap=C.PT_BLEND_CAP_PITCHER).iloc[0]
+    ip_old_formula = w_default * cand["IP_a"] + (1 - w_default) * cand["IP_b"]
+
+    from klab.project import project_pitchers
+    p = project_pitchers()
+    ip_shipped = p.loc[p["fg_id"] == cand["fg_id"], "IP"].iloc[0]
+
+    assert ip_shipped > ip_old_formula, (
+        f"{cand['name']}: shipped IP {ip_shipped:.1f} should exceed the "
+        f"pre-#53 formula's {ip_old_formula:.1f} once the higher cap applies")
+
+
 # --- C/SS positional adjustment (out/FINDINGS.md #52) -----------------------
 
 def test_positional_adjustment_actually_changes_values():
@@ -684,3 +754,38 @@ def test_positional_adjustment_only_touches_catchers_and_shortstops():
         on[["fg_id", "rp_above_repl"]], on="fg_id", suffixes=("_off", "_on"))
     unaffected = m[~m["fg_id"].isin(adjusted_ids)]
     assert (unaffected["rp_above_repl_off"] == unaffected["rp_above_repl_on"]).all()
+
+
+def test_positional_adjustment_2028_actually_uses_the_position_specific_bar():
+    """The SAME min()-based no-op bug #52 found in value_players() was still
+    live in value_2028() -- caught by reverse-solving the replacement level
+    implied by a shortstop's 2028 dollar figure and finding it equal to the
+    pooled number, not his own position's. A shortstop's 2028 value must
+    actually move by the gap between the pooled and position-specific
+    replacement level, not only by the leaguewide $/point rescale every
+    player rides regardless of position."""
+    from klab.board import build_board, value_players, value_2028
+    _, exch_on, meta_on = build_board(positional=True)
+
+    players_on, _, _ = value_players(exch_on, positional=True)
+    sv27 = players_on.set_index("fg_id")["SV"] if "SV" in players_on else None
+    # Same exch/meta (same $/point scale, same pooled replacement_rp) for
+    # both calls -- positional=False here just skips the override block, so
+    # this isolates the replacement-level effect from the scale-rescale
+    # effect every player rides regardless of position.
+    v28_pooled_repl = value_2028(exch_on, meta_on, sv27, positional=False)
+    v28_position_repl = value_2028(exch_on, meta_on, sv27, positional=True)
+
+    from klab.io import load_position_eligibility
+    elig = load_position_eligibility()
+    ss_ids = elig["SS"]
+    m = v28_pooled_repl[["fg_id", "redraft_value_2028"]].merge(
+        v28_position_repl[["fg_id", "redraft_value_2028"]],
+        on="fg_id", suffixes=("_pooled", "_position"))
+    ss_rows = m[m["fg_id"].isin(ss_ids) & (m["redraft_value_2028_pooled"] > 1.0)]
+    assert len(ss_rows) > 0, "test needs at least one non-floored rostered-caliber shortstop"
+    # SS replacement (6.76) sits above pooled (~4.8), so applying it must
+    # strictly lower every affected shortstop's 2028 value, not leave it
+    # identical to the pooled-replacement run.
+    assert (ss_rows["redraft_value_2028_position"]
+           < ss_rows["redraft_value_2028_pooled"]).all()
