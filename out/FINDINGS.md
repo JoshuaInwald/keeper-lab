@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (35 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (37 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -41,6 +41,8 @@ in `LAB_NOTEBOOK.md`.
 33. [Extension eligibility was applied to codes "2" and "3", not just "1"](#33-extension-eligibility-was-applied-to-codes-2-and-3-not-just-1)
 34. [A win-now metric that isn't a team-standings swap: ROS value over replacement](#34-a-win-now-metric-that-isnt-a-team-standings-swap-ros-value-over-replacement)
 35. [A comp-based next-auction price estimator — a deliberately separate tool](#35-a-comp-based-next-auction-price-estimator--a-deliberately-separate-tool)
+36. [A retained-but-unused extension right has zero value in the model, for any non-final-year contract](#36-a-retained-but-unused-extension-right-has-zero-value-in-the-model-for-any-non-final-year-contract)
+37. [Uncertainty bands were already done in the app — the roadmap said otherwise](#37-uncertainty-bands-were-already-done-in-the-app--the-roadmap-said-otherwise)
 
 </details>
 
@@ -1733,3 +1735,45 @@ larger — but by how much isn't something this model can currently
 quantify, because doing so would require projecting extension-worthiness
 for a season beyond the data it has. Flagging as a genuine, general
 modeling gap — not specific to this trade, and not resolved here.
+
+## 37. Uncertainty bands were already done in the app — the roadmap said otherwise
+
+Asked to make sure uncertainty gets reflected in the app *and* in how
+valuations are done generally. Checked the app first, expecting to build
+the ROADMAP.md 1.2 item from scratch. It was already there: `klab/uncertainty.py`'s
+bootstrap (±34% per category) has been fully wired into `app/template.html`
+since before this session started — a "likely range" column, a
+`p_surplus_positive` "Sure?" column, tooltips, and full ranges on the
+player card. `out/ROADMAP.md` had been claiming this was undone ("the ±34%
+error bar is in the footer as prose") in two separate places, and I
+repeated that stale claim back to Josh in an earlier turn this session
+without checking the code first — exactly the class of error this project
+has been catching all session, just committed by me this time instead of
+found in the code. Corrected both places in `out/ROADMAP.md`.
+
+**What actually was missing, verified directly**: `bootstrap_bands()` was
+only ever called from inside `scripts/build_app.py`'s payload merge.
+`klab.board.build_board()`, `klab.api.snapshot()`, `out/keeper_board_2027.csv`,
+`scripts/eval_trade.py`, and `scripts/team_reports.py` all showed point
+estimates only — including every trade evaluation earlier in this session,
+which never displayed a confidence range for any player. Wired in for
+`scripts/run_all.py` (now in the main board CSV, and therefore every CSV
+derived from it) and `scripts/eval_trade.py`'s per-player table.
+`scripts/team_reports.py` and `klab/auction_estimator.py` still don't show
+bands — not done, logged in `out/ROADMAP.md`.
+
+**What the bands actually reveal, now that they're visible in a trade
+evaluation**: re-ran Trade 2/3 (Spehr's Army sends Scott/Walker for
+Skubal/Freeman) with bands attached. Tarik Skubal's $17.97 multiyear
+surplus — the number carrying most of that trade's conclusion — is
+positive in only **73%** of 1,000 bootstrap draws, with a 10th-90th
+percentile range of **−$7.4 to +$37.7**. That's a real, wide range, not a
+rounding footnote: roughly 1 in 4 draws would call him a net loss to keep
+at $38. Jordan Walker's headline +$0.21 surplus (essentially a coin flip
+on the point estimate alone) is positive in only 61% of draws. Christian
+Scott and Freddie Freeman are both **0%** — confidently bad keeps, which
+the point estimates already suggested and the bands now confirm rather
+than complicate. The trade's directional conclusion (favors Spehr's Army)
+doesn't change, but "Skubal makes this trade a clear win" is a
+meaningfully overstated way to describe a number that's genuinely
+uncertain 27% of the time.

@@ -4,7 +4,7 @@ Read this before changing a modelling decision. Most of the obvious
 alternatives were tried and rejected for reasons that are not obvious.
 
 <details>
-<summary><strong>Contents</strong> (15 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (16 sections — click to expand)</summary>
 
 1. [Denominators: four estimators tried, all unstable, fixed by pooling](#1-denominators-four-estimators-tried-all-unstable-fixed-by-pooling)
 2. [Contract codes: the correction, and how it was established](#2-contract-codes-the-correction-and-how-it-was-established)
@@ -22,6 +22,7 @@ alternatives were tried and rejected for reasons that are not obvious.
 13. [Fixing #26 didn't fix all of #26](#13-fixing-26-didnt-fix-all-of-26-2026-08-13)
 14. [Extension eligibility applied to the wrong contract codes — caught by Josh, not by review](#14-extension-eligibility-applied-to-the-wrong-contract-codes--caught-by-josh-not-by-review-2026-08-13)
 15. [Building the auction-price estimator: two forks tried and rejected in the regression itself](#15-building-the-auction-price-estimator-two-forks-tried-and-rejected-in-the-regression-itself)
+16. [I repeated a stale claim from out/ROADMAP.md without checking the code first](#16-i-repeated-a-stale-claim-from-outroadmapmd-without-checking-the-code-first-2026-08-13)
 
 </details>
 
@@ -600,3 +601,25 @@ choked trying to call `.sqrt()` as a method on a plain float. Fixed with an
 explicit `.astype(float)`. Worth remembering as a category of bug distinct
 from the modeling ones above: pandas silently downgrading a numeric slice
 to `object` because *some other column in the same row* was a string.
+
+## 16. I repeated a stale claim from out/ROADMAP.md without checking the code first (2026-08-13)
+
+Recommended "uncertainty bands (1.2)" as the top next-roadmap item in an
+earlier turn this session, quoting `out/ROADMAP.md`'s own description
+("the ±34% error bar is in the footer as prose; it should be a range on
+every dollar figure") without opening `app/template.html` to check whether
+that was still true. It wasn't — the app has had a full "likely range"
+column, a `p_surplus_positive` confidence column, tooltips, and player-card
+ranges for a while. The doc was stale, and I passed the staleness straight
+through instead of catching it, the same failure mode this notebook has
+documented happening to the *project* several times this session (#10,
+#13), just now happening to me specifically, in a conversational answer
+rather than a code change.
+
+**What actually caught it**: being asked to "make sure uncertainty gets
+updated in the app," which meant actually opening the app's code to plan
+the work, instead of trusting a doc's own status claim about itself.
+Same lesson as #13's closing line, worth restating because it applied to
+me this time: a doc describing its own state is a claim, not a fact, and
+the only way to know if it's still true is to check the thing it's
+describing.

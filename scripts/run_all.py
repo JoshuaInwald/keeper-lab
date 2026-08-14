@@ -24,6 +24,15 @@ def main():
     spec_battery(sample).to_csv(OUT / "auction_regression_battery.csv", index=False)
 
     board, exch, meta = build_board()
+
+    # Uncertainty bands used to live only inside the app's own payload merge
+    # (scripts/build_app.py) -- every other consumer of the board (this CSV,
+    # eval_trade.py, team_reports.py) showed point estimates only, with no
+    # way to tell "the model is confident" from "the model is guessing"
+    # apart. Merged here so it's in the board everywhere from this point on.
+    from klab.uncertainty import bootstrap_bands
+    board = board.merge(bootstrap_bands().reset_index(), on="fg_id", how="left")
+
     board.to_csv(OUT / "keeper_board_2027.csv", index=False)
     board[board["keep_2027"]].to_csv(OUT / "optimal_keepers_2027.csv", index=False)
 

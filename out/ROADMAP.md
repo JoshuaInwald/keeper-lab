@@ -49,10 +49,20 @@ denominator window, exchange-rate window, blend weights, PT floor, discount
 rate. Output is one table. Without it the app displays point estimates from a
 model with six live forks.
 
-**1.2 Uncertainty bands (0.5 session).** The honest error bar is ±34%
-(bootstrapped) per category from n=30 team-seasons (20 for ERA/WHIP, 17 for
-SV). Propagate it to dollar values and show a range, not a point. This is
-also the single most credible thing to show an interviewer.
+**1.2 Uncertainty bands — done, this item was stale.** `klab/uncertainty.py`'s
+bootstrap (±34% per category, n=30 team-seasons; 20 for ERA/WHIP, 17 for SV)
+was already fully wired into the app (`app/template.html`'s "likely range"
+column, `p_surplus_positive` "Sure?" column, and full ranges on the player
+card) — this item just hadn't been marked done. What genuinely wasn't wired
+in until 2026-08-13: everything *outside* the app. `board.py`,
+`api.snapshot()`, `out/keeper_board_2027.csv`, `scripts/eval_trade.py`, and
+`scripts/team_reports.py` all showed point estimates only, with no way to
+tell "confident" from "guessing" apart. Fixed for `run_all.py`'s board CSV
+and `eval_trade.py`'s per-player table; `team_reports.py` and the new
+`klab/auction_estimator.py` still don't show bands. Real finding from
+wiring it in: Tarik Skubal's $17.97 multiyear surplus is positive in only
+73% of bootstrap draws (range −$7.4 to +$37.7) — a materially less certain
+number than the point estimate alone suggested. See `out/FINDINGS.md` #37.
 
 **1.3 Positional replacement — investigate, don't assume (0.5 session).**
 External review flagged its absence as a first-order gap. The published
@@ -189,18 +199,18 @@ opened locally.
 
 Done: sensitivity harness (1.1), inflation display (3.1), waiver-value settings
 (3.3, three anchored levels), positional-adjustment investigation (1.3, tested
-and left off), the app.
+and left off), the app, uncertainty bands (1.2 — done in the app for a while,
+extended to the board CSV and eval_trade.py 2026-08-13).
 
-1. **Uncertainty bands (1.2)** — the ±34% error bar is in the footer as prose;
-   it should be a range on every dollar figure. Half a session, and it is the
-   single most credible thing to show an interviewer.
-2. **Projection-basis selector (2.2)** — ship three payloads, let the user
+1. **Projection-basis selector (2.2)** — ship three payloads, let the user
    watch 17% of the keep/cut calls move. Half a session.
-3. **Prospect / upside distribution (3.2)** — ZiPS percentile bands are already
+2. **Prospect / upside distribution (3.2)** — ZiPS percentile bands are already
    in the export; value the option rather than the mean.
-4. **Auto-refresh (2.4)** — makes the tool live.
-5. **Aging curves (3.4)**, then **transaction logs (3.5)** if you want the
+3. **Auto-refresh (2.4)** — makes the tool live.
+4. **Aging curves (3.4)**, then **transaction logs (3.5)** if you want the
    manager-skill analysis.
+5. **Young-player/rookie modeling (3.7)** and **auction-estimator UI
+   integration (3.6)** — both new 2026-08-13, both scoped, neither started.
 
 Items 1 and 2 are mechanical and belong on a cheap model. Items 3 and 5 are
 modelling judgment and are worth the expensive one.
