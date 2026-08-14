@@ -1688,3 +1688,48 @@ building this and deliberately not applied, per instruction:**
    the auction exports carry was not investigated — flagging it because
    it silently affects comp-pool size for every position-specific search
    this tool runs, and would affect anything else built on that file later.
+
+## 36. A retained-but-unused extension right has zero value in the model, for any non-final-year contract
+
+Flagged directly by Josh while reviewing Trade 1 (Spehr's Army sends Lowe,
+Okamoto, Luzardo for Sánchez, Marte, De La Cruz): the side receiving the
+three `F`-contract players is receiving players who are about to *spend*
+their one lifetime extension as part of realizing the deal's value, while
+the side receiving the three live-contract players is giving up players
+who *retain* their extension right, unused, for whenever they individually
+reach their own final year. Checked with `already_extended()` — confirmed
+none of the six have used it yet, so this asymmetry is real, not already
+netted out somewhere.
+
+**The retained option is worth exactly $0.00 in every current dollar
+figure, for any player not currently coded `F`.** Not a discount, zero.
+`multiyear_surplus`'s extension-pricing branch only activates for
+`is_final` contracts — a player with 1-3 years of live control has no
+mechanism anywhere in the pipeline that prices "and someday, when this
+runs out, there will be an extension decision too." This isn't a bug in
+the sense of computing something wrong; it's a structural consequence of a
+finite forecast horizon (ZiPS only reaches 2028) intersecting with a
+contract mechanism that can be exercised at a point in time the model
+can't see yet for most players.
+
+**Rough magnitude check, not a fix**: ran each of the three live-contract
+players (Lowe, Okamoto, Luzardo) through the same extension-option formula
+as if they were at `F` today, using their own current 2027/2028
+projections as a stand-in for whatever season they actually reach it.
+All three came back **$0.00** — none clear the extension cost at their
+current projected production (Okamoto and Luzardo are already
+net-negative surplus without an extension question at all). This likely
+*understates* what's missing, since a real option's value comes partly
+from the chance production improves before the decision point, which a
+single point-estimate check doesn't capture — but it's evidence the
+omitted value for these three specific players is probably modest, not a
+hidden second star.
+
+**What this means for Trade 1's headline $25 surplus gap**: it's an
+accurate account of everything the model currently prices, not the whole
+economic picture. The omission cuts one direction only (understates the
+live-contract side), so the true gap is probably smaller than $25, not
+larger — but by how much isn't something this model can currently
+quantify, because doing so would require projecting extension-worthiness
+for a season beyond the data it has. Flagging as a genuine, general
+modeling gap — not specific to this trade, and not resolved here.
