@@ -6,36 +6,36 @@
   "Nico Hoerner"
  ],
  "b_sends": [
-  "Elly De La Cruz",
+  "Mike Trout",
   "Byron Buxton"
  ],
  "points_before": {
-  "All-Stars": 56.5,
+  "All-Stars": 52.0,
   "Lisbon Long Balls": 52.0,
-  "McBlocks": 66.5,
-  "NPB No Stars": 28.0,
-  "New York Polar Bears": 48.5,
-  "Orange and Black Attack": 55.0,
+  "McBlocks": 67.5,
+  "NPB No Stars": 26.0,
+  "New York Polar Bears": 46.5,
+  "Orange and Black Attack": 56.5,
   "Pookie 2.0": 78.0,
-  "Producers": 39.0,
-  "Spehr's Army": 70.5,
-  "The Fighting Phils": 56.0
+  "Producers": 41.0,
+  "Spehr's Army": 73.0,
+  "The Fighting Phils": 57.5
  },
  "points_after": {
-  "All-Stars": 58.0,
+  "All-Stars": 57.5,
   "Lisbon Long Balls": 53.5,
   "McBlocks": 65.5,
-  "NPB No Stars": 28.0,
-  "New York Polar Bears": 47.5,
+  "NPB No Stars": 26.0,
+  "New York Polar Bears": 46.5,
   "Orange and Black Attack": 57.5,
-  "Pookie 2.0": 75.5,
-  "Producers": 40.0,
-  "Spehr's Army": 69.5,
-  "The Fighting Phils": 55.0
+  "Pookie 2.0": 74.5,
+  "Producers": 42.0,
+  "Spehr's Army": 70.5,
+  "The Fighting Phils": 56.5
  },
- "a_dS": -16.853666,
- "b_dS": 16.853666,
- "a_dMY": -20.098087,
- "a_dP": -2.5,
- "b_dP": 1.5
+ "a_dS": -31.646544,
+ "b_dS": 31.646544,
+ "a_dMY": -37.862753,
+ "a_dP": -3.5,
+ "b_dP": 5.5
 }

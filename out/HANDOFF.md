@@ -34,11 +34,22 @@ The code is the number of seasons remaining **after** the current one:
 | `3` | 2027, 2028, 2029 at salary | salary |
 | `2` | 2027, 2028 at salary | salary |
 | `1` | 2027 only, at salary | salary |
-| `F` | 2026 was the final year | salary + $5 |
+| `F` | confirmed free agent after 2026, not extendable | n/a — not keepable |
 
 This was previously documented backwards. The evidence for the correction is
 in `LAB_NOTEBOOK.md` §2. Three players carry `?` and are charged the worst
 case. Getting this wrong understates every multi-year contract by a season.
+
+**`F` is not a live extension choice — CORRECTED 2026-08-13, `out/FINDINGS.md`
+#39.** The extension clause covers a player "about to enter" his final
+year, meaning the decision happens *before that season's own draft*. A
+player still coded `F` in a mid-2026-or-later snapshot already missed that
+window — he's confirmed for the open 2027 auction, not a keeper option at
+all. `keeper_cost`/`surplus_multiyear`/`extension_option` are all `0` for
+every `F` player and `keepable` is `False`, unconditionally. The one
+genuinely live extension decision on the whole board belongs to a code-`1`
+player (one guaranteed year left) — he's the one actually "about to enter"
+his final year, for the upcoming 2027 deadline.
 
 ---
 

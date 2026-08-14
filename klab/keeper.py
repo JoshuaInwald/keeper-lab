@@ -269,6 +269,20 @@ def multiyear_surplus(value_2027: pd.Series, value_2028: pd.Series,
 
         # For `F`, express the choice as an increment over the y1 baseline so
         # `surplus_multiyear = total + ext` stays the identity everywhere.
+        #
+        # CORRECTED 2026-08-13 (out/FINDINGS.md #39): this branch is now
+        # informational only, never applied. The extension window is "about
+        # to enter the final year" -- it closes before that season's OWN
+        # draft. Any player observed as `F` in `contracts_parsed.csv` (a
+        # mid-season-or-later snapshot) already missed that window and is
+        # confirmed for free agency, not offering a live extension choice
+        # right now. `klab/board.py::build_board` marks every `F` player
+        # `keepable=False` unconditionally and zeroes `extension_option`/
+        # `surplus_multiyear` downstream regardless of what this branch
+        # computes. Left in place rather than deleted because it's still a
+        # correct answer to a real question -- "what WOULD extending him
+        # have been worth, if that window were still open" -- which is
+        # useful context even though it's never the number that ships.
         final = [(pd.Series(0.0, index=total.index), 1)]
         for n_yrs in range(2, C.EXTENSION_MAX_YEARS + 1):
             cost_n = salary + C.EXTENSION_COST * n_yrs

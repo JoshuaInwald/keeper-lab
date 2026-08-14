@@ -4,7 +4,7 @@ Read this before changing a modelling decision. Most of the obvious
 alternatives were tried and rejected for reasons that are not obvious.
 
 <details>
-<summary><strong>Contents</strong> (16 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (18 sections — click to expand)</summary>
 
 1. [Denominators: four estimators tried, all unstable, fixed by pooling](#1-denominators-four-estimators-tried-all-unstable-fixed-by-pooling)
 2. [Contract codes: the correction, and how it was established](#2-contract-codes-the-correction-and-how-it-was-established)
@@ -23,6 +23,8 @@ alternatives were tried and rejected for reasons that are not obvious.
 14. [Extension eligibility applied to the wrong contract codes — caught by Josh, not by review](#14-extension-eligibility-applied-to-the-wrong-contract-codes--caught-by-josh-not-by-review-2026-08-13)
 15. [Building the auction-price estimator: two forks tried and rejected in the regression itself](#15-building-the-auction-price-estimator-two-forks-tried-and-rejected-in-the-regression-itself)
 16. [I repeated a stale claim from out/ROADMAP.md without checking the code first](#16-i-repeated-a-stale-claim-from-outroadmapmd-without-checking-the-code-first-2026-08-13)
+17. [The app's self-test reference trade broke the moment a real trade happened](#17-the-apps-self-test-reference-trade-broke-the-moment-a-real-trade-happened-2026-08-13)
+18. [F was never actually extendable right now, and #33 didn't catch it](#18-f-was-never-actually-extendable-right-now-and-33-didnt-catch-it-2026-08-13)
 
 </details>
 
@@ -623,3 +625,53 @@ Same lesson as #13's closing line, worth restating because it applied to
 me this time: a doc describing its own state is a claim, not a fact, and
 the only way to know if it's still true is to check the thing it's
 describing.
+
+## 17. The app's self-test reference trade broke the moment a real trade happened (2026-08-13)
+
+Updated rosters after real league trades (`out/FINDINGS.md` #38) and
+`scripts/run_all.py` crashed: `build_app.py::_reference()` hardcodes a
+specific trade (Cade Smith/Hoerner for De La Cruz/Buxton, Pookie 2.0 vs
+All-Stars) as the ground-truth pandas answer `app/verify.mjs` diffs the
+browser against. De La Cruz had actually been traded to Spehr's Army by
+the time this ran, so `evaluate_trade()` correctly raised
+(`"is on Spehr's Army, not All-Stars"`) rather than silently computing
+something wrong — a real, working guardrail, not a bug. Swapped De La Cruz
+for Mike Trout (confirmed still on All-Stars) and moved on. Worth a note
+for whoever eventually revisits this: hardcoding real player names into a
+"forever" self-test is a real, if minor, maintenance cost every time the
+league's actual rosters move, and the failure mode here (loud crash) is
+the right one -- a stale hardcoded trade going undetected and silently
+diffing wrong data would be much worse.
+
+## 18. F was never actually extendable right now, and #33 didn't catch it (2026-08-13)
+
+#33 (this notebook's #14) fixed *which* contract codes get a live extension
+option -- only code `1`, not `2` or `3`. It left `F` completely alone,
+because "F players can extend right now" read as an established, tested
+fact by that point: FINDINGS §24 had already fixed the 1-vs-2-year pricing
+for exactly this case, the whole `multiyear_surplus` F-branch was built
+around it, and Ohtani's corrected $76 surplus was a named, celebrated
+result. Nothing about #33's own investigation had reason to question
+*whether* F was live at all -- only whether the eligibility rule had been
+applied to the right set of codes.
+
+It took Josh stating the actual constitutional timing plainly -- the
+extension has to be decided before the walk year's own draft, not during
+it -- to reveal that the premise under #24, under the whole F-branch, and
+under three trade evaluations already run this session, was wrong the
+same way every time: treating an observed mid-season snapshot as if it
+still had a live decision in it, when the window described by "about to
+enter the final year" had already closed months earlier. See
+`out/FINDINGS.md` #39 for the fix and the league-wide numbers ($130.48 of
+phantom surplus, 10 keep/cut flips, 6 of them on Spehr's Army alone).
+
+**Why review didn't catch this either.** Every review pass this session
+(the general code review that produced #32, the extension-eligibility fix
+in #33/this notebook's #14) read `multiyear_surplus` and `keeper_status`
+and found them internally consistent with each other and with
+`config.py`'s own documented semantics. The bug wasn't an inconsistency
+between the code and its own stated rules -- it was that the *documented
+rule itself* was simply wrong about when the extension decision happens,
+and every downstream piece of code correctly implemented that wrong rule.
+No amount of internal-consistency checking catches a premise everyone
+involved, including two rounds of dedicated review, shared.

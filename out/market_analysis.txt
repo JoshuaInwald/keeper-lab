@@ -58,21 +58,21 @@ F-test, do MLB team dummies explain anything at all?
                          standings_pts  auction 2026  free agent  keeper  roto_per_$
 team                                                                                
 Pookie 2.0                        76.0         20.92       33.46   45.62        0.64
-Spehr's Army                      67.0         30.75       38.16   31.09        0.50
+Spehr's Army                      67.0         26.32       32.28   41.40        0.50
 McBlocks                          66.5         26.59       40.86   32.55        0.58
-Orange and Black Attack           59.5         25.35       38.36   36.29        0.66
+Orange and Black Attack           59.5         25.92       38.07   36.02        0.59
 Lisbon Long Balls                 57.0         21.72       61.19   17.10        0.53
 The Fighting Phils                52.0         31.23       14.76   54.01        0.42
-All-Stars                         50.0         24.41       40.51   35.08        0.57
+All-Stars                         50.0         29.14       47.19   23.67        0.57
 New York Polar Bears              49.0         31.65       48.32   20.02        0.49
 Producers                         40.5         25.26       49.23   25.51        0.46
-NPB No Stars                      32.5         36.71       37.14   26.16        0.47
+NPB No Stars                      32.5         35.58       35.26   29.16        0.55
 
 correlation with standings points:
-  auction 2026    r = -0.559
-  free agent      r = -0.114
-  keeper          r = +0.369
-  roto_per_$      r = +0.643
+  auction 2026    r = -0.704
+  free agent      r = -0.152
+  keeper          r = +0.432
+  roto_per_$      r = +0.497
 
 category points, best vs worst team:
                  R   HR  RBI   SB  AVG    W   SV    K  ERA  WHIP
@@ -83,8 +83,8 @@ NPB No Stars   5.0  1.0  2.0  3.5  6.0  1.0  7.0  2.0  2.0   3.0
 ================================================================================================
 4. KEEP-VS-CASH: WHAT IS A DOLLAR OF AUCTION BUDGET WORTH?
 ================================================================================================
-  aggregate keeper surplus $561  ->  inflation 1.429
-  so $1 of auction budget buys $0.70 of value, not $1.00
+  aggregate keeper surplus $473  ->  inflation 1.310
+  so $1 of auction budget buys $0.76 of value, not $1.00
 
   This changes the keep rule. Cutting a player does not give you his
   value back -- it gives you his SALARY, which buys salary/inflation
@@ -92,101 +92,100 @@ NPB No Stars   5.0  1.0  2.0  3.5  6.0  1.0  7.0  2.0  2.0   3.0
 
       keep if   value  >  keeper_cost / inflation
 
-  34 of 275 rostered players flip from cut to keep once inflation is priced in.
+  37 of 275 rostered players flip from cut to keep once inflation is priced in.
 
   --- Pookie 2.0: marginal decisions ---
              name  keeper_cost  redraft_value  cash_equiv  surplus_redraft  surplus_vs_cash  keep_naive  keep_infl
-    Shohei Ohtani         21.0           75.7        14.7              0.0             61.1       False       True
-     Nico Hoerner          1.0           14.5         0.7             13.5             13.8        True       True
-     Wilyer Abreu          1.0           11.9         0.7             10.9             11.2        True       True
-   Dansby Swanson          3.0           10.0         2.1              7.0              7.9        True       True
-    JJ Wetherholt          5.0           11.0         3.5              6.0              7.5        True       True
-     Ozzie Albies          5.0           10.5         3.5              5.5              7.0        True       True
-      Pete Alonso         27.0           24.0        18.9             -3.0              5.1       False       True
-    Jake McCarthy         10.0           12.0         7.0              2.0              5.0        True       True
-    Drake Baldwin         10.0           11.4         7.0              1.4              4.4        True       True
- Ronald Acuña Jr.         26.0           21.2        18.2             -4.8              3.1       False       True
-  Kevin McGonigle         13.0           12.0         9.1             -1.0              3.0       False       True
-     Bryce Harper         21.0           16.5        14.7              0.0              1.8       False       True
-Teoscar Hernández         11.0            6.9         7.7             -4.1             -0.8       False      False
-       Zack Gelof         10.0            4.8         7.0             -5.2             -2.2       False      False
-  Spencer Strider          4.0            0.0         2.8             -4.0             -2.8       False      False
-     Zack Wheeler         14.0            6.5         9.8             -7.5             -3.3       False      False
-    Kevin Gausman          5.0            0.0         3.5             -5.0             -3.5       False      False
-      Jake Bauers         10.0            3.4         7.0             -6.6             -3.6       False      False
-       Sonny Gray          7.0            0.0         4.9             -7.0             -4.9       False      False
-    Riley O'Brien         10.0            1.1         7.0             -8.9             -5.8       False      False
-  Emerson Hancock         10.0            0.0         7.0            -10.0             -7.0       False      False
-    Ryan Weathers         10.0            0.0         7.0            -10.0             -7.0       False      False
- Justin Wrobleski         10.0            0.0         7.0            -10.0             -7.0       False      False
-     Jacob deGrom         26.0            7.8        18.2            -18.2            -10.4       False      False
+    Shohei Ohtani         21.0           75.7        16.0              0.0             59.7       False       True
+     Nico Hoerner          1.0           14.5         0.8             13.5             13.7        True       True
+     Wilyer Abreu          1.0           11.9         0.8             10.9             11.1        True       True
+   Dansby Swanson          3.0           10.0         2.3              7.0              7.7        True       True
+    JJ Wetherholt          5.0           11.0         3.8              6.0              7.2        True       True
+     Ozzie Albies          5.0           10.5         3.8              5.5              6.7        True       True
+    Jake McCarthy         10.0           12.0         7.6              2.0              4.4        True       True
+    Drake Baldwin         10.0           11.4         7.6              1.4              3.7        True       True
+      Pete Alonso         27.0           24.0        20.6             -3.0              3.3       False       True
+  Kevin McGonigle         13.0           12.0         9.9             -1.0              2.1       False       True
+ Ronald Acuña Jr.         26.0           21.2        19.8             -4.8              1.4       False       True
+     Bryce Harper         21.0           16.5        16.0              0.0              0.4       False       True
+Teoscar Hernández         11.0            6.9         8.4              0.0             -1.5       False      False
+       Zack Gelof         10.0            4.8         7.6             -5.2             -2.8       False      False
+  Spencer Strider          4.0            0.0         3.1             -4.0             -3.1       False      False
+    Kevin Gausman          5.0            0.0         3.8             -5.0             -3.8       False      False
+      Jake Bauers         10.0            3.4         7.6             -6.6             -4.2       False      False
+     Zack Wheeler         14.0            6.5        10.7             -7.5             -4.2       False      False
+       Sonny Gray          7.0            0.0         5.3             -7.0             -5.3       False      False
+    Riley O'Brien         10.0            1.1         7.6             -8.9             -6.5       False      False
+  Emerson Hancock         10.0            0.0         7.6            -10.0             -7.6       False      False
+    Ryan Weathers         10.0            0.0         7.6            -10.0             -7.6       False      False
+ Justin Wrobleski         10.0            0.0         7.6            -10.0             -7.6       False      False
 
   --- NPB No Stars: marginal decisions ---
                  name  keeper_cost  redraft_value  cash_equiv  surplus_redraft  surplus_vs_cash  keep_naive  keep_infl
-         Tarik Skubal         38.0           45.7        26.6              7.7             19.1        True       True
-     Chandler Simpson          3.0           16.0         2.1             13.0             13.9        True       True
-    Spencer Torkelson          1.0           14.0         0.7             13.0             13.3        True       True
-           Nick Kurtz         10.0           18.7         7.0              8.7             11.7        True       True
-       Bryan Reynolds          4.0            8.1         2.8              4.1              5.3        True       True
-         Andrés Muñoz         13.0           14.0         9.1              1.0              4.9        True       True
-         Hunter Brown         10.0           10.7         7.0              0.7              3.7        True       True
-        Sam Antonacci         10.0            8.5         7.0             -1.5              1.5       False       True
-         Tanner Bibee          6.0            5.1         4.2             -0.9              0.9       False       True
-       Daulton Varsho          4.0            3.4         2.8             -0.6              0.6       False       True
-       MacKenzie Gore          1.0            0.8         0.7             -0.2              0.1       False       True
-         José Soriano          1.0            0.0         0.7             -1.0             -0.7       False      False
-      Julio Rodríguez         43.0           29.0        30.1            -14.0             -1.1       False      False
-        Michael Wacha          2.0            0.0         1.4             -2.0             -1.4       False      False
-        Jack Flaherty          2.0            0.0         1.4             -2.0             -1.4       False      False
-       Dillon Dingler         10.0            5.2         7.0             -4.8             -1.8       False      False
-        Trey Yesavage          3.0            0.0         2.1             -3.0             -2.1       False      False
-Vladimir Guerrero Jr.         35.0           22.0        24.5            -13.0             -2.5       False      False
-      Freddie Freeman         26.0           15.4        18.2            -10.6             -2.8       False      False
-       Gleyber Torres         10.0            2.2         7.0             -7.8             -4.8       False      False
-        Nolan Arenado          8.0            0.6         5.6             -7.4             -5.0       False      False
-         Kody Clemens         10.0            0.9         7.0             -9.1             -6.1       False      False
-        Casey Schmitt         10.0            0.0         7.0            -10.0             -7.0       False      False
-         Colt Emerson         10.0            0.0         7.0            -10.0             -7.0       False      False
-          Curtis Mead         10.0            0.0         7.0            -10.0             -7.0       False      False
-          Troy Melton         10.0            0.0         7.0            -10.0             -7.0       False      False
-          Jack Leiter         10.0            0.0         7.0            -10.0             -7.0       False      False
+         Tarik Skubal         38.0           45.7        29.0              7.7             16.7        True       True
+     Chandler Simpson          3.0           16.0         2.3             13.0             13.7        True       True
+    Spencer Torkelson          1.0           14.0         0.8             13.0             13.2        True       True
+           Nick Kurtz         10.0           18.7         7.6              8.7             11.1        True       True
+       Bryan Reynolds          4.0            8.1         3.1              4.1              5.1        True       True
+         Andrés Muñoz         13.0           14.0         9.9              1.0              4.1        True       True
+         Hunter Brown         10.0           10.7         7.6              0.7              3.0        True       True
+        Sam Antonacci         10.0            8.5         7.6             -1.5              0.9       False       True
+         Tanner Bibee          6.0            5.1         4.6             -0.9              0.5       False       True
+       Daulton Varsho          4.0            3.4         3.1             -0.6              0.3       False       True
+       MacKenzie Gore          1.0            0.8         0.8             -0.2              0.0       False       True
+         José Soriano          1.0            0.0         0.8             -1.0             -0.8       False      False
+        Michael Wacha          2.0            0.0         1.5             -2.0             -1.5       False      False
+        Jack Flaherty          2.0            0.0         1.5             -2.0             -1.5       False      False
+        Trey Yesavage          3.0            0.0         2.3             -3.0             -2.3       False      False
+       Dillon Dingler         10.0            5.2         7.6             -4.8             -2.4       False      False
+      Xander Bogaerts          7.0            1.7         5.3              0.0             -3.7       False      False
+       Chase DeLauter          5.0            0.0         3.8             -5.0             -3.8       False      False
+      Freddie Freeman         26.0           15.4        19.8            -10.6             -4.4       False      False
+Vladimir Guerrero Jr.         35.0           22.0        26.7            -13.0             -4.7       False      False
+       Gleyber Torres         10.0            2.2         7.6             -7.8             -5.4       False      False
+        Nolan Arenado          8.0            0.6         6.1             -7.4             -5.6       False      False
+         Kody Clemens         10.0            0.9         7.6             -9.1             -6.7       False      False
+        Casey Schmitt         10.0            0.0         7.6            -10.0             -7.6       False      False
+          Curtis Mead         10.0            0.0         7.6            -10.0             -7.6       False      False
+          Troy Melton         10.0            0.0         7.6            -10.0             -7.6       False      False
+          Jack Leiter         10.0            0.0         7.6            -10.0             -7.6       False      False
 
 ================================================================================================
 5. BEST AVAILABLE RETURNS FOR SKUBAL
 ================================================================================================
   cap room per team after optimal keepers (can they absorb $38?):
 team
+All-Stars                  226.0
 Orange and Black Attack    224.0
 Pookie 2.0                 215.0
-Lisbon Long Balls          205.0
-All-Stars                  201.0
+Lisbon Long Balls          213.0
+McBlocks                   206.0
+Spehr's Army               204.0
 Producers                  188.0
 NPB No Stars               181.0
 New York Polar Bears       176.0
 The Fighting Phils         165.0
-McBlocks                   158.0
-Spehr's Army               153.0
 
   best cheap-contract surplus assets in the league ($1-5 salary):
-                   team               name role contract  years_controlled  salary  roto_points  redraft_value  surplus_multiyear
-              Producers          Zach Neto  HIT        1                 1       1          8.4           23.5               45.5
-               McBlocks   Ceddanne Rafaela  HIT        1                 1       1          8.2           22.3               33.0
-     The Fighting Phils        Jhoan Duran  PIT        1                 1       4          8.8           26.0               28.4
-           Spehr's Army    Shea Langeliers  HIT        1                 1       2          6.4           11.1               16.6
-             Pookie 2.0       Nico Hoerner  HIT        1                 1       1          6.9           14.5               16.0
-      Lisbon Long Balls       Riley Greene  HIT        F                 1       3          7.9           20.8               15.0
-              Producers       Iván Herrera  HIT        2                 2       1          6.5           11.8               14.8
-             Pookie 2.0       Wilyer Abreu  HIT        2                 2       1          6.5           11.9               12.9
-              All-Stars Cristopher Sánchez  PIT        F                 1       5          8.2           22.7               12.7
-Orange and Black Attack       Caleb Durbin  HIT        2                 2       1          6.1            9.2               12.1
-     The Fighting Phils           Jo Adell  HIT        1                 1       1          6.3           10.8               11.1
-Orange and Black Attack      Mickey Moniak  HIT        2                 2       1          5.8            7.4                8.9
-           Spehr's Army       Jarren Duran  HIT        F                 1       1          6.9           14.5                8.5
-             Pookie 2.0      JJ Wetherholt  HIT        2                 2       5          6.4           11.0                8.5
-               McBlocks      Trevor Megill  PIT        2                 2       1          6.1            9.3                8.3
-      Lisbon Long Balls    Aroldis Chapman  PIT        1                 1       2          6.2           10.2                8.2
-     The Fighting Phils      Hunter Greene  PIT        2                 2       1          4.2            0.0                7.9
-Orange and Black Attack     Drew Rasmussen  PIT        1                 1       1          5.9            8.1                7.1
+                   team              name role contract  years_controlled  salary  roto_points  redraft_value  surplus_multiyear
+              Producers         Zach Neto  HIT        1                 1       1          8.4           23.5               45.5
+               McBlocks  Ceddanne Rafaela  HIT        1                 1       1          8.2           22.3               33.0
+     The Fighting Phils       Jhoan Duran  PIT        1                 1       4          8.8           26.0               28.4
+           Spehr's Army   Shea Langeliers  HIT        1                 1       2          6.4           11.1               16.6
+             Pookie 2.0      Nico Hoerner  HIT        1                 1       1          6.9           14.5               16.0
+              Producers      Iván Herrera  HIT        2                 2       1          6.5           11.8               14.8
+             Pookie 2.0      Wilyer Abreu  HIT        2                 2       1          6.5           11.9               12.9
+Orange and Black Attack      Caleb Durbin  HIT        2                 2       1          6.1            9.2               12.1
+     The Fighting Phils          Jo Adell  HIT        1                 1       1          6.3           10.8               11.1
+Orange and Black Attack     Mickey Moniak  HIT        2                 2       1          5.8            7.4                8.9
+             Pookie 2.0     JJ Wetherholt  HIT        2                 2       5          6.4           11.0                8.5
+               McBlocks     Trevor Megill  PIT        2                 2       1          6.1            9.3                8.3
+      Lisbon Long Balls   Aroldis Chapman  PIT        1                 1       2          6.2           10.2                8.2
+     The Fighting Phils     Hunter Greene  PIT        2                 2       1          4.2            0.0                7.9
+Orange and Black Attack    Drew Rasmussen  PIT        1                 1       1          5.9            8.1                7.1
+             Pookie 2.0    Dansby Swanson  HIT        2                 2       3          6.2           10.0                7.0
+      Lisbon Long Balls Colson Montgomery  HIT        2                 2       5          6.1            9.2                6.9
+             Pookie 2.0      Ozzie Albies  HIT        2                 2       5          6.3           10.5                5.5
 
   Skubal's multi-year surplus to beat: $18.0
   (a fair package needs to clear that, from one team, with the cap room)

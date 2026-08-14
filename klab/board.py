@@ -299,7 +299,19 @@ def build_board(exch: dict | None = None) -> tuple[pd.DataFrame, dict, dict]:
     my["surplus_multiyear"] = (my["surplus_y2027"] + my["surplus_y2028"]
                                + my["surplus_y2029"] + my["extension_option"])
     b["extension_used"] = used.values
-    b["keepable"] = ~(used & b["contract"].astype(str).str.upper().isin(C.EXTENSION_REQUIRED))
+    # CORRECTED 2026-08-13 (out/FINDINGS.md #39): an `F` player observed in
+    # THIS data is never keepable, full stop -- not conditional on whether
+    # he has used a prior extension. The constitution's extension window is
+    # "about to enter the final year," i.e. it closes before that season's
+    # OWN draft. `contracts_parsed.csv` is a mid-season-or-later snapshot, so
+    # any player still coded `F` in it already missed that window; he is
+    # confirmed for unrestricted free agency after this season, not offering
+    # a live extension choice for 2027. This used to read
+    # `~(used & is_final)`, which only caught a player who had *already*
+    # spent an extension -- a first-time F player (the common case) was
+    # incorrectly treated as extendable right now.
+    is_final = b["contract"].astype(str).str.upper().isin(C.EXTENSION_REQUIRED)
+    b["keepable"] = ~is_final
     b = pd.concat([b, my], axis=1)
 
     # A player who cannot be kept has no future surplus -- not "unknown"

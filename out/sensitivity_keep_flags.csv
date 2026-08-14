@@ -7,16 +7,17 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 9132,Nathan Eovaldi,All-Stars,False,False,False,False,False,False,False,False
 9218,Paul Goldschmidt,Lisbon Long Balls,False,False,False,False,False,False,False,False
 9777,Nolan Arenado,NPB No Stars,False,False,False,False,False,False,False,False
-10155,Mike Trout,All-Stars,False,False,True,False,False,False,False,False
-10233,Aroldis Chapman,Lisbon Long Balls,True,False,True,True,True,True,True,True
+10155,Mike Trout,All-Stars,True,True,True,True,False,True,True,True
+10233,Aroldis Chapman,Lisbon Long Balls,True,True,True,True,True,True,True,True
 10310,Zack Wheeler,Pookie 2.0,False,False,False,False,True,False,False,False
-10603,Chris Sale,McBlocks,False,False,False,False,True,False,False,False
+10603,Chris Sale,McBlocks,False,False,False,False,False,False,False,False
 10954,Jacob deGrom,Pookie 2.0,False,False,False,False,False,False,False,False
 11477,Christian Yelich,All-Stars,False,False,False,False,False,False,False,False
 11486,Robbie Ray,New York Polar Bears,False,False,False,False,False,False,False,False
 11493,Manny Machado,McBlocks,False,False,False,False,False,False,False,False
 11579,Bryce Harper,Pookie 2.0,False,False,False,False,False,False,False,False
 11609,Willson Contreras,Spehr's Army,False,False,False,False,False,False,False,False
+12161,Xander Bogaerts,NPB No Stars,False,False,False,False,False,False,False,False
 12552,Eugenio Suárez,The Fighting Phils,True,True,True,True,True,True,True,True
 12564,Trevor Story,All-Stars,False,False,False,False,False,False,False,False
 12730,Nick Martinez,Producers,False,False,False,False,False,False,False,False
@@ -29,7 +30,7 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 13510,José Ramírez,Lisbon Long Balls,False,False,False,False,False,False,False,False
 13543,Blake Snell,Producers,False,False,False,False,False,False,False,False
 13611,Mookie Betts,Producers,False,False,False,False,False,False,False,False
-13613,Ketel Marte,All-Stars,False,False,False,False,False,False,False,False
+13613,Ketel Marte,Spehr's Army,False,False,False,False,False,False,False,False
 13624,Corey Seager,McBlocks,False,False,False,False,False,False,False,False
 13649,Clay Holmes,The Fighting Phils,False,False,False,False,False,False,False,False
 13743,Max Fried,New York Polar Bears,False,False,False,False,False,False,False,False
@@ -76,8 +77,8 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 18568,Luis Arraez,The Fighting Phils,True,True,True,True,True,True,True,True
 18679,Freddy Peralta,The Fighting Phils,False,False,False,False,False,False,False,False
 18684,Sandy Alcantara,McBlocks,False,False,False,False,False,False,False,False
-18839,Josh Naylor,Spehr's Army,True,True,True,True,False,True,True,True
-18882,Brandon Lowe,Spehr's Army,True,True,True,True,True,True,True,True
+18839,Josh Naylor,Spehr's Army,False,False,False,False,False,False,False,False
+18882,Brandon Lowe,All-Stars,True,True,True,True,True,True,True,True
 19251,Pete Alonso,Pookie 2.0,False,False,False,False,False,False,False,False
 19290,Randy Arozarena,New York Polar Bears,True,True,True,True,True,True,True,True
 19326,Bryan Reynolds,NPB No Stars,True,True,True,True,True,True,True,True
@@ -93,7 +94,7 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 19853,Michael King,All-Stars,False,False,False,False,False,False,False,False
 19918,Daulton Varsho,NPB No Stars,False,False,True,False,False,False,False,False
 19956,Mickey Moniak,Orange and Black Attack,True,True,True,True,True,True,True,True
-19959,Jesús Luzardo,Spehr's Army,False,False,False,False,True,False,False,False
+19959,Jesús Luzardo,All-Stars,False,False,True,False,True,False,False,False
 20036,Isaac Paredes,McBlocks,False,False,False,False,False,False,False,False
 20123,Juan Soto,The Fighting Phils,False,False,False,False,False,False,False,False
 20178,Miguel Vargas,All-Stars,True,True,True,True,True,True,True,True
@@ -105,12 +106,12 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 20373,Andrés Muñoz,NPB No Stars,True,False,False,True,True,True,True,True
 20391,Luis García Jr.,Orange and Black Attack,True,True,True,True,True,True,True,True
 20437,Royce Lewis,Orange and Black Attack,True,True,True,True,True,True,True,True
-20454,Jazz Chisholm Jr.,The Fighting Phils,False,False,True,False,False,False,False,False
+20454,Jazz Chisholm Jr.,The Fighting Phils,False,False,False,False,False,False,False,False
 20492,Casey Mize,Producers,False,False,False,False,False,False,False,False
 20503,William Contreras,Producers,True,True,True,True,True,True,True,True
 20572,Kody Clemens,NPB No Stars,False,False,False,False,False,False,False,False
 20599,Iván Herrera,Producers,True,True,True,True,True,True,True,True
-20778,Cristopher Sánchez,All-Stars,True,True,True,True,True,True,True,True
+20778,Cristopher Sánchez,Spehr's Army,False,False,False,False,False,False,False,False
 21029,Jhoan Duran,The Fighting Phils,True,True,True,True,True,True,True,True
 21306,Jacob Latz,Producers,False,False,False,False,True,False,False,False
 21390,Joe Ryan,All-Stars,False,False,False,False,False,False,False,False
@@ -126,21 +127,21 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 21846,Cole Ragans,Spehr's Army,False,False,False,False,False,False,False,False
 22100,José Soriano,NPB No Stars,False,False,False,False,False,False,False,False
 22182,Hunter Greene,The Fighting Phils,True,True,True,True,True,True,True,True
-22186,Brice Turang,McBlocks,True,True,True,True,True,True,True,True
+22186,Brice Turang,McBlocks,False,False,False,False,False,False,False,False
 22201,MacKenzie Gore,NPB No Stars,False,True,True,False,False,False,False,False
-22250,Logan Gilbert,New York Polar Bears,False,False,False,False,True,False,False,False
+22250,Logan Gilbert,New York Polar Bears,False,False,False,False,False,False,False,False
 22266,Xavier Edwards,Producers,True,True,True,True,True,True,True,True
 22267,Tarik Skubal,NPB No Stars,True,True,False,True,True,True,True,True
 22286,Trevor Rogers,New York Polar Bears,False,False,False,False,False,False,False,False
 22543,Taj Bradley,The Fighting Phils,False,False,False,False,False,False,False,False
 22664,Gabriel Moreno,The Fighting Phils,True,True,True,True,True,True,True,True
 22715,Maikel Garcia,Orange and Black Attack,False,False,False,False,False,False,False,False
-22799,Geraldo Perdomo,New York Polar Bears,True,True,True,True,False,True,True,True
+22799,Geraldo Perdomo,New York Polar Bears,True,True,True,True,True,True,True,True
 22872,Yoendrys Gómez,Spehr's Army,False,False,False,False,False,False,False,False
 23401,José Caballero,The Fighting Phils,False,False,False,False,False,False,False,False
 23590,Ben Brown,Spehr's Army,False,False,False,False,False,False,False,False
 23690,Brayan Rocchio,All-Stars,False,False,False,False,False,False,False,False
-23697,Julio Rodríguez,NPB No Stars,False,False,False,False,False,False,False,False
+23697,Julio Rodríguez,Orange and Black Attack,False,False,False,False,False,False,False,False
 23733,Ezequiel Duran,Producers,False,False,False,False,False,False,False,False
 23772,Wilyer Abreu,Pookie 2.0,True,True,True,True,True,True,True,True
 23793,Braxton Ashcraft,All-Stars,False,False,False,False,False,False,False,False
@@ -148,7 +149,7 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 23986,Curtis Mead,NPB No Stars,False,False,False,False,False,False,False,False
 24262,Ceddanne Rafaela,McBlocks,True,True,True,True,True,True,True,True
 24586,Kyle Bradish,McBlocks,False,False,False,False,False,False,False,False
-24617,Jarren Duran,Spehr's Army,True,True,True,True,True,True,True,True
+24617,Jarren Duran,Spehr's Army,False,False,False,False,False,False,False,False
 24618,Ryan Jeffers,Orange and Black Attack,False,False,False,False,False,False,False,False
 24816,Andy Pages,New York Polar Bears,True,True,True,True,True,True,True,True
 25385,Drew Rasmussen,Orange and Black Attack,True,True,True,True,True,True,True,True
@@ -159,7 +160,7 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 25878,Corbin Carroll,The Fighting Phils,False,False,False,False,False,False,False,False
 25880,Hunter Brown,NPB No Stars,True,True,False,True,False,True,True,True
 25931,Michael Harris II,New York Polar Bears,True,True,True,True,True,True,True,True
-25976,Riley Greene,Lisbon Long Balls,True,True,True,True,True,True,True,True
+25976,Riley Greene,Lisbon Long Balls,False,False,False,False,False,False,False,False
 25977,Quinn Priester,Lisbon Long Balls,False,False,False,False,False,False,False,False
 25979,Nasim Nuñez,McBlocks,False,False,False,False,False,False,False,False
 26108,Andre Pallante,McBlocks,False,False,False,False,False,False,False,False
@@ -169,10 +170,10 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 26288,Adley Rutschman,Producers,False,False,False,False,False,False,False,False
 26289,Gunnar Henderson,Spehr's Army,False,False,False,False,False,False,False,False
 26294,Bryson Stott,Spehr's Army,True,True,True,True,True,True,True,True
-26319,Michael Busch,Spehr's Army,True,True,True,True,False,True,True,True
+26319,Michael Busch,Spehr's Army,False,False,False,False,False,False,False,False
 26368,JJ Bleday,Lisbon Long Balls,False,False,False,False,False,False,False,False
 26438,Dominic Canzone,Lisbon Long Balls,False,False,False,False,False,False,False,False
-26668,Elly De La Cruz,All-Stars,True,True,True,True,True,True,True,True
+26668,Elly De La Cruz,Spehr's Army,False,False,False,False,False,False,False,False
 27463,Garrett Crochet,Producers,True,True,False,True,False,True,True,True
 27464,Dillon Dingler,NPB No Stars,False,False,False,False,False,False,False,False
 27465,Spencer Torkelson,NPB No Stars,True,True,True,True,True,True,True,True
@@ -200,11 +201,11 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 27914,Daniel Palencia,Spehr's Army,False,False,False,False,False,False,False,False
 27932,Ian Seymour,McBlocks,False,False,False,False,False,False,False,False
 28163,Junior Caminero,Spehr's Army,True,True,True,True,True,True,True,True
-28806,Jackson Chourio,McBlocks,True,True,True,True,True,True,True,True
+28806,Jackson Chourio,McBlocks,False,False,False,False,False,False,False,False
 28824,Samuel Basallo,Spehr's Army,False,False,False,False,False,False,False,False
 29357,Walbert Ureña,Lisbon Long Balls,False,False,False,False,False,False,False,False
-29490,Jackson Merrill,McBlocks,True,True,True,True,True,True,True,True
-29518,James Wood,Spehr's Army,True,True,True,True,True,True,True,True
+29490,Jackson Merrill,McBlocks,False,False,False,False,False,False,False,False
+29518,James Wood,Spehr's Army,False,False,False,False,False,False,False,False
 29576,Ben Rice,Lisbon Long Balls,True,True,True,True,True,True,True,True
 29646,Caleb Durbin,Orange and Black Attack,True,True,True,True,True,True,True,True
 29712,Colson Montgomery,Lisbon Long Balls,True,True,True,True,True,True,True,True
@@ -241,7 +242,7 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 31912,Chandler Simpson,NPB No Stars,True,True,True,True,True,True,True,True
 31986,Parker Messick,Orange and Black Attack,False,False,False,False,True,False,False,False
 32095,Cam Schlittler,Lisbon Long Balls,False,False,False,False,True,False,False,False
-32127,Chase DeLauter,Orange and Black Attack,False,False,False,False,False,False,False,False
+32127,Chase DeLauter,NPB No Stars,False,False,False,False,False,False,False,False
 33253,Cole Carrigg,Lisbon Long Balls,False,False,False,False,False,False,False,False
 33266,Jacob Wilson,Orange and Black Attack,False,False,False,False,False,False,False,False
 33333,Wyatt Langford,New York Polar Bears,False,False,False,False,False,False,False,False
@@ -250,7 +251,6 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 33433,George Lombard Jr.,The Fighting Phils,False,False,False,False,False,False,False,False
 33530,Cooper Pratt,McBlocks,False,False,False,False,False,False,False,False
 33572,Kevin McGonigle,Pookie 2.0,False,False,False,False,False,False,False,False
-33575,Colt Emerson,NPB No Stars,False,False,False,False,False,False,False,False
 33656,A.J. Ewing,The Fighting Phils,True,True,True,True,True,True,True,True
 33666,Connelly Early,The Fighting Phils,False,False,False,False,False,False,False,False
 33677,Paul Skenes,McBlocks,True,True,True,True,True,True,True,True
@@ -273,4 +273,4 @@ fg_id,name,team,baseline,SV punters included,denominators 2022-25,auction window
 35456,Trey Yesavage,NPB No Stars,False,False,False,False,False,False,False,False
 35466,Payton Tolle,Lisbon Long Balls,False,False,False,False,False,False,False,False
 37120,Munetaka Murakami,Lisbon Long Balls,True,True,True,True,True,True,True,True
-37123,Kazuma Okamoto,Spehr's Army,False,False,False,False,False,False,False,False
+37123,Kazuma Okamoto,All-Stars,False,False,False,False,False,False,False,False

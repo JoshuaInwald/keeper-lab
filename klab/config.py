@@ -38,7 +38,27 @@ FA_SALARY_POST_ASB = 20
 #   "3" -> 2027, 2028, 2029 at current salary (only reachable via extension)
 #   "2" -> 2027, 2028 at current salary
 #   "1" -> 2027 only, at current salary
-#   "F" -> 2026 was the final year; keep only by extending at salary + $5
+#   "F" -> confirmed unrestricted free agent after 2026. NOT extendable.
+#
+# CORRECTED AGAIN 2026-08-13, this one bigger (out/FINDINGS.md #39): "F" used
+# to be documented as "keep only by extending at salary + $5", i.e. a live
+# choice available right now. It isn't. The constitution's extension clause
+# is for a player "about to enter the final year of his contract eligibility"
+# -- the decision has to be made BEFORE that season's own draft, not during
+# or after it. contracts_parsed.csv is a mid-2026-or-later snapshot, so any
+# player still coded "F" in it already missed that window (back around the
+# 2026 keeper deadline, before the 2026 draft) -- he is confirmed heading to
+# the open 2027 auction pool, full stop, not a keeper decision at all. This
+# feeds klab.board.build_board's `keepable` flag directly: every "F" player
+# is unkeepable unconditionally now, not just the ones who already used a
+# prior extension. Read that as "F = gone" wherever it appears in this
+# codebase or the docs, not "F = pay $5 to keep him."
+#
+# The ONLY currently-live extension decision in this whole model is for a
+# code-"1" player: he has one guaranteed year left (2027), which makes HIM
+# the one "about to enter his final year" -- so the decision about extending
+# him into 2028/2029 is legitimately being made right now, for the upcoming
+# 2027 keeper deadline. See klab/keeper.py::multiyear_surplus's `live` branch.
 #
 # Evidence in contracts_parsed.csv:
 #   * $10 and $20 salaries -- the pre- and post-All-Star-break FA acquisition

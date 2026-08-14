@@ -248,9 +248,15 @@ def test_category_sign_conventions_hold_every_season():
 
 
 def test_final_year_player_can_buy_two_extension_years():
-    """The constitution allows +$5 PER YEAR for one or two years. A final-year
-    player whose 2028 line clears the extra $5 must be valued at two years, not
-    one. The old code zeroed the option for `F` players entirely."""
+    """Tests multiyear_surplus()'s raw math in isolation: IF an F player's
+    extension were live, a 2028 line clearing the extra $5 must be valued at
+    two years, not one. As of out/FINDINGS.md #39 this computation is never
+    actually applied on the real board -- klab.board.build_board marks every
+    F player unkeepable unconditionally, because the real extension window
+    closes before that player's own walk-year draft, not now. Kept as a math
+    check on the function itself; see
+    test_f_contract_players_are_never_keepable for the board-level behavior
+    that actually ships."""
     from klab.keeper import multiyear_surplus
     # Cheap star: $16 salary, worth $72 in 2027 and $62 in 2028.
     v27, v28 = pd.Series([72.0]), pd.Series([62.0])
@@ -447,3 +453,20 @@ def test_ros_value_over_replacement_ranks_better_rates_higher():
     g = ros_value_over_replacement(good, D, base, 4.78)
     b = ros_value_over_replacement(bad, D, base, 4.78)
     assert g["ros_value_over_replacement"].iloc[0] > b["ros_value_over_replacement"].iloc[0]
+
+
+def test_f_contract_players_are_never_keepable(board):
+    """out/FINDINGS.md #39: the extension window closes before a player's OWN
+    walk-year draft, not now -- so any player observed as F in
+    contracts_parsed.csv already missed it and is confirmed for free agency,
+    regardless of whether he's ever used a prior extension or how good his
+    projection is. keepable must be False, extension_option/surplus_multiyear
+    must be exactly 0, and he must never be flagged keep_2027, for EVERY F
+    player on the board -- not just the ones already_extended() catches."""
+    b, _, _ = board
+    f_players = b[b["contract"].astype(str).str.upper() == "F"]
+    assert len(f_players) > 0, "test needs at least one F-contract player to exist"
+    assert not f_players["keepable"].any()
+    assert not f_players["keep_2027"].any()
+    assert (f_players["extension_option"] == 0).all()
+    assert (f_players["surplus_multiyear"] == 0).all()

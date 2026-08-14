@@ -154,14 +154,27 @@ Before this, Kazuma Okamoto was charged −$9.35 for a 2028 season nobody would
 keep him for, turning a −$3.50 contract into −$12.80. **Every multi-year deal
 was being penalised for its own length.**
 
-**The extension.** Any contract in its final year extends at +$5 **per year**,
-for one *or* two years, once ever. That is a call option, and pricing it
-properly moved cheap young stars a lot — Jhoan Duran at $4 gained ~$34.
+**The extension.** +$5 **per year**, for one *or* two years, once ever — but
+only for a player *about to enter* his final year, which in this data means
+code `"1"` (one guaranteed year left, extending into what would be 2028/2029).
+That's a call option, and pricing it properly moved cheap young stars a lot —
+Jhoan Duran at $4 gained ~$34.
 
-The most recent fix (FINDINGS §24): final-year (`F`) players had the option
-zeroed entirely, on the grounds it was "already in keeper_cost" — true of one
-year, false of two. Ohtani went from $51 to **$76** of surplus. The rule, once
-written down, is one line:
+**`F` is not a live extension choice — CORRECTED 2026-08-13, `out/FINDINGS.md`
+#39.** The extension window closes *before* the walk year's own draft, not
+during or after it. Any player still coded `F` in this data (a mid-2026-
+or-later snapshot) already missed that window and is confirmed for the open
+2027 auction, full stop — `keepable=False` unconditionally, no extension
+option computed. This section used to describe `F` players as having the
+same live +$5/yr choice as a code-`"1"` player; §24 below (kept for
+history) was the fix that made that choice price correctly for `F` — before
+this later correction removed the choice from `F` entirely. Ohtani's own
+$76 figure from that fix was separately zeroed by a league-ruling override
+(`NON_EXTENDABLE_NAMES`) before this session; two other players it applied
+to (Riley Greene, Elly De La Cruz) were not protected by that override and
+are now correctly `$0`/unkeepable too. The rule §24 wrote down is still the
+right math for a code-`"1"` player's extension — just no longer reachable
+by an `F` player:
 
 ```
 buy the second year iff  0.85 × (value_2028 − salary − 10) > 5

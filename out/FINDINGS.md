@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (37 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (39 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -43,6 +43,8 @@ in `LAB_NOTEBOOK.md`.
 35. [A comp-based next-auction price estimator — a deliberately separate tool](#35-a-comp-based-next-auction-price-estimator--a-deliberately-separate-tool)
 36. [A retained-but-unused extension right has zero value in the model, for any non-final-year contract](#36-a-retained-but-unused-extension-right-has-zero-value-in-the-model-for-any-non-final-year-contract)
 37. [Uncertainty bands were already done in the app — the roadmap said otherwise](#37-uncertainty-bands-were-already-done-in-the-app--the-roadmap-said-otherwise)
+38. [Roster update — two real trades, one FA move, resolved cleanly against 268-of-277 players untouched](#38-roster-update--two-real-trades-one-fa-move-resolved-cleanly-against-268-of-277-players-untouched)
+39. [F-contract players were never actually extendable right now — a bigger correction than #33](#39-f-contract-players-were-never-actually-extendable-right-now--a-bigger-correction-than-33)
 
 </details>
 
@@ -996,6 +998,16 @@ Nothing was arithmetically inconsistent, so neither the audit script nor the
 32 invariants caught it. What caught it was rendering one player's numbers
 side by side and asking whether they looked like a real contract.
 
+**Superseded 2026-08-13, in two different ways (§39).** Ohtani's own $76.1
+figure was already independently zeroed out before this session, by the
+`NON_EXTENDABLE_NAMES` league-ruling override — unrelated timing to §39's
+fix, already correct going into it. Riley Greene and Elly De La Cruz's
+$13.2/$11.8 figures were not protected by any override and were both live,
+real numbers on the board until §39 — both are among the ten players whose
+`keep_2027` flag flips there. This section's closing claim, "no keep/cut
+decision flips," no longer holds; it was true under the model as it stood
+that day, not today.
+
 ### 24.1 A column collision the same build surfaced
 
 `ros_lines()` returns a `PA` column; so does the projection. Merging them
@@ -1777,3 +1789,94 @@ than complicate. The trade's directional conclusion (favors Spehr's Army)
 doesn't change, but "Skubal makes this trade a clear win" is a
 meaningfully overstated way to describe a number that's genuinely
 uncertain 27% of the time.
+
+## 38. Roster update — two real trades, one FA move, resolved cleanly against 268-of-277 players untouched
+
+Updated `data/rosters_valued.csv`/`rosters_current.csv`/`contracts_parsed.csv`
+against a fresh CBS roster export. Matched all 277 players by `name_key`
+(first-initial + last name — already built for exactly this) with team-level
+disambiguation for three collision cases (two "C Smith"s, two "W
+Contreras"es, two "J Duran"s, each already on the correct respective teams).
+Detected, not assumed: two real trades already executed —
+
+- **Spehr's Army ⇄ All-Stars**: Brandon Lowe, Kazuma Okamoto, Jesús Luzardo
+  to All-Stars; Ketel Marte, Elly De La Cruz, Cristopher Sánchez to Spehr's
+  Army. This is exactly "Trade 1" evaluated earlier in this session as a
+  hypothetical — it has since actually happened.
+- **Orange and Black Attack ⇄ NPB No Stars**: Julio Rodríguez to Orange and
+  Black Attack, Chase DeLauter to NPB No Stars. Not previously discussed.
+
+Xander Bogaerts appeared on NPB No Stars with no prior record on that
+franchise — his last draft was 2025 @ $2 under "Moben," which
+`data/franchise_map.csv` resolves to Orange and Black Attack's old name, not
+NPB No Stars. No transaction log to check (the same recurring blocker as
+§27/§11 of `out/LAB_NOTEBOOK.md`), so asked directly: confirmed he was
+drafted 2025, kept into 2026, dropped mid-season, and re-added — so per the
+**already-established** re-add rule (§23.6: a re-added player keeps his
+original contract, not a fresh one), he carries his $2/`F` contract, not a
+new free-agent price. Colt Emerson dropped off every roster with no
+replacement team — treated as released, removed from the roster files
+(his contract history is untouched in `contracts_parsed.csv` and he
+reverts to ordinary free-agent status).
+
+## 39. F-contract players were never actually extendable right now — a bigger correction than #33
+
+Flagged directly by Josh, framed precisely: *"a player w F is going to free
+agency. If they were extendable, then they had to be extended before the
+start of their walk year (technically before the draft of the walk year,
+the extension must happen or not)."* Checked against the constitution's
+actual clause — "Players **about to enter** the final year of their
+contract eligibility can be retained for additional seasons" — and the
+plain reading confirms it: the decision happens before that season starts,
+not during or after it.
+
+**Why this is a different, bigger bug than #33.** #33 corrected *which*
+contract codes are eligible for a live extension (only code `"1"`, not `"2"`
+or `"3"`) — it left `F` alone, still treated as "the extension is live right
+now." That's the part that was still wrong. `contracts_parsed.csv` is a
+mid-2026-or-later snapshot. A player coded `F` in it was, by construction,
+already "about to enter" his final year months ago (around the 2026 keeper
+deadline, before the 2026 draft) — that window is the one that's closed, not
+one still open for 2027. Every `F` player currently in the data already
+missed his one shot; he is confirmed for the open 2027 auction pool, not
+offering a live keep-or-extend choice at all.
+
+`klab.board.build_board`'s `keepable` flag used to read
+`~(already_extended & is_final)` — only excluding an `F` player who had
+*already* burned a prior extension. A first-time `F` player, the common
+case, was incorrectly treated as extendable right now. Fixed:
+`keepable = ~is_final`, unconditionally. `klab.keeper.multiyear_surplus`'s
+`F`-branch computation is untouched and still correct as a piece of math —
+it's now documented as informational-only ("what an extension would have
+been worth, if that window were still open"), never applied, since
+`build_board`'s zeroing catches every `F` row regardless of what this
+branch computes.
+
+**League-wide impact, measured directly**: 37 players currently carry code
+`F`. 35 of them were incorrectly marked `keepable=True` before this fix (only
+2 were already correctly excluded, via a prior-extension history). **10 were
+actually flagged `keep_2027=True`** and all ten flip to `False`. Total
+`surplus_multiyear` removed from the board: **$130.48**. Six of the ten
+flips are on Spehr's Army alone — Elly De La Cruz (−$16.18), James Wood
+(−$15.87), Cristopher Sánchez (−$12.67), Jarren Duran (−$8.53), Josh Naylor
+(−$4.28), Michael Busch (−$0.89), **$58.42 combined**, none of it connected
+to the trades discussed earlier in this session — these were already on the
+roster, independently wrong. The other four: Riley Greene (Lisbon Long
+Balls, −$15.00), Jackson Chourio (McBlocks, −$7.31), Jackson Merrill
+(McBlocks, −$7.01), Brice Turang (McBlocks, −$5.82).
+
+**What this means for §36 and every trade evaluation run so far this
+session that involved an `F`-contract player**: the multi-year surplus
+figures reported for Sánchez, Marte, and De La Cruz in "Trade 1" (now
+confirmed real, per #38) assumed a live extension option none of them
+actually have. Those numbers need to be, and will be, rerun. §36's
+extension-option asymmetry finding (retained-but-unused rights on
+live-contract players being worth $0) still stands on its own terms, but
+it was analyzing a trade whose `F`-side valuations were themselves wrong in
+a much bigger way — the two corrections compound rather than offset.
+
+**Verified with a new test**, not just a rebuild:
+`test_f_contract_players_are_never_keepable` asserts every `F` player on
+the real board has `keepable=False`, `keep_2027=False`,
+`extension_option==0`, and `surplus_multiyear==0` — not just the ones
+`already_extended()` would have caught before. 47/47 tests pass.

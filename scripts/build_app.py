@@ -171,7 +171,7 @@ def _reference() -> dict:
     s = snapshot()
     # Deliberately avoids unkeepable players: their `surplus_multiyear` is NaN
     # by design, which is correct on the board and useless as a reference value.
-    a_sends, b_sends = ["Cade Smith", "Nico Hoerner"], ["Elly De La Cruz", "Byron Buxton"]
+    a_sends, b_sends = ["Cade Smith", "Nico Hoerner"], ["Mike Trout", "Byron Buxton"]
     res = evaluate_trade(s.board, "Pookie 2.0", "All-Stars", a_sends, b_sends,
                          usd_per_point=s.constants["usd_per_roto_point_auction"])
     w = res["win_now"]
