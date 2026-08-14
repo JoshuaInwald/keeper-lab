@@ -49,7 +49,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-from . import config as C
 from .trade import evaluate_trade
 
 SHORTLIST_SIZE = 10

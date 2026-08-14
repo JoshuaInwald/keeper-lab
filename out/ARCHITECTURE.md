@@ -351,22 +351,33 @@ page in a headless browser and diffs 25 numbers against pandas.
 
 ## 4.1 What it actually is
 
-`out/keeper_lab.html` is **one file, ~300 KB.** Inside it: the CSS, the
+`out/keeper_lab.html` is **one file, ~3.7 MB.** Inside it: the CSS, the
 JavaScript, and the data — 275 rostered players, 400 free agents, every fitted
-constant — serialised as JSON and pasted into the middle of the file at build
-time.
+constant, **times three** (one full copy per projection basis — blend,
+projection-only, actuals — so the basis selector is a re-render, not a
+rebuild), plus a comp-based auction estimate and its top-8 comps for each of
+~673 players in each of those three copies — serialised as JSON and pasted
+into the middle of the file at build time. That per-basis tripling is the
+reason this grew from ~300 KB earlier in the project; see
+`out/FINDINGS.md` #42-43 for what's in each copy and why it isn't shared.
 
 That means: no server, no network, no install, no database. Double-click it.
 It works on a plane. It works on your phone.
 
-**The build** (`scripts/build_app.py`, ~3 seconds):
+**The build** (`scripts/build_app.py`, ~25-30 seconds as of the basis
+selector and auction estimator — three fresh-subprocess passes over most of
+the pipeline, one per projection basis, dominate that; was ~3 seconds
+before):
 
-1. call `api.snapshot()`
-2. merge in rest-of-season stat lines
-3. round every float to 4 decimals (halves the file size, costs nothing)
-4. serialise to compact JSON — column names once, then rows as arrays
-5. string-replace it into `app/template.html`
-6. write `out/app_reference.json` for the verifier
+1. for each of the three `PROJECTION_BASIS` values: call `api.snapshot()`,
+   merge in rest-of-season stat lines, compute a comp-based auction estimate
+   per player (`klab/auction_estimator.py`)
+2. round every float to 4 decimals (halves the file size, costs nothing)
+3. serialise to compact JSON — column names once, then rows as arrays,
+   three basis copies plus the basis-invariant standings/settings/precomputed
+   trade suggestions (`scripts/build_trade_suggestions.py`, run separately)
+4. string-replace it into `app/template.html`
+5. write `out/app_reference.json` for the verifier
 
 ## 4.2 What the browser computes vs what it looks up
 
@@ -408,24 +419,26 @@ for it and expect it to break when CBS changes their HTML.
 
 ## 4.4 What is left on the interface
 
-Ranked by value-per-effort:
+Done since this section was first written (kept here so the "why" doesn't get
+lost): **uncertainty bands** (every dollar figure shows a 10-90% range and a
+"surplus positive in X% of draws" confidence read, not just footer prose),
+**the projection-basis selector** (blend / projection-only / 2026-only, a
+dropdown in the header, three payloads shipped so switching is a re-render —
+`out/FINDINGS.md` #42), and **the auction-estimator panel** on the player
+card (`out/FINDINGS.md` #43). All three were exactly the "ship a cheap
+mechanical thing, watch the model's disagreements become visible" items this
+list used to rank first.
 
-1. **Uncertainty bands.** The ±34% is currently prose in the footer. It should
-   be a range on every dollar figure. Half a session, and it is the single most
-   credible thing to show an interviewer — it says "I know what my numbers are
-   worth."
-2. **Projection-basis selector.** `PROJECTION_BASIS` switches the board between
-   blend / projection-only / 2026-only, and 17% of keep/cut calls depend on it.
-   Right now that fork is invisible. Ship three payloads in one file and make it
-   a dropdown — the user *watches* the model's biggest disagreement move.
-3. **History chart.** `api.write_snapshot()` already persists a dated copy.
+Ranked by value-per-effort, what's actually still open:
+
+1. **History chart.** `api.write_snapshot()` already persists a dated copy.
    Nothing reads it back. "How has Ohtani's value moved since June" is one line
    chart away.
-4. **Auction-day mode.** A live board that tracks remaining budget and
+2. **Auction-day mode.** A live board that tracks remaining budget and
    recomputes inflation as players come off — genuinely useful for four hours a
    year.
 
-Items 1–3 are mechanical. Put a cheap model on them.
+Both are mechanical. Put a cheap model on them.
 
 ---
 

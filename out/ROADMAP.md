@@ -79,7 +79,9 @@ way.
 Streamlit was the plan. It was the wrong plan: it needs a Python process
 running to look at a number, which means the tool is only available at the desk
 where the repo lives. The build target instead is **one self-contained HTML
-file** — `out/keeper_lab.html`, ~300 KB, no server, no network, no
+file** — `out/keeper_lab.html`, ~3.7 MB as of 2026-08-13 (grew from ~300 KB
+once the basis selector and auction estimator started shipping three payload
+copies each, see `out/FINDINGS.md` #42-43), no server, no network, no
 dependencies. It opens on a phone at the draft table, and it can be emailed to
 a league-mate or dropped in a portfolio without asking anyone to `pip install`.
 

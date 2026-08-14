@@ -33,10 +33,11 @@ and how/how often each one needs refreshing.
 
 ## The app
 
-`out/keeper_lab.html` is one self-contained file, ~300 KB, no server and no
+`out/keeper_lab.html` is one self-contained file, ~3.7 MB, no server and no
 network. Six screens — keeper board, player card, league, trade evaluator,
-projected standings, free agents, model — plus an inflation-adjusted toggle.
-It opens on a phone, which is where a keeper decision actually gets made.
+projected standings, free agents, model — plus an inflation-adjusted toggle,
+a projection-basis selector, and precomputed trade suggestions. It opens on
+a phone, which is where a keeper decision actually gets made.
 
 One thing is re-implemented in JavaScript: the rest-of-season standings
 calculation, so a trade can be re-scored client-side. Re-implementations drift,

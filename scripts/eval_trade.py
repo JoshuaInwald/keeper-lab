@@ -8,7 +8,6 @@ import sys
 
 import pandas as pd
 
-import klab.config as C
 from klab.board import build_board, build_2027_scorer
 from klab.trade import (evaluate_trade, find_player, format_trade, ros_lines,
                         ros_value_over_replacement)

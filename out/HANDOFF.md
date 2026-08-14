@@ -14,6 +14,9 @@ evaluates trades from both a win-now and an asset perspective.
   it is. Read this before changing any modelling decision.
 - `FINDINGS.md` — research results (saves mispricing, draft value chain,
   stat reliability). The intellectual content.
+- `ROADMAP.md` — what's next, kept current. This file's own "next steps"
+  section used to duplicate it and drifted out of sync; §7 below now just
+  points there instead of maintaining a second list.
 
 ---
 
@@ -230,17 +233,10 @@ it in the blend) was tested and refuted — see `LAB_NOTEBOOK.md` §7.
 
 ---
 
-## 7. Next steps, in order
+## 7. Next steps
 
-1. ~~**Sensitivity harness.**~~ **Done** — `scripts/sensitivity.py`, results in
-   `FINDINGS.md` §6. Headline: 12% of keeper decisions are choice-dependent,
-   88% are robust. The denominator window is the highest-stakes knob.
-2. ~~**Tests.**~~ **Done** — `tests/test_invariants.py`, 26 tests in 3.7s.
-   Every one maps to a bug actually made.
-3. **App / UI.** The core is stable enough to build on.
-3. Prospect-upside term.
-4. Waiver-value decomposition → better replacement level.
-5. Aging curves for 2028+.
-6. Uncertainty bands.
-7. Transaction logs → historical roster reconstruction → value attribution
-   (draft vs waiver vs trade).
+See `out/ROADMAP.md` — this section used to keep its own numbered list and
+it drifted out of sync with reality across enough sessions that it was
+actively misleading (it still said the app/UI, uncertainty bands, and the
+sensitivity harness were future work; all three have been done for a while).
+One list, kept current, beats two that disagree.
