@@ -52,6 +52,7 @@ in `LAB_NOTEBOOK.md`.
 44. [UI audit: a stale pre-#39 status string, a missing IL/LOCKED tag, and two confirmed false alarms](#44-ui-audit-a-stale-pre-39-status-string-a-missing-illocked-tag-and-two-confirmed-false-alarms)
 45. [A blended 2026 rest-of-season signal, and a real bug in the first version](#45-a-blended-2026-rest-of-season-signal-and-a-real-bug-in-the-first-version)
 46. [A rest-of-2026 basis toggle in the app — Standings and Trade only, never a dollar value](#46-a-rest-of-2026-basis-toggle-in-the-app--standings-and-trade-only-never-a-dollar-value)
+47. [ROS value on the Keeper Board / Free Agents tables — a second toggle stacked on the first](#47-ros-value-on-the-keeper-board--free-agents-tables--a-second-toggle-stacked-on-the-first)
 
 </details>
 
@@ -2354,3 +2355,40 @@ in isolation looks fine.
 recomputes `PROJ_PTS` (proves `recomputeProjections()` ran, not just that
 the underlying data changed), round-trips back to the default exactly, and
 survives an unrelated basis switch as described above.
+
+## 47. ROS value on the Keeper Board / Free Agents tables — a second toggle stacked on the first
+
+Requested directly: the rest-of-2026 basis toggle (#46) only lived on the
+Standings and Trade tabs; the Keeper Board (and, since it shares the same
+table code, Free Agents) had no rest-of-season value column at all —
+everything there was 2027-only. Added a "ROS value" column
+(`ros_value_over_replacement`, out/FINDINGS.md #34 — a player's intrinsic
+rest-of-season value, not a team-standings swing) and put the same
+rest-of-2026 basis picker in the board/FA control bar.
+
+**The real complication this exposed**: `ros_value_over_replacement` isn't
+a function of ONE toggle, it's a function of both. Its inputs are a
+ROS-basis-dependent piece (which `ros_*` line — #45/#46) and a
+PROJECTION_BASIS-dependent piece (the denominators/baseline/replacement
+level that price it, all downstream of the 2027 pipeline). A value that's
+only correct for one specific combination of the two toggles would be
+subtly wrong the moment a user touched the other one. Handled the same way
+#43 handled an analogous problem for the auction estimator: nest the
+second toggle's computation inside each of the first toggle's three
+per-basis subprocesses (`scripts/build_app.py`'s `_ros_values()`, called
+from inside `_variant_payload()`), producing a full 3×3 grid rather than
+computing it once and hoping the other toggle doesn't matter much.
+
+**Read live, not mutated into the row array.** Unlike the raw `ros_*` stat
+columns (which `setRosBasis()` overwrites directly on each board row so
+`rosterAgg()` keeps working unchanged), the new column is looked up at
+render time via `rosVal(r)` against `ROS_VALUES[S.rosBasis][fg_id]` — it
+isn't a real board-row field, so `sortRows()` needed a one-line special
+case (`k==="ros_value"` uses `rosVal` instead of the generic row-array
+lookup `g()`) or sorting by the new column would have silently sorted
+nothing, using `undefined` for every row. Caught before shipping by
+actually testing the sort, not just that the column renders.
+
+Payload cost: +~123 KB (small — one float per player per ROS-basis, not a
+whole row). `app/verify.mjs` gained a permanent check for the sort
+correctness and basis-responsiveness together.

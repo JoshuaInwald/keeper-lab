@@ -83,7 +83,8 @@ tbody tr.sel{background:#22303a}
   #tbl th:nth-child(9),#tbl td:nth-child(9),
   #tbl th:nth-child(10),#tbl td:nth-child(10),
   #tbl th:nth-child(13),#tbl td:nth-child(13),
-  #tbl th:nth-child(14),#tbl td:nth-child(14){display:none}
+  #tbl th:nth-child(14),#tbl td:nth-child(14),
+  #tbl th:nth-child(15),#tbl td:nth-child(15){display:none}
   .wrap{max-height:none}
   input[type=search]{min-width:0;flex:1 1 100%}
 }
@@ -146,6 +147,12 @@ const idByName = {}; BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
 // showPlayer() -- reassigned wholesale by setBasis() since it's not present
 // for every player, unlike BOARD/FA which always have full row coverage.
 let AUCTION_EST = D.auction_estimates || {};
+// ros_value_over_replacement per player, keyed [rosBasis][fg_id] -- powers
+// the Keeper Board/Free Agents "ROS value" column. Varies by BOTH toggles
+// (out/FINDINGS.md #46's _ros_values()), so reassigned wholesale by
+// setBasis() same as AUCTION_EST, and read live by rosVal() per S.rosBasis
+// rather than mutated into row arrays like the raw ros_* stat fields.
+let ROS_VALUES = D.ros_values || {};
 const TRADE_SUGGESTIONS = D.trade_suggestions || [];
 // Alternate 2026 rest-of-season signals (out/FINDINGS.md #45/#46): "ros"
 // (ZiPS alone, default), "prorated" (season-to-date pace), "blend" (50/50).
@@ -201,6 +208,7 @@ function setBasis(b){
   Object.assign(D.constants, v.constants);
   INFL = D.constants.inflation || 1;
   AUCTION_EST = v.auction_estimates || {};
+  ROS_VALUES = v.ros_values || {};
   renderHeader();
   // New board/fa rows always carry the default ("ros") rest-of-season
   // signal -- reapply whichever ros-basis toggle was active, or a switch
@@ -301,7 +309,15 @@ const BOARD_COLS=[
   ["surplus_y2027","Gain '27"],["surplus_multiyear","Gain, all yrs"],
   ["p_surplus_positive","Sure?"],
   ["redraft_value_2028","Worth '28"],["upside_ft","If full-time"],
+  ["ros_value","ROS value"],
 ];
+// ros_value isn't a board-row field -- it's looked up per the active
+// rest-of-2026 basis toggle (out/FINDINGS.md #45/#46), same data the
+// Standings/Trade tabs' toggle drives, now also on the board.
+function rosVal(r){
+  const m = ROS_VALUES[S.rosBasis];
+  return m ? m[g(r,"fg_id")] : null;
+}
 // Plain-English gloss for every column header, shown on hover.
 const COL_HELP = {
   name:"Click for the full arithmetic.",
@@ -321,6 +337,10 @@ const COL_HELP = {
     +"Under 80% means the keep is a coin flip, not a decision.",
   redraft_value_2028:"Same dollar value, one year further out.",
   upside_ft:"Extra value if he plays a full season rather than his projected workload.",
+  ros_value:"How much better than a free replacement player he is for the REST of 2026 only "
+    +"(not the 2027 numbers everything else in this row uses) -- same scale as a keeper "
+    +"decision, but answers a different question: not \"keep him,\" \"is he worth a rental "
+    +"right now.\" Controlled by the \"rest-of-2026 basis\" dropdown above.",
 };
 // How often the multi-year surplus stayed positive across the bootstrap draws.
 // This is the column to read for a marginal keeper: $2 of surplus at 55%
@@ -350,8 +370,10 @@ function filtered(rows){
 }
 function sortRows(rows){
   const k=S.sort;
+  // ros_value isn't a real board-row field -- see rosVal().
+  const val = k==="ros_value" ? rosVal : (r)=>g(r,k);
   return rows.sort((a,b)=>{
-    let x=g(a,k), y=g(b,k);
+    let x=val(a), y=val(b);
     if(typeof x==="string"||typeof y==="string"){
       x=String(x??"");y=String(y??"");
       return S.desc ? y.localeCompare(x) : x.localeCompare(y);
@@ -400,7 +422,8 @@ function playerRow(r){
   <td>${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</td>
   <td>${conf(r)}</td>
   <td class="dim">${money(g(r,"redraft_value_2028"))}</td>
-  <td class="dim">${sgn(adj(g(r,"upside_ft")),0,"$")}</td></tr>`;
+  <td class="dim">${sgn(adj(g(r,"upside_ft")),0,"$")}</td>
+  <td class="dim">${nf(rosVal(r),2)}</td></tr>`;
 }
 function boardView(rows,title){
   const th=BOARD_COLS.map(([k,l,c])=>
@@ -432,6 +455,7 @@ function controls(showOnly=true){
     </select>`:""}
     <label class="chk"><input type="checkbox" ${S.infl?"checked":""}
       onchange="S.infl=this.checked;refilter()"> inflation-adjusted</label>
+    ${rosBasisPicker()}
   </div>`;
 }
 

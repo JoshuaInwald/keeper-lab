@@ -182,6 +182,23 @@ const rosBasisBad = !rosBasisResult.perTeamChanged
   || !rosBasisResult.survivedBasisSwitch || rosBasisResult.selValue !== 'ros';
 if (rosBasisBad) console.log('  ROS-BASIS TOGGLE MISMATCH:', JSON.stringify(rosBasisResult));
 
+// Board tab "ROS value" column (out/FINDINGS.md #46): must sort correctly
+// (not the raw unsorted BOARD array -- curRows() applies the filter+sort)
+// and must respond to the same rest-of-2026 toggle as Standings/Trade.
+const boardRosResult = await page.evaluate(() => {
+  go('board');
+  sortBy('ros_value');
+  const sorted = curRows().slice(0, 10).map(r => rosVal(r));
+  const isDescending = sorted.every((v, i) => i === 0 || sorted[i - 1] >= v);
+  const before = rosVal(curRows()[0]);
+  setRosBasis('prorated');
+  const after = rosVal(curRows()[0]);
+  setRosBasis('ros'); S.sort = 'surplus_multiyear'; S.desc = true; // restore defaults
+  return { isDescending, before, after, changedOnToggle: before !== after };
+});
+const boardRosBad = !boardRosResult.isDescending || !boardRosResult.changedOnToggle;
+if (boardRosBad) console.log('  BOARD ROS-VALUE COLUMN MISMATCH:', JSON.stringify(boardRosResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -207,5 +224,7 @@ console.log(auctionBad ? 'FAIL  auction-estimator panel missing, empty, or not b
                        : 'PASS  auction-estimator panel renders, hides when absent, tracks basis');
 console.log(rosBasisBad ? 'FAIL  ROS-basis toggle did not recompute, round-trip, or survive a basis switch'
                         : 'PASS  ROS-basis toggle recomputes standings, round-trips, and survives a basis switch');
+console.log(boardRosBad ? 'FAIL  board ROS-value column does not sort correctly or ignores the toggle'
+                        : 'PASS  board ROS-value column sorts correctly and tracks the rest-of-2026 toggle');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad || boardRosBad ? 1 : 0);

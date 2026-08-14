@@ -103,6 +103,36 @@ def _ros_variants(fg_ids) -> dict:
     return out
 
 
+def _ros_values(board: pd.DataFrame, fa: pd.DataFrame, D: dict, base: dict,
+                replacement_rp: float) -> dict:
+    """ros_value_over_replacement (out/FINDINGS.md #34) for every player,
+    under each of the three ROS bases -- for the Keeper Board tab's
+    rest-of-2026 value column.
+
+    Computed inside THIS process's D/base/replacement_rp on purpose:
+    `ros_value_over_replacement` mixes a ROS-basis-dependent input (which
+    ros_* line -- see #45) with a PROJECTION_BASIS-dependent one (the
+    denominators/baseline/replacement level that price it). Getting a
+    number that's consistent under an arbitrary combination of BOTH
+    toggles means nesting this inside each per-PROJECTION_BASIS subprocess
+    (see `_variant_payload()`), not computing it once and reusing it --
+    the same reasoning `_auction_estimates()` already applies for a
+    different pair of toggles."""
+    from klab.trade import ros_lines_for_basis, ros_value_over_replacement
+    id_role = pd.concat([board[["fg_id", "role"]], fa[["fg_id", "role"]]],
+                        ignore_index=True).drop_duplicates("fg_id")
+    out = {}
+    for basis in ROS_BASES:
+        ros = ros_lines_for_basis(basis)
+        p = id_role.merge(ros, on="fg_id", how="left")
+        for c in ["PA"] + ROS_COLS:
+            p[c] = p[c].fillna(0.0)
+        rv = ros_value_over_replacement(p, D, base, replacement_rp)
+        out[basis] = {str(int(fid)): _round(val) for fid, val in
+                     zip(rv["fg_id"], rv["ros_value_over_replacement"])}
+    return out
+
+
 def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
     """Comp-based next-auction price estimate for every player with a
     projection, keyed by fg_id (as a string -- JSON object keys are always
@@ -165,6 +195,11 @@ def _variant_payload() -> dict:
     hazard, same root cause: process-global state and per-arg caching don't
     mix)."""
     s = snapshot()
+    # snapshot() already builds this internally (cached, so this is free) --
+    # pulled out separately because s.constants doesn't carry the raw
+    # baseline dict `_ros_values()` needs.
+    from klab.board import build_board as _build_board_raw
+    _, _, _meta = _build_board_raw()
     # Prefix EVERY ros column, not just the ones the win-now maths uses.
     # `ros_lines()` also carries PA, which silently collided with the board's
     # projected PA and turned it into PA_x/PA_y -- the drawer showed a dash.
@@ -206,6 +241,8 @@ def _variant_payload() -> dict:
                       {kk: _round(vv) for kk, vv in v.items()}
                       for k, v in s.constants.items()},
         "auction_estimates": _auction_estimates(board, fa),
+        "ros_values": _ros_values(board, fa, _meta["denominators"], _meta["baseline"],
+                                  _meta["replacement_rp"]),
     }
 
 
@@ -265,7 +302,8 @@ def build_payload() -> dict:
         # reads basis_variants directly.
         "basis_variants": {b: {"cols": v["cols"], "board": v["board"], "fa": v["fa"],
                                "teams": v["teams_raw"], "constants": v["constants"],
-                               "auction_estimates": v["auction_estimates"]}
+                               "auction_estimates": v["auction_estimates"],
+                               "ros_values": v["ros_values"]}
                            for b, v in variants.items()},
         "trade_suggestions": trade_suggestions,
         "ros_variants": ros_variants,
@@ -280,6 +318,7 @@ def build_payload() -> dict:
         "fa": variants[default]["fa"],                      # (default basis)
         "teams": variants[default]["teams_raw"],             # (default basis)
         "auction_estimates": variants[default]["auction_estimates"],  # (default basis)
+        "ros_values": variants[default]["ros_values"],      # (default proj basis; keyed by [rosBasis][fg_id])
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
                        for t in cur.index},
