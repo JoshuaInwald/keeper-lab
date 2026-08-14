@@ -77,6 +77,52 @@ def _rows(df: pd.DataFrame, cols: list[str]) -> list[list]:
     return [[_round(v) for v in rec] for rec in d.itertuples(index=False, name=None)]
 
 
+def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
+    """Comp-based next-auction price estimate for every player with a
+    projection, keyed by fg_id (as a string -- JSON object keys are always
+    strings). Computed per-basis, not once and reused: `regression_fair_value`
+    inside `estimate_auction_price()` is the player's own `redraft_value`,
+    which is exactly the number the basis selector changes -- pinning this
+    panel to one basis while the rest of the page follows the selector
+    would reproduce the same inconsistency out/FINDINGS.md #42 already
+    found and fixed for team/constant aggregates.
+
+    Deliberately still a separate, non-integrated tool per
+    klab/auction_estimator.py's own docstring -- this only *displays* its
+    output next to the regression fair value, it does not feed back into
+    redraft_value or any keep/cut decision anywhere in klab/."""
+    from klab.auction_estimator import estimate_auction_price
+    players = pd.concat([board, fa], ignore_index=True)
+    players = players[players["roto_points"] > 0]
+    out = {}
+    for name, fg_id in zip(players["name"], players["fg_id"]):
+        try:
+            est = estimate_auction_price(name, players, k=15)
+        except Exception:
+            continue   # ambiguous/unresolved name -- skip rather than fail the whole build
+        comps = est["comps"].head(8).to_dict("records")
+        out[str(int(fg_id))] = {
+            "fair": _round(est["regression_fair_value"]),
+            "lo": _round(est["comp_adjusted_low"]),
+            "mid": _round(est["comp_adjusted_mid"]),
+            "hi": _round(est["comp_adjusted_high"]),
+            "n_comps": est["n_comps"],
+            "fallback": est["fallback_to_full_role"],
+            "n_same_pos": est["n_same_position_available"],
+            # _round() on every field, not just the numeric ones: a handful
+            # of historical auction_sample.csv rows have a missing `pos`,
+            # which pandas represents as float('nan') -- not a string, and
+            # not caught unless it goes through the same NaN-safe helper
+            # everything else does. json.dumps(allow_nan=False) surfaced it
+            # immediately (673 players, several dozen with a NaN comp `pos`).
+            "comps": [{"season": _round(c["season"]), "player": _round(c["player"]),
+                       "team": _round(c["team"]), "salary": _round(c["salary"]),
+                       "pos": _round(c["pos"]), "premium_pct": _round(c["premium_frac"] * 100)}
+                      for c in comps],
+        }
+    return out
+
+
 def _variant_payload() -> dict:
     """Board, free agents, team summaries and constants for whichever
     PROJECTION_BASIS is ambient in THIS process (klab/config.py's
@@ -133,6 +179,7 @@ def _variant_payload() -> dict:
         "constants": {k: _round(v) if not isinstance(v, dict) else
                       {kk: _round(vv) for kk, vv in v.items()}
                       for k, v in s.constants.items()},
+        "auction_estimates": _auction_estimates(board, fa),
     }
 
 
@@ -187,7 +234,8 @@ def build_payload() -> dict:
         # itself (app/template.html's setBasis()) is the only thing that
         # reads basis_variants directly.
         "basis_variants": {b: {"cols": v["cols"], "board": v["board"], "fa": v["fa"],
-                               "teams": v["teams_raw"], "constants": v["constants"]}
+                               "teams": v["teams_raw"], "constants": v["constants"],
+                               "auction_estimates": v["auction_estimates"]}
                            for b, v in variants.items()},
         "trade_suggestions": trade_suggestions,
         "band": {"lo": 10, "hi": 90, "draws": BOOTSTRAP_DRAWS},
@@ -199,6 +247,7 @@ def build_payload() -> dict:
         "board": variants[default]["board"],                # (default basis)
         "fa": variants[default]["fa"],                      # (default basis)
         "teams": variants[default]["teams_raw"],             # (default basis)
+        "auction_estimates": variants[default]["auction_estimates"],  # (default basis)
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
                        for t in cur.index},

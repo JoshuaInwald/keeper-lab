@@ -48,6 +48,7 @@ in `LAB_NOTEBOOK.md`.
 40. [A trade-finder feature: precomputed suggestions, three scenarios, three real bugs caught building it](#40-a-trade-finder-feature-precomputed-suggestions-three-scenarios-three-real-bugs-caught-building-it)
 41. [The trade finder was non-deterministic across identical reruns — caught checking auto-refresh safety](#41-the-trade-finder-was-non-deterministic-across-identical-reruns--caught-checking-auto-refresh-safety)
 42. [A projection-basis selector — three payloads, swapped client-side, no rebuild](#42-a-projection-basis-selector--three-payloads-swapped-client-side-no-rebuild)
+43. [Auction-estimator UI integration — a player-card panel, and a real bug it exposed on the way in](#43-auction-estimator-ui-integration--a-player-card-panel-and-a-real-bug-it-exposed-on-the-way-in)
 
 </details>
 
@@ -2100,3 +2101,68 @@ majority of players' `roto_points` actually changed on each switch (272 of
 because `setBasis()` mutates shared objects in place rather than
 reassigning them, which is exactly the kind of code that can leave stale
 leftovers behind if a clear-then-refill step is missed.
+
+## 43. Auction-estimator UI integration — a player-card panel, and a real bug it exposed on the way in
+
+Wires `klab/auction_estimator.py` (built earlier this session, #35 —
+comp-based next-auction price, deliberately separate from `redraft_value`)
+into the app, closing `out/ROADMAP.md` 3.6. Design wasn't discussed in
+advance, so it's worth stating the two calls made and why.
+
+**Precompute, not live, same reasoning as everything else in this app.**
+`estimate_auction_price()` is fast per player (~1000 players/sec, checked
+directly) but there's no server to call it from — same constraint that
+made the trade finder (#40) and the basis selector (#42) both precompute-
+and-ship rather than compute-on-click. `scripts/build_app.py`'s
+`_auction_estimates()` runs it for every player with `roto_points > 0`
+(~673 of 675 board+free-agent rows) and ships fair value, comp-adjusted
+low/mid/high, and the top 8 comps, keyed by `fg_id`.
+
+**Computed per basis, not once.** `estimate_auction_price()`'s own base
+number is `regression_fair_value = row["redraft_value"]` — exactly the
+column the projection-basis selector (#42) changes. Shipping one
+auction-estimate payload pinned to "blend" while the rest of the page
+followed the selector would have reproduced the identical bug #42 already
+found and fixed for team/constant aggregates, in a feature built in the
+same session as the fix. So `_auction_estimates()` was folded into the
+existing per-basis `_variant_payload()` / `_basis_variants()` machinery
+rather than computed once — it now runs three times (once per basis, same
+fresh-subprocess pattern as everything else there) instead of being a
+fourth special case.
+
+**A real bug, not a design question: `allow_nan=False` caught a data gap
+immediately.** The first full build crashed on `json.dumps`: "Out of range
+float values are not JSON compliant." Root cause: `auction_sample.csv` has
+a handful of historical purchases with a missing `pos` — pandas represents
+that as `float('nan')`, not a string — and the comp-table serialization
+only ran the existing `_round()` NaN-safety helper over the *numeric*
+fields (`salary`, `premium_pct`), assuming `player`/`team`/`pos` were
+always valid strings. They weren't, for several dozen of 673 players'
+comp lists. Fixed by running every comp field through `_round()`
+uniformly — it already has a `str`/`None` fallback for exactly this case,
+the bug was just not using it everywhere. Same lesson as #33/#39's
+category of bug: an assumption ("this column is always populated") that
+was true often enough to never get tested until the full data volume ran
+through it.
+
+**Payload cost.** `out/keeper_lab.html` grew from 1.17 MB (after #42) to
+3.74 MB — three bases × ~673 players × up to 8 comps each is the real
+driver, not the summary numbers. Still well inside "opens on a phone,
+attaches to an email" territory, but flagged here rather than silently
+accepted: if a future feature adds a fourth expensive per-player,
+per-basis payload, this is the point to reconsider trimming (fewer comps
+shown, or shorter JSON keys) rather than letting it compound unnoticed.
+
+**UI placement.** A new panel in the player-card drawer
+(`app/template.html`'s `showPlayer()`), between "Money" and "Rest of
+2026" — titled plainly as a second, independent estimate, not a
+correction, with the same "no age/debut-year data exists" caveat the
+Python module's own docstring states, so the gap is visible in the UI, not
+just in a comment. Absent entirely (no empty panel, no placeholder) for
+players below the `roto_points > 0` cutoff, same "don't force a weak
+result to fill a slot" pattern as the trade finder's "no deal found."
+`app/verify.mjs` gained a permanent check: the panel renders with comp
+rows for a player who has an estimate, is absent for one who doesn't, and
+its displayed fair value actually changes when the basis switches
+(confirming the per-basis wiring above actually took effect, not just that
+the code runs without crashing).

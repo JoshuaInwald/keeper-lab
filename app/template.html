@@ -141,6 +141,11 @@ const TEAMS = Object.keys(D.cur_totals);
 const BOARD = D.board, FA = D.fa;
 const byId = {}; BOARD.concat(FA).forEach(r=>byId[g(r,"fg_id")]=r);
 const idByName = {}; BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
+// Comp-based next-auction estimate (klab/auction_estimator.py), keyed by
+// fg_id. A deliberately separate, non-integrated tool -- see its panel in
+// showPlayer() -- reassigned wholesale by setBasis() since it's not present
+// for every player, unlike BOARD/FA which always have full row coverage.
+let AUCTION_EST = D.auction_estimates || {};
 const TRADE_SUGGESTIONS = D.trade_suggestions || [];
 
 // ---------- formatting ----------
@@ -188,6 +193,7 @@ function setBasis(b){
   Object.keys(D.constants).forEach(k=>delete D.constants[k]);
   Object.assign(D.constants, v.constants);
   INFL = D.constants.inflation || 1;
+  AUCTION_EST = v.auction_estimates || {};
   renderHeader();
   render();
 }
@@ -408,6 +414,41 @@ function extLabel(r){
   if(fin) return n>=2 ? "buy 2 yrs, not 1" : "1 yr (in the cost above)";
   return n>0 ? `${n} yr${n>1?"s":""} at expiry` : "not worth exercising";
 }
+// A second, independent price estimate (klab/auction_estimator.py) --
+// deliberately not folded into `redraft_value` above. Finds the most
+// similar historical auction purchases by production profile and position,
+// and asks whether players like that typically sold for more or less than
+// a pure production regression predicts. No age/debut-year data exists in
+// this league's records, so it's a production+position comp only.
+function auctionEstPanel(r){
+  const est = AUCTION_EST[g(r,"fg_id")];
+  if(!est) return "";
+  const rows = est.comps.map(c=>
+    `<tr><td>${c.season}</td><td class="l">${esc(c.player)}</td><td class="l">${esc(c.team)}</td>
+     <td>${usd(c.salary)}</td><td class="l">${esc(c.pos)}</td>
+     <td style="white-space:nowrap">${sgn(c.premium_pct,0)}%</td></tr>`
+  ).join("");
+  const confNote = est.fallback
+    ? `Too few same-position comps (${est.n_same_pos}), so this pulls from the full `
+      + `${g(r,"role")==="PIT"?"pitcher":"hitter"} pool instead of ${g(r,"position")||"his position"} alone.`
+    : `Based on the ${est.n_comps} most similar historical purchases at his position.`;
+  return `<div class="panel">
+    <h3 title="A second, independent estimate, not a correction to the value above -- see the note below.">
+      Next-auction estimate, comp-based</h3>
+    <div class="kv">
+      <div class="k">regression fair value</div><div class="v">${money(est.fair)}</div>
+      <div class="k">comp-adjusted range</div><div class="v">${money(est.lo)}–${money(est.hi)}</div>
+      <div class="k">comp-adjusted midpoint</div><div class="v">${money(est.mid)}</div>
+    </div>
+    <div class="note">${confNote} No age or debut-year data exists anywhere in this league's
+      records, so this can't do age-based comps the way a real market read would -- a stated
+      gap, not a silent one.</div>
+    <table style="margin-top:9px"><thead><tr>
+      <th class="l">Yr</th><th class="l">Comp</th><th class="l">Team</th>
+      <th>Paid</th><th class="l">Pos</th><th>Premium</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
 function showPlayer(id){
   const r=byId[id]; if(!r) return;
   const cat = c=>`<div class="k">${c}</div><div class="v">${nf(g(r,"rp_"+c),2)}</div>`;
@@ -468,6 +509,7 @@ function showPlayer(id){
         the denominators are fit on. They describe uncertainty in <i>how to score a stat line</i>,
         not in the stat line — projection error is separate and additional.</div>
     </div>
+    ${auctionEstPanel(r)}
     <div class="panel">
       <h3>Rest of 2026</h3>
       <div class="kv">

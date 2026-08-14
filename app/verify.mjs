@@ -129,6 +129,32 @@ const basisBad = basisResult.changedProj === 0 || basisResult.changedAct === 0
   || basisResult.selAfterBlend !== 'blend';
 if (basisBad) console.log('  BASIS SELECTOR MISMATCH:', JSON.stringify(basisResult));
 
+// Auction-estimator drawer panel (klab/auction_estimator.py): must render
+// for a player who has an estimate, must be absent (not crash) for one who
+// doesn't, and its "regression fair value" must track the active basis --
+// it's computed per-basis in build_app.py for exactly the reason #42 gives
+// for teams/constants: it's derived from the board's own redraft_value.
+const auctionResult = await page.evaluate(() => {
+  go('board');
+  const withEst = BOARD.find(r => AUCTION_EST[g(r, 'fg_id')]);
+  const withoutEst = BOARD.find(r => !AUCTION_EST[g(r, 'fg_id')]);
+  showPlayer(g(withEst, 'fg_id'));
+  const panelHtml = $('dbody').innerHTML;
+  const hasPanel = panelHtml.includes('Next-auction estimate');
+  const nCompRows = document.querySelectorAll('#dbody table tbody tr').length;
+  const fairBlend = AUCTION_EST[g(withEst, 'fg_id')].fair;
+  showPlayer(g(withoutEst, 'fg_id'));
+  const noPanelForMissing = !$('dbody').innerHTML.includes('Next-auction estimate');
+  setBasis('actuals');
+  const fairActuals = AUCTION_EST[g(withEst, 'fg_id')].fair;
+  setBasis('blend');
+  return { hasPanel, nCompRows, noPanelForMissing, fairBlend, fairActuals,
+          basisAware: fairBlend !== fairActuals };
+});
+const auctionBad = !auctionResult.hasPanel || auctionResult.nCompRows === 0
+  || !auctionResult.noPanelForMissing || !auctionResult.basisAware;
+if (auctionBad) console.log('  AUCTION ESTIMATOR PANEL MISMATCH:', JSON.stringify(auctionResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -150,5 +176,7 @@ console.log(suggBad.length ? `FAIL  trade-suggestion load-into-picker mismatched
 console.log(basisBad ? 'FAIL  projection-basis selector did not swap/round-trip correctly'
                      : `PASS  basis selector changes ${basisResult.changedProj}/${basisResult.total} `
                        + `players on switch and round-trips back exactly`);
+console.log(auctionBad ? 'FAIL  auction-estimator panel missing, empty, or not basis-aware'
+                       : 'PASS  auction-estimator panel renders, hides when absent, tracks basis');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad ? 1 : 0);

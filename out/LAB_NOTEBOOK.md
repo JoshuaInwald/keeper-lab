@@ -792,3 +792,26 @@ when you actually look at the rendered page with the feature turned on,
 which is the reason screenshotting every affected tab after a UI change
 stayed part of the routine rather than trusting `node app/verify.mjs`'s
 green output alone.
+
+## 22. Auction estimator UI: a NaN `pos` field crashed the build the first time (2026-08-13)
+
+Wiring `klab/auction_estimator.py` into the app (`out/FINDINGS.md` #43),
+the first full `build_app.py` run crashed with `ValueError: Out of range
+float values are not JSON compliant`. Cause: some rows in
+`auction_sample.csv` have no recorded position, which pandas reads as
+`float('nan')`, and the comp-table serialization only ran the existing
+`_round()` NaN-guard over the numeric columns (salary, premium_pct),
+leaving `player`/`team`/`pos` passed through raw on the assumption they'd
+always be real strings. 673 players' worth of comp lists (8 comps each)
+was enough real volume to hit the several dozen affected rows immediately.
+`json.dumps(..., allow_nan=False)` (already set, for good reason -- a
+silent `NaN` in the payload would just render as the literal text "NaN" in
+the browser, wrong and not obviously wrong) turned this into a build-time
+crash instead of a shipped bug. Fixed by running every comp field through
+`_round()`, not just the ones I assumed needed it.
+
+Worth remembering: this is the second time this session a bug got caught
+specifically because something ran across the FULL player pool instead of
+a hand-picked test case (`_pick_challenge`'s tie-break, #41's ~28-of-45
+pairs, was the first) -- both were "worked fine on the players I checked
+by hand, broke on player #340."

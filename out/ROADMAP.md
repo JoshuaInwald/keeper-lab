@@ -191,15 +191,17 @@ scraping CBS. Unlocks: historical acquisition-channel analysis back to 2022,
 manager skill evaluation (who converts draft dollars into production best),
 and true "value added by trade" per manager.
 
-**3.6 Auction-price-estimator UI integration (0.5-1 session).** Built
+**3.6 Auction-price-estimator UI integration — done, 2026-08-13.** Built
 2026-08-13 as a standalone tool (`klab/auction_estimator.py`,
 `scripts/estimate_auction_price.py`, `out/FINDINGS.md` #35) — comp-based
-next-auction price range, deliberately separate from `redraft_value`.
-Currently CLI-only. Adding it to the app means: a player-card panel
-showing the comp-adjusted range next to the regression fair value, and the
-comp list itself (transparency — the estimate should never look like a
-black box). Real blind spot to fix or document prominently in the UI: no
-age/debut-year data anywhere in `data/`, so it can't do age-based comps.
+next-auction price range, deliberately separate from `redraft_value`. Now a
+player-card panel (`app/template.html`'s `showPlayer()`) showing the
+comp-adjusted range next to the regression fair value plus the top 8 comps
+themselves (transparency — the estimate never looks like a black box), for
+every player with a projection, computed fresh for all three projection
+bases so it stays consistent with the selector (2.2). The age/debut-year
+gap is stated directly in the panel's own caveat text, not just in code
+comments. See `out/FINDINGS.md` #43.
 
 **3.7 Young/rookie-player projection modeling (0.5-1 session to scope,
 more to build) — parked by explicit decision, 2026-08-13.** Josh's call:
@@ -255,7 +257,8 @@ and left off), the app, uncertainty bands (1.2 — done in the app for a while,
 extended to the board CSV and eval_trade.py 2026-08-13), projection-basis
 selector (2.2, 2026-08-13), auto-refresh checked and documented (2.4,
 2026-08-13 — the rebuild chain is cron-safe, but there's no ingestion step to
-schedule yet, so it stays manual).
+schedule yet, so it stays manual), auction-estimator UI integration (3.6,
+2026-08-13).
 
 **Deprioritized by explicit decision (2026-08-13):** 3.7, young/rookie
 projection modeling. Josh's call: treat ZiPS as already capturing the
@@ -263,14 +266,13 @@ rookie/debut-year case well enough, rather than spend a session building a
 second reliability table for it. Left as a scoped-but-parked item below in
 case that judgment changes later.
 
-1. **Auction-estimator UI integration (3.6)** — in progress, 2026-08-13.
-2. **Prospect / upside distribution (3.2)** — ZiPS percentile bands are already
+1. **Prospect / upside distribution (3.2)** — ZiPS percentile bands are already
    in the export; value the option rather than the mean.
-3. **Aging curves (3.4)**, then **transaction logs (3.5)** if you want the
+2. **Aging curves (3.4)**, then **transaction logs (3.5)** if you want the
    manager-skill analysis.
-4. **Young-player/rookie modeling (3.7)** — parked, see above.
+3. **Young-player/rookie modeling (3.7)** — parked, see above.
 
-Item 2 is mechanical and belongs on a cheap model. Item 3 is modelling
+Item 1 is mechanical and belongs on a cheap model. Item 2 is modelling
 judgment and is worth the expensive one.
 
 ---
