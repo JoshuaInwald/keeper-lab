@@ -1,11 +1,11 @@
 {
   "exchange_rate": {
-    "slope": 0.10902259322643579,
-    "intercept": 3.979167257505175,
-    "slope_se": 0.01640891616797698,
-    "r2": 0.16219309611292176,
+    "slope": 0.10902259322643576,
+    "intercept": 3.979167257505174,
+    "slope_se": 0.016408916167976975,
+    "r2": 0.16219309611292188,
     "n": 404,
-    "usd_per_point": 9.17241069402044,
+    "usd_per_point": 9.172410694020442,
     "seasons": [
       2024,
       2025,
@@ -14,9 +14,9 @@
     "basis": "keeper_adjusted"
   },
   "save_model": {
-    "intercept": 0.5061112268696969,
-    "slope": 0.651888805340274,
-    "r2": 0.4330654285713894,
+    "intercept": 0.5061112268696956,
+    "slope": 0.6518888053402746,
+    "r2": 0.43306542857139074,
     "n": 1637,
     "mean_sv_t": 2.197923029932804,
     "mean_sv_t1": 1.9389126450824679
@@ -43,12 +43,12 @@
     "team_IP": 1426.691711524169,
     "team_ER": 572.8029177256064,
     "team_WH": 1677.5118196005633,
-    "team_ERA": 3.6131999999999995,
+    "team_ERA": 3.6132,
     "team_WHIP": 1.17585
   },
   "replacement_rp": 4.798149416825285,
-  "usd_per_rp_keep": 9.17241069402044,
-  "usd_per_rp_redraft": 6.576545220558631,
+  "usd_per_rp_keep": 9.172410694020442,
+  "usd_per_rp_redraft": 6.576545220558625,
   "config": {
     "N_TEAMS": 10,
     "BUDGET": 260,
@@ -168,6 +168,10 @@
       "OF": 5,
       "UTIL": 2,
       "P": 9
+    },
+    "TWO_POS_SLOTS": {
+      "C": 1,
+      "SS": 1
     },
     "PROJ_2027_HITTERS": "fg_zips_dc_2027_hitters_projections.csv",
     "PROJ_2027_PITCHERS": "fg_zips_dc_2027_pitchers_projections.csv",

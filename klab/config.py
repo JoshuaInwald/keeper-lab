@@ -244,6 +244,18 @@ POSITIONAL_ADJUSTMENT = False
 # Roster slots by position group, used to set each group's replacement rank.
 POSITION_SLOTS = {"C": 1, "MI": 2, "CI": 2, "OF": 5, "UTIL": 2, "P": 9}
 
+# --- Positional adjustment, catcher/shortstop only ---------------------------
+# Narrower than POSITIONAL_ADJUSTMENT above, and the one actually wired up in
+# the app. Josh's call, 2026-08-14 (out/FINDINGS.md #52): only catcher and
+# shortstop are scarce enough in this format to bother adjusting for -- every
+# other position stays on the pooled replacement level regardless of this
+# setting. Needs data/fg_catchers_2026.csv and data/fg_shortstops_2026.csv
+# (FanGraphs batting-leaderboard exports, pre-filtered by position; see
+# data/README.md). Exposed as an app toggle (both variants ship every
+# build), not a rebuild-to-flip config flag like POSITIONAL_ADJUSTMENT.
+TWO_POS_ADJUST = {"C", "SS"}
+TWO_POS_SLOTS = {"C": 1, "SS": 1}   # dedicated roster slots per team
+
 # --- Projection source ------------------------------------------------------
 # Which files supply the out-year projection. Any export with FanGraphs' column
 # names works -- Steamer, THE BAT, ATC, Depth Charts -- so switching systems is

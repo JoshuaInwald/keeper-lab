@@ -134,6 +134,23 @@ def load_ros_pitchers():
 
 
 @cached
+def load_position_eligibility() -> dict:
+    """fg_id sets for the two positions Josh believes are actually scarce
+    enough to adjust for (out/FINDINGS.md #52) -- catcher and shortstop,
+    not the full defensive spectrum. Each file is a FanGraphs batting
+    leaderboard export pre-filtered by the query that generated it (e.g.
+    "at least 1 PA at C in 2026"); the export itself carries no position
+    column, so which file a player came from IS the position label. A
+    player appearing in both files (essentially never happens defensively,
+    but not impossible) is eligible for both -- `two_position_replacement()`
+    decides which one actually applies to him.
+    """
+    c = _read_fg_projection(DATA / "fg_catchers_2026.csv")
+    ss = _read_fg_projection(DATA / "fg_shortstops_2026.csv")
+    return {"C": set(c["fg_id"]), "SS": set(ss["fg_id"])}
+
+
+@cached
 def load_zips27_hitters():
     from . import config as C
     return _read_fg_projection(DATA / C.PROJ_2027_HITTERS)

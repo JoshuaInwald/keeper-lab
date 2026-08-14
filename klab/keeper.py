@@ -336,16 +336,19 @@ def positional_replacement(players: pd.DataFrame) -> pd.Series:
     and Razzball -- who tested four stances -- measured "very close to zero
     impact". The theoretical appeal is much stronger than the measured effect.
 
-    Practical: **this league does not have the data.** Positions come only
-    from the auction files, which cover 51% of rostered players and identify
-    just 6 catchers where there must be at least 10. Computing a catcher
-    replacement level off 6 observations, most of a roster unlabelled, would
-    manufacture precision rather than find it.
+    Practical: **this league did not have the data** as of 2026-08-13 --
+    positions came only from the auction files, which cover 51% of rostered
+    players and identify just 6 catchers where there must be at least 10.
+    Computing a catcher replacement level off 6 observations, most of a
+    roster unlabelled, would manufacture precision rather than find it.
 
-    To turn this on for real, the roster export needs a position column (CBS
-    publishes one) or a FanGraphs positional-eligibility file. Then this
-    becomes a ~20-line change: group by position, take the
-    (slots x N_TEAMS)th player in each group as that group's replacement.
+    Still true for the FULL position spectrum this function covers (C
+    through P). For catcher and shortstop specifically, that's since been
+    resolved with real position-eligibility exports -- see
+    `two_position_replacement()` below, which is the one actually wired
+    into the app (out/FINDINGS.md #52). This function is left as-is,
+    unused but not deleted: a real, more general implementation for the day
+    a full position export (all spots, not just two) shows up.
     """
     pos = position_map()
     covered = players["fg_id"].map(pos).notna().mean()
@@ -362,3 +365,27 @@ def positional_replacement(players: pd.DataFrame) -> pd.Series:
         if len(sub):
             out[g] = float(sub["roto_points"].min())
     return pd.Series(out)
+
+
+def two_position_replacement(players: pd.DataFrame, elig: dict) -> dict:
+    """Replacement level for catcher and shortstop only, from real
+    eligibility data (`klab.io.load_position_eligibility()`) -- Josh's
+    scoping call, 2026-08-14, out/FINDINGS.md #52: those are the only two
+    spots this league's roster construction makes genuinely scarce; every
+    other position stays on the pooled replacement level regardless.
+
+    Same mechanism as `positional_replacement()` (Nth-best-at-the-position
+    by roto_points, N = slots x N_TEAMS), just scoped to two groups with an
+    explicit fg_id set instead of a position_map() lookup, so it doesn't
+    need the ~90% coverage `positional_replacement()` requires -- eligible
+    players not currently rostered simply don't affect the replacement
+    calc, same as any other unrostered player.
+    """
+    out = {}
+    for g in C.TWO_POS_ADJUST:
+        ids = elig.get(g, set())
+        sub = players[players["fg_id"].isin(ids)].nlargest(
+            C.TWO_POS_SLOTS[g] * C.N_TEAMS, "roto_points")
+        if len(sub):
+            out[g] = float(sub["roto_points"].min())
+    return out

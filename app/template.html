@@ -195,7 +195,7 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 // ---------- shared state ----------
 const S = {tab:"board", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
            desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
-           rosBasis: D.ros_basis_default || "ros", standSeason: "live",
+           rosBasis: D.ros_basis_default || "ros", standSeason: "live", positional: false,
            shades: {}, intuitionQ: "", intuitionCalculated: false};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
@@ -213,29 +213,53 @@ const BASIS_HELP = "Which source drives every 2027 number on this page. "
   + "2027 alone and ignores 2026 entirely. \"2026 only\" extrapolates this year's "
   + "actual performance and ignores the projection system entirely. About 17% of "
   + "keep/cut calls move depending on this choice.";
-function setBasis(b){
-  if(!D.basis_variants[b]) return;
-  S.basis = b;
-  const v = D.basis_variants[b];
-  BOARD.length = 0; BOARD.push(...v.board);
-  FA.length = 0; FA.push(...v.fa);
+// ---------- positional adjustment ----------
+// out/FINDINGS.md #52: prices catchers and shortstops off their own
+// position's replacement level instead of the pooled one. Every basis
+// carries both settings (D.basis_variants[b].positional_variants.off/on),
+// same "all variants ship, switching is a re-render" approach as the basis
+// selector above -- so this toggle and the basis selector must compose:
+// switching either one has to reapply the other, not silently reset it.
+const POSITIONAL_HELP = "Off (default) prices every player against one league-wide "
+  + "replacement level. On prices catchers and shortstops against their own "
+  + "position's replacement level instead, like a real draft board. Surprising "
+  + "result on this league's data: both C and SS come out DEEPER than the pooled "
+  + "line, not scarcer -- so turning this on mostly lowers catcher/shortstop values.";
+function applyVariant(){
+  const bv = D.basis_variants[S.basis];
+  if(!bv) return;
+  const pv = bv.positional_variants[S.positional ? "on" : "off"];
+  BOARD.length = 0; BOARD.push(...pv.board);
+  FA.length = 0; FA.push(...pv.fa);
   Object.keys(byId).forEach(k=>delete byId[k]);
   BOARD.concat(FA).forEach(r=>byId[g(r,"fg_id")]=r);
   Object.keys(idByName).forEach(k=>delete idByName[k]);
   BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
-  D.teams.length = 0; D.teams.push(...v.teams);
+  D.teams.length = 0; D.teams.push(...pv.teams_raw);
   Object.keys(D.constants).forEach(k=>delete D.constants[k]);
-  Object.assign(D.constants, v.constants);
+  Object.assign(D.constants, pv.constants);
   INFL = D.constants.inflation || 1;
-  AUCTION_EST = v.auction_estimates || {};
-  ROS_VALUES = v.ros_values || {};
-  KEEPER_STANDINGS_2027 = v.keeper_standings_2027 || [];
+  // Not positional-aware (documented scope limit, out/FINDINGS.md #52) --
+  // stay pinned to whichever basis is active, same for either setting of
+  // S.positional.
+  AUCTION_EST = bv.auction_estimates || {};
+  ROS_VALUES = bv.ros_values || {};
+  KEEPER_STANDINGS_2027 = bv.keeper_standings_2027 || [];
   renderHeader();
   // New board/fa rows always carry the default ("ros") rest-of-season
   // signal -- reapply whichever ros-basis toggle was active, or a switch
   // here would silently discard it. setRosBasis() renders, so this is the
   // last step.
   setRosBasis(S.rosBasis);
+}
+function setBasis(b){
+  if(!D.basis_variants[b]) return;
+  S.basis = b;
+  applyVariant();
+}
+function setPositionalAdjustment(on){
+  S.positional = !!on;
+  applyVariant();
 }
 
 function setRosBasis(basis){
@@ -322,7 +346,10 @@ function renderHeader(){
   $("basisbar").innerHTML = `<label class="chk" title="${esc(BASIS_HELP)}">projection basis `
     + `<select onchange="setBasis(this.value)">`
     + BASES_ORDER.map(b=>`<option value="${b}" ${b===S.basis?"selected":""}>${BASIS_LABEL[b]}</option>`).join("")
-    + `</select></label>`;
+    + `</select></label>`
+    + `<label class="chk" title="${esc(POSITIONAL_HELP)}">`
+    + `<input type="checkbox" ${S.positional?"checked":""} onchange="setPositionalAdjustment(this.checked)"> `
+    + `C/SS positional adjustment</label>`;
 }
 renderHeader();
 $("foot").innerHTML = `Values are 2027 projections priced off this league's own auction history `

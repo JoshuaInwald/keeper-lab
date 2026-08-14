@@ -64,13 +64,23 @@ wiring it in: Tarik Skubal's $17.97 multiyear surplus is positive in only
 73% of bootstrap draws (range −$7.4 to +$37.7) — a materially less certain
 number than the point estimate alone suggested. See `out/FINDINGS.md` #37.
 
-**1.3 Positional replacement — investigate, don't assume (0.5 session).**
-External review flagged its absence as a first-order gap. The published
-evidence disagrees: Razzball concluded position adjustments have "very close
-to zero impact," and in FanGraphs' 13-system test the variants with the
-largest positional adjustments finished *last*. Worth testing on this league's
-own data before building. Cheap to test, and the answer is interesting either
-way.
+**1.3 Positional replacement — investigate, don't assume — done for C/SS,
+2026-08-14.** External review flagged its absence as a first-order gap. The
+published evidence disagrees: Razzball concluded position adjustments have
+"very close to zero impact," and in FanGraphs' 13-system test the variants
+with the largest positional adjustments finished *last*. Tested on this
+league's own data rather than assumed either way, once real eligibility
+data existed to test it with (`data/fg_catchers_2026.csv`,
+`data/fg_shortstops_2026.csv`). Scoped to C/SS only — the two positions
+this roster forces a start at every week — not the full defensive
+spectrum, which stays blocked on `klab/keeper.py`'s pre-existing
+`positional_replacement()` covering only ~52% of the player pool. Shipped
+as a header toggle (on/off, composes with the projection-basis selector).
+The published skepticism held up on this league's numbers too, in an even
+stronger form than "close to zero impact": both catcher and shortstop
+replacement level came out *higher* than pooled, meaning the adjustment
+mostly lowers C/SS values rather than raising them for scarcity, which
+wasn't the expected direction going in. See `out/FINDINGS.md` #52.
 
 ---
 
@@ -282,13 +292,13 @@ opened locally.
 ## Suggested order from here
 
 Done: sensitivity harness (1.1), inflation display (3.1), waiver-value settings
-(3.3, three anchored levels), positional-adjustment investigation (1.3, tested
-and left off), the app, uncertainty bands (1.2 — done in the app for a while,
-extended to the board CSV and eval_trade.py 2026-08-13), projection-basis
-selector (2.2, 2026-08-13), auto-refresh checked and documented (2.4,
-2026-08-13 — the rebuild chain is cron-safe, but there's no ingestion step to
-schedule yet, so it stays manual), auction-estimator UI integration (3.6,
-2026-08-13).
+(3.3, three anchored levels), positional adjustment for C/SS (1.3, tested,
+shipped as an on/off toggle, 2026-08-14), the app, uncertainty bands (1.2 —
+done in the app for a while, extended to the board CSV and eval_trade.py
+2026-08-13), projection-basis selector (2.2, 2026-08-13), auto-refresh
+checked and documented (2.4, 2026-08-13 — the rebuild chain is cron-safe,
+but there's no ingestion step to schedule yet, so it stays manual),
+auction-estimator UI integration (3.6, 2026-08-13).
 
 **Deprioritized by explicit decision (2026-08-13):** 3.7, young/rookie
 projection modeling. Josh's call: treat ZiPS as already capturing the

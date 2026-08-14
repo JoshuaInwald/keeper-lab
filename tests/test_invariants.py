@@ -618,3 +618,69 @@ def test_short_season_pitcher_projected_innings_lean_toward_zips(board):
     # ZiPS's own total, not dragged down toward a shortened 2026 sample
     assert abs(r["IP"] - r["IP_zips"]) < r["IP_zips"] * 0.35, \
         f"{r['name']}: blended IP {r['IP']:.1f} strayed too far from ZiPS's {r['IP_zips']:.1f}"
+
+
+# --- C/SS positional adjustment (out/FINDINGS.md #52) -----------------------
+
+def test_positional_adjustment_actually_changes_values():
+    """Real bug, caught testing this directly before it shipped: the first
+    version took min(pooled, position-specific) to break a tie for a player
+    eligible at multiple adjusted positions, but that same "min" also
+    silently compared against the pooled default -- and since both catcher
+    and shortstop replacement come out ABOVE the pooled level on this
+    league's real 2026 data, positional=True produced byte-identical
+    output to positional=False with no error. A change that does nothing
+    is worse than one that's visibly wrong: nothing would have caught this
+    in the UI either, since the toggle would have looked like it worked."""
+    from klab.board import value_players
+    off, _, _ = value_players(None, positional=False)
+    on, _, _ = value_players(None, positional=True)
+    m = off[["fg_id", "redraft_value"]].merge(
+        on[["fg_id", "redraft_value"]], on="fg_id", suffixes=("_off", "_on"))
+    changed = (m["redraft_value_off"] != m["redraft_value_on"]).sum()
+    assert changed > 50, f"only {changed} players changed -- adjustment is probably a no-op"
+
+
+def test_positional_adjustment_leaves_default_path_untouched():
+    """positional=False (every existing caller) must be byte-identical to
+    before this feature existed -- the shared value_players()/build_board()
+    functions were restructured to support the new parameter, and a
+    regression here would silently change every dollar figure in the app,
+    not just catcher/shortstop ones."""
+    from klab.board import build_board
+    b1, _, m1 = build_board()             # default, positional not passed
+    b2, _, m2 = build_board(positional=False)   # explicit False
+    assert (b1["redraft_value"] == b2["redraft_value"]).all()
+    assert m1["budget_check_top230"] == pytest.approx(2600.0, abs=0.01)
+
+
+def test_positional_adjustment_budget_check_stays_close(board):
+    """The $2,600 top-230 identity is exact under pooled replacement (every
+    top-230 player is above the pooled bar by construction) but only
+    approximate under positional adjustment (a player can rank in the
+    overall top 230 while sitting below his OWN position's higher bar,
+    breaking the clean linear calibration -- see the long comment in
+    value_players()). Approximate is fine for a documented sanity-check
+    number; miscalibrated by a lot would mean the recalibration math itself
+    is wrong."""
+    from klab.board import build_board
+    _, _, meta = build_board(positional=True)
+    assert meta["budget_check_top230"] == pytest.approx(2600.0, rel=0.05)
+
+
+def test_positional_adjustment_only_touches_catchers_and_shortstops():
+    """A player who isn't C/SS-eligible should see his `rp_above_repl`
+    change ONLY through the recalibrated $/point scale's effect on
+    redraft_value, never through a different replacement level being
+    subtracted -- his own rp_above_repl (roto_points minus replacement)
+    must be identical on vs off, even though his dollar value can move."""
+    from klab.board import value_players
+    from klab.io import load_position_eligibility
+    off, _, _ = value_players(None, positional=False)
+    on, _, _ = value_players(None, positional=True)
+    elig = load_position_eligibility()
+    adjusted_ids = elig["C"] | elig["SS"]
+    m = off[["fg_id", "rp_above_repl"]].merge(
+        on[["fg_id", "rp_above_repl"]], on="fg_id", suffixes=("_off", "_on"))
+    unaffected = m[~m["fg_id"].isin(adjusted_ids)]
+    assert (unaffected["rp_above_repl_off"] == unaffected["rp_above_repl_on"]).all()

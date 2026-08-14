@@ -24,6 +24,7 @@ there).
 | `fg_ros_hitters.csv`, `fg_ros_pitchers.csv` | ZiPS rest-of-season 2026 projections |
 | `fg_zips_dc_2027_hitters_projections.csv`, `fg_zips_dc_2027_pitchers_projections.csv` | ZiPS Depth Charts full-year 2027 projections |
 | `fg_zips_dc_2028_hitters_projections.csv`, `fg_zips_dc_2028_pitchers_projections.csv` | ZiPS Depth Charts full-year 2028 projections (out-year, used for multi-year keeper surplus) |
+| `fg_catchers_2026.csv`, `fg_shortstops_2026.csv` | FanGraphs batting leaderboard, filtered to every player with ≥1 PA at C / at SS in 2026 — the eligibility set the positional-adjustment toggle checks membership against (`out/FINDINGS.md` #52). No Position column; eligibility is which file a player's row appears in, not a labeled field. |
 
 ## League exports (CBS Sports, private league)
 
@@ -50,15 +51,18 @@ either. This project's `data/` is a **working copy**: when a file changes in
 Documents, copy it into `data/` here before rebuilding
 (`PYTHONPATH=.:scripts python3 scripts/run_all.py`). Nothing auto-syncs.
 
-**Exception — four files exist only in this project's `data/`, nowhere
+**Exception — six files exist only in this project's `data/`, nowhere
 else:** `contracts_parsed.csv`, `rosters_current.csv`, `rosters_valued.csv`,
-`cbs_rank_2026.csv`. They were produced directly here (`contracts_parsed.csv`
+`cbs_rank_2026.csv`, `fg_catchers_2026.csv`, `fg_shortstops_2026.csv`. The
+first four were produced directly here (`contracts_parsed.csv`
 via LLM-assisted parsing of a CBS contracts dump — see `out/LAB_NOTEBOOK.md`
 §2 for the parsing rules that were reverse-engineered) and never copied back
 to Documents. The raw contracts dump they were parsed from (`contracts_raw.txt`
-in the old handoff docs) no longer exists on disk anywhere. Since `data/`
-isn't in git, these four files currently have **no backup** — worth copying
-into Documents, or committing somewhere private, before this folder is ever
+in the old handoff docs) no longer exists on disk anywhere. The last two
+were downloaded straight from FanGraphs into this project's `data/`
+(2026-08-13) and never routed through Documents either. Since `data/` isn't
+in git, these six files currently have **no backup** — worth copying into
+Documents, or committing somewhere private, before this folder is ever
 wiped.
 
 | file(s) | source | refresh trigger | how |
@@ -67,6 +71,7 @@ wiped.
 | `fg_ros_hitters.csv`, `fg_ros_pitchers.csv` | FanGraphs ZiPS rest-of-season | in-season only; ROS projections drift as playing time is used up — refresh weekly-ish if you're actively trading | manual export |
 | `fg_zips_dc_2027_*`, `fg_zips_dc_2028_*` | FanGraphs ZiPS Depth Charts, full-year | FanGraphs reruns these a handful of times a year; refresh before any keeper decision or the auction itself | manual export |
 | `fg_hitters_2022_2026.csv`, `fg_pitchers_2022_2026.csv` | FanGraphs multi-year leaderboard | once a season, after it closes — append the year that just finished | manual export |
+| `fg_catchers_2026.csv`, `fg_shortstops_2026.csv` | FanGraphs batting leaderboard, filtered by position | once a season is enough — eligibility (who has played the position at all) rarely changes mid-season; refresh if a new player debuts there | manual export from FanGraphs, filtered to the position in the leaderboard query |
 | `draft_20XX.csv`, `draft_salaries_all.csv` | CBS auction results | once a year, right after the auction | manual export from CBS |
 | `keepers_20XX.csv` | CBS keeper submissions | once a year, at the keeper deadline | manual export |
 | `standings_20XX.csv`, `standings_long_all.csv` | CBS standings page | in-season if you want live trade evaluation to be accurate; final once the season ends | manual export |

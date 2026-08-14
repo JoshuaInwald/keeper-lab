@@ -282,48 +282,24 @@ def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
     return out
 
 
-def _variant_payload() -> dict:
-    """Board, free agents, team summaries and constants for whichever
-    PROJECTION_BASIS is ambient in THIS process (klab/config.py's
-    PROJECTION_BASIS, overridable via the KLAB_PROJECTION_BASIS env var).
-
-    Deliberately does not try to flip C.PROJECTION_BASIS mid-process to get
-    all three bases from one run: `klab.io.cached()` memoises every loader
-    on its function arguments only, not on this global, so a second basis
-    computed in the same process would silently return the first basis's
-    cached intermediate results. See `_basis_variants()`, which runs this
-    function in three separate fresh processes instead, and
-    out/FINDINGS.md #42 for the version of this bug that was actually
-    shipped and caught (klab/trade_finder.py, a different memoisation
-    hazard, same root cause: process-global state and per-arg caching don't
-    mix)."""
-    s = snapshot()
-    # snapshot() already builds this internally (cached, so this is free) --
-    # pulled out separately because s.constants doesn't carry the raw
-    # baseline dict `_ros_values()` needs.
-    from klab.board import build_board as _build_board_raw
-    _, _, _meta = _build_board_raw()
-    # Prefix EVERY ros column, not just the ones the win-now maths uses.
-    # `ros_lines()` also carries PA, which silently collided with the board's
-    # projected PA and turned it into PA_x/PA_y -- the drawer showed a dash.
-    ros = ros_lines()
-    ros = ros.rename(columns={c: f"ros_{c}" for c in ros.columns if c != "fg_id"})
-    ros_cols = [f"ros_{c}" for c in ROS_COLS]
-    assert not (set(ros.columns) - {"fg_id"}) & set(PLAYER_COLS), "column collision"
-
-    # Defensive position, for the Intuition tab's player tooltips (out/
-    # FINDINGS.md #50) -- not used anywhere in the valuation itself
-    # (POSITIONAL_ADJUSTMENT is off, see klab/keeper.py's own reasoning).
-    # Sourced from auction-history matches, so it's missing for anyone with
-    # no draft record on file; "?" rather than a crash for those.
-    from klab.keeper import position_map
-    pos_map = position_map()
-
+def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: list,
+                              pos_map: pd.Series) -> dict:
+    """Board, free agents, team summaries and constants for one
+    `positional` setting (out/FINDINGS.md #52), within the PROJECTION_BASIS
+    ambient in this process. Factored out of `_variant_payload()` so it can
+    be called twice -- once per positional-adjustment setting -- without
+    duplicating the ros/position merge logic."""
+    s = snapshot(positional=positional)
     board = s.board.merge(ros, on="fg_id", how="left")
     board[ros_cols] = board[ros_cols].fillna(0.0)
     board["position"] = board["fg_id"].map(pos_map).fillna("?")
     # Bands come from resampling the team-seasons the denominators are fit on,
     # so every dollar figure can be shown as a range instead of a point.
+    # NOT positional-aware (a documented scope limit, not an oversight): the
+    # bootstrap describes denominator uncertainty, which doesn't change with
+    # replacement level, and threading `positional` through it for exactness
+    # would double an already-expensive 1000-draw resample for a band that
+    # wouldn't move much anyway.
     from klab.uncertainty import bootstrap_bands
     board = board.merge(bootstrap_bands(B=BOOTSTRAP_DRAWS).reset_index(),
                         on="fg_id", how="left")
@@ -345,18 +321,86 @@ def _variant_payload() -> dict:
         "cols": cols,
         "board": _rows(board, cols),
         "fa": _rows(fa, cols),
-        # points_2026 isn't attached here -- it comes from live 2026
-        # standings, which don't depend on PROJECTION_BASIS, so the caller
-        # attaches it once from its own snapshot() rather than every
-        # subprocess repeating an identical lookup.
         "teams_raw": json.loads(s.teams.reset_index().to_json(orient="records")),
         "constants": {k: _round(v) if not isinstance(v, dict) else
                       {kk: _round(vv) for kk, vv in v.items()}
                       for k, v in s.constants.items()},
-        "auction_estimates": _auction_estimates(board, fa),
-        "ros_values": _ros_values(board, fa, _meta["denominators"], _meta["baseline"],
+    }
+
+
+def _variant_payload() -> dict:
+    """Everything for whichever PROJECTION_BASIS is ambient in THIS process
+    (klab/config.py's PROJECTION_BASIS, overridable via the
+    KLAB_PROJECTION_BASIS env var), under BOTH positional-adjustment
+    settings (out/FINDINGS.md #52).
+
+    Deliberately does not try to flip C.PROJECTION_BASIS mid-process to get
+    all three bases from one run: `klab.io.cached()` memoises every loader
+    on its function arguments only, not on this global, so a second basis
+    computed in the same process would silently return the first basis's
+    cached intermediate results. See `_basis_variants()`, which runs this
+    function in three separate fresh processes instead, and
+    out/FINDINGS.md #42 for the version of this bug that was actually
+    shipped and caught (klab/trade_finder.py, a different memoisation
+    hazard, same root cause: process-global state and per-arg caching don't
+    mix). `positional` doesn't have that hazard (`snapshot()`/`build_board()`
+    take it as a real argument, correctly cached per-value), so both
+    settings are computed in-process here rather than needing their own
+    subprocess split too.
+
+    Auction estimates, ROS values, and the 2027 keeper-standings projection
+    are NOT positional-aware -- a deliberate scope limit, not an oversight.
+    They're built once, off the positional=False board/fa only, same as
+    every other feature this session that's stayed pinned to the pooled
+    board for cost reasons (#43, #47, #49 all note the same tradeoff for
+    their own second toggle)."""
+    from klab.board import build_board as _build_board_raw
+    _, _, _meta = _build_board_raw()   # positional=False; _ros_values()/_keeper_standings_2027() stay pooled
+    # Prefix EVERY ros column, not just the ones the win-now maths uses.
+    # `ros_lines()` also carries PA, which silently collided with the board's
+    # projected PA and turned it into PA_x/PA_y -- the drawer showed a dash.
+    ros = ros_lines()
+    ros = ros.rename(columns={c: f"ros_{c}" for c in ros.columns if c != "fg_id"})
+    ros_cols = [f"ros_{c}" for c in ROS_COLS]
+    assert not (set(ros.columns) - {"fg_id"}) & set(PLAYER_COLS), "column collision"
+
+    # Defensive position, for the Intuition tab's player tooltips (#50) --
+    # NOT the same thing as the C/SS eligibility driving positional
+    # adjustment (that's load_position_eligibility(), used inside
+    # value_players() itself). This is the broader, sparser auction-history
+    # lookup, still just for display; "?" where there's no draft record.
+    from klab.keeper import position_map
+    pos_map = position_map()
+
+    variants = {pos: _board_fa_teams_constants(pos, ros, ros_cols, pos_map)
+               for pos in (False, True)}
+    default = variants[False]
+
+    # _auction_estimates()/_ros_values()/_keeper_standings_2027() need the
+    # actual DataFrames, not the already-serialised row arrays -- rebuild
+    # the positional=False board/fa once more rather than threading the
+    # pre-serialisation DataFrames out of _board_fa_teams_constants().
+    s = snapshot(positional=False)
+    board_raw = s.board.merge(ros, on="fg_id", how="left")
+    board_raw[ros_cols] = board_raw[ros_cols].fillna(0.0)
+    board_raw["position"] = board_raw["fg_id"].map(pos_map).fillna("?")
+    fa_raw = s.free_agents.copy()
+    fa_raw["team"] = "(free agent)"
+    fa_raw = fa_raw[fa_raw["roto_points"] > 0].nlargest(400, "roto_points")
+    fa_raw = fa_raw.merge(ros, on="fg_id", how="left")
+    fa_raw[ros_cols] = fa_raw[ros_cols].fillna(0.0)
+
+    return {
+        "cols": default["cols"],
+        "board": default["board"],
+        "fa": default["fa"],
+        "teams_raw": default["teams_raw"],
+        "constants": default["constants"],
+        "positional_variants": {"off": variants[False], "on": variants[True]},
+        "auction_estimates": _auction_estimates(board_raw, fa_raw),
+        "ros_values": _ros_values(board_raw, fa_raw, _meta["denominators"], _meta["baseline"],
                                   _meta["replacement_rp"]),
-        "keeper_standings_2027": _keeper_standings_2027(board, fa, _meta["replacement_rp"]),
+        "keeper_standings_2027": _keeper_standings_2027(board_raw, fa_raw, _meta["replacement_rp"]),
     }
 
 
@@ -387,7 +431,14 @@ def build_payload() -> dict:
                       # vary by basis, so one snapshot covers all three
     pts_2026 = s.standings["points_2026"].to_dict()
     for v in variants.values():
+        # teams_raw (positional=False) and positional_variants["off"]["teams_raw"]
+        # are the same list object (see _variant_payload()), so this loop
+        # already covers "off" once -- but positional_variants["on"] is a
+        # separate dict and needs its own pass, or its League tab would show
+        # blank points_2026 whenever positional adjustment is toggled on.
         for t in v["teams_raw"]:
+            t["points_2026"] = pts_2026.get(t["team"])
+        for t in v["positional_variants"]["on"]["teams_raw"]:
             t["points_2026"] = pts_2026.get(t["team"])
 
     st = load_standings_long()
@@ -418,7 +469,8 @@ def build_payload() -> dict:
                                "teams": v["teams_raw"], "constants": v["constants"],
                                "auction_estimates": v["auction_estimates"],
                                "ros_values": v["ros_values"],
-                               "keeper_standings_2027": v["keeper_standings_2027"]}
+                               "keeper_standings_2027": v["keeper_standings_2027"],
+                               "positional_variants": v["positional_variants"]}
                            for b, v in variants.items()},
         "trade_suggestions": trade_suggestions,
         "ros_variants": ros_variants,

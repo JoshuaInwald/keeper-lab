@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (40 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (52 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -57,6 +57,7 @@ in `LAB_NOTEBOOK.md`.
 49. [2027 standings from keeper sets alone — and a bad replacement-line pick caught before shipping](#49-2027-standings-from-keeper-sets-alone--and-a-bad-replacement-line-pick-caught-before-shipping)
 50. [The Intuition tab — manual player shading, sandboxed, split into an exact half and an approximate half](#50-the-intuition-tab--manual-player-shading-sandboxed-split-into-an-exact-half-and-an-approximate-half)
 51. [Playing time gets its own weight, decoupled from the rate/talent blend](#51-playing-time-gets-its-own-weight-decoupled-from-the-ratetalent-blend)
+52. [Positional adjustment for catchers and shortstops — and a surprise: both positions are deep, not scarce](#52-positional-adjustment-for-catchers-and-shortstops--and-a-surprise-both-positions-are-deep-not-scarce)
 
 </details>
 
@@ -2556,3 +2557,124 @@ currently-injured players. That would need threading roster/IL status
 into `klab/project.py`, which doesn't currently see it at all — a real,
 scoped follow-up, not implemented here because it wasn't part of what was
 explicitly asked for this pass.
+
+## 52. Positional adjustment for catchers and shortstops — and a surprise: both positions are deep, not scarce
+
+Prompted by the Dillon Dingler deep dive (#51's companion question): he's
+this year's best-producing catcher by a wide margin, so shouldn't catcher
+scarcity make him worth more than the pooled replacement-level system says?
+Testing that required real position-eligibility data the model didn't have —
+FanGraphs' "at least one PA at C" / "at least one PA at SS" exports for 2026
+(`data/fg_catchers_2026.csv`, 106 players; `data/fg_shortstops_2026.csv`, 115
+players), joined on `fg_id`. Scoped to these two positions only, not the full
+defensive spectrum: they're the two positions this league's roster actually
+forces a start at every week, and a `positional=True` full-spectrum version
+already existed (`klab/keeper.py`'s `positional_replacement()`) but stayed
+disabled — its lookup only covers ~52% of the player pool, short of the ~90%
+a real replacement-level estimate needs, and nothing in this pass changed
+that. The two-position version doesn't need that guard: `data/fg_*_2026.csv`
+give an explicit eligibility set to check membership against, not a sparse
+lookup to trust the coverage of.
+
+**Mechanism** (`klab/keeper.py`'s new `two_position_replacement()`,
+threaded through `value_players()`/`value_2028()`/`build_board()`/
+`free_agent_board()`/`snapshot()` as a `positional: bool` argument — off by
+default, on by toggle): for C and SS, replacement level is now the
+10th-best-in-that-position score (`C.TWO_POS_SLOTS[pos] * C.N_TEAMS`)
+instead of the pooled 230th-best-overall score. Every other position keeps
+the pooled line unchanged.
+
+**The surprise**: on this league's real 2026 data, BOTH positions came out
+**deeper** than pooled, not scarcer —
+
+| | roto points |
+|---|---|
+| pooled replacement | 4.80 |
+| catcher replacement | 5.12 |
+| shortstop replacement | 6.76 |
+
+A higher replacement bar means a *smaller* gap between a given player's
+production and "what you could get for free," which is a smaller dollar
+value, not a bigger one. So turning positional adjustment on mostly
+*lowers* catcher and shortstop values relative to today's pooled system —
+the opposite of the scarcity premise the original ask assumed. Dillon
+Dingler specifically: **$2.46 pooled → $0.24 positional**, not $10. He
+isn't being underpaid for scarcity; on this league's numbers, the catcher
+pool this year is deep enough that a below-average bat with playable
+defense (which is most of what's behind Dingler in the FanGraphs export)
+holds real value, dragging the position's own replacement level up past
+the league-wide bar. Bobby Witt Jr., a shortstop who's nowhere close to
+replacement level either way, still drops **$36.10 → $26.52** for the same
+scale reason described next. This is worth saying plainly since it cuts
+against what "scarcity" usually implies in fantasy analysis: scarcity
+raises value only when the *replacement option* at a position is bad, and
+this league's ten C-eligible and eleven SS-eligible rosters this year
+don't produce a bad one.
+
+**Everyone else moves too, and not always down.** Positional adjustment
+shrinks the pool of total "points above replacement" that gets divided
+among all 230 rostered players to reach the league's $2,600 budget
+(`out/METHODS.md`'s calibration), so the leaguewide $/point rate rises
+(**$6.58 → $7.56** per point) and every player *not* touched by the C/SS
+override gets modestly more valuable in dollar terms even though his own
+roto-point total hasn't changed. Tarik Skubal is the clean illustration:
+**$52.12 pooled → $59.76 positional** — a pure scale effect, since he's
+neither a catcher nor a shortstop.
+
+**League-wide keep/cut impact, measured**: 15 flips. Six flip OUT, all
+catchers or shortstops paying the higher position-specific bar (Otto
+Lopez, Jeremy Peña, Geraldo Perdomo, JJ Wetherholt, Dansby Swanson, Drake
+Baldwin); nine flip IN, all non-C/SS players benefiting from the
+scale-wide rate increase (Roman Anthony, Kyle Schwarber, Yandy Díaz,
+Ronald Acuña Jr., Pete Alonso, Xavier Edwards, Corbin Carroll, plus
+pitchers Bryan Baker and Yoshinobu Yamamoto).
+
+**Two real bugs found building this, both caught by direct comparison
+testing before shipping, neither by a passing check going wrong quietly**:
+
+1. **A `min()` that silently no-op'd.** The first version picked a
+   player's effective replacement level as
+   `np.minimum(pooled, positional)`, meant to let a player eligible for
+   both adjusted positions take whichever was more favorable. The same
+   `min()` also compared against the pooled default — and since *both*
+   adjusted positions came out higher than pooled (the surprise above),
+   `min()` always kept the pooled value. `positional=True` produced
+   byte-identical output to `positional=False`, no error, no warning.
+   Caught only by diffing Dingler's `redraft_value` on and off and finding
+   it unchanged. Fixed by building the override as an explicit
+   elementwise minimum across *only* the positions a player is eligible
+   for, applied unconditionally via a mask, rather than folding the
+   pooled default into the same `min()`.
+2. **The budget identity broke after fixing bug 1.** Once values actually
+   started moving, `budget_check_top230` jumped to $2,834.58 against a
+   target of $2,600 — `dollars()` floors every player's value at $0
+   (`.clip(lower=0.0)`), but the pool total feeding the $/point calibration
+   was summing raw, unclipped `roto_points − replacement`. A player like
+   Dansby Swanson can rank in the overall top 230 while sitting *below*
+   his own position's (higher) bar — his `dollars()` value floors at $0,
+   but the unclipped pool sum had still counted his negative contribution,
+   breaking the linear calibration. Fixing the pool sum to clip the same
+   way `dollars()` does brought the check to $2,572.86 — about 1% off,
+   not exact. Left as an accepted approximation rather than chased
+   further: getting it to exactly $2,600 would need iterative fitting,
+   since the clip threshold and `dollars()`'s own `+$1` floor interact
+   non-linearly, for a number whose only job is a sanity check.
+
+**Shipped**: a checkbox in the app header (next to the projection-basis
+selector, since — like that toggle — positional adjustment repriced
+dollar values across every tab, not one) wired through
+`app/template.html`'s `setPositionalAdjustment()`/`applyVariant()`, backed
+by both settings shipping in the payload
+(`D.basis_variants[basis].positional_variants.off/on`) so switching is a
+re-render, same pattern as the projection-basis selector. Composes
+correctly with that selector — switching either one reapplies the other's
+current setting rather than silently resetting it, covered by a permanent
+`app/verify.mjs` check. `AUCTION_EST`/`ROS_VALUES`/`KEEPER_STANDINGS_2027`
+stay pinned to the pooled (`positional=False`) board regardless of the
+toggle, a documented scope limit for cost reasons, consistent with how
+#43/#47/#49 handled their own second toggle.
+
+**Not done in this pass**: the full defensive spectrum (1B/2B/3B/OF)
+stays on the pooled line — `positional_replacement()`'s ~52%-coverage gap
+is unresolved, and closing it would need a similarly complete FanGraphs
+eligibility export for every position, not just the two requested here.

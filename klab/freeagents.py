@@ -26,13 +26,20 @@ DRAFT_YEAR_TO_CODE = {2026: "2", 2025: "1"}
 
 
 @cached
-def free_agent_board() -> pd.DataFrame:
-    """Every unrostered player, with the contract he would carry if re-added."""
+def free_agent_board(positional: bool = False) -> pd.DataFrame:
+    """Every unrostered player, with the contract he would carry if re-added.
+
+    `positional` (out/FINDINGS.md #52) must match whatever the board it's
+    being shown alongside used -- a free agent's `redraft_value` comes from
+    the same per-player replacement level as a rostered player's, so a
+    catcher on the waiver wire needs the same catcher-specific replacement
+    level a rostered catcher gets, or the two would be on different scales.
+    """
     from .auction import match_drafts
     from .board import build_board, fit_exchange_rate, value_players
 
-    board, exch, meta = build_board()
-    players, _, _ = value_players(exch)
+    board, exch, meta = build_board(positional=positional)
+    players, _, _ = value_players(exch, positional=positional)
     rostered = set(board["fg_id"])
 
     fa = players[~players["fg_id"].isin(rostered)].copy()
@@ -71,7 +78,7 @@ def free_agent_board() -> pd.DataFrame:
     # silently zeroed every out-year value and understated multi-year surplus.
     from .board import value_2028
     sv27 = players.set_index("fg_id")["SV"] if "SV" in players else None
-    v28 = value_2028(exch, meta, sv27)[["fg_id", "redraft_value_2028"]]
+    v28 = value_2028(exch, meta, sv27, positional=positional)[["fg_id", "redraft_value_2028"]]
     fa = fa.merge(v28, on="fg_id", how="left")
     fa["redraft_value_2028"] = fa["redraft_value_2028"].fillna(0.0)
 

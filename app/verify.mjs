@@ -129,6 +129,36 @@ const basisBad = basisResult.changedProj === 0 || basisResult.changedAct === 0
   || basisResult.selAfterBlend !== 'blend';
 if (basisBad) console.log('  BASIS SELECTOR MISMATCH:', JSON.stringify(basisResult));
 
+// Positional-adjustment toggle (out/FINDINGS.md #52): switching it must move
+// a catcher's dollar value, must round-trip back to identical numbers, the
+// checkbox must reflect the active setting, and -- the same cross-toggle
+// hazard the ROS-basis check guards against -- it must survive a
+// PROJECTION_BASIS switch instead of silently resetting, since setBasis()
+// replaces BOARD/FA/teams/constants wholesale from D.basis_variants[basis]
+// and has to reapply S.positional or a user's choice would revert.
+const positionalResult = await page.evaluate(() => {
+  go('board');
+  const catchers = BOARD.filter(r => g(r, 'position') === 'C' && g(r, 'redraft_value') > 0);
+  const catcher = catchers.reduce((best, r) =>
+    g(r, 'redraft_value') > g(best, 'redraft_value') ? r : best);
+  const before = g(catcher, 'redraft_value');
+  const checkedBefore = document.querySelector('#basisbar input[type=checkbox]')?.checked;
+  setPositionalAdjustment(true);
+  const afterOn = g(byId[g(catcher, 'fg_id')], 'redraft_value');
+  const checkedOn = document.querySelector('#basisbar input[type=checkbox]')?.checked;
+  setBasis('projection');   // an unrelated toggle -- must not silently reset positional
+  const survivedBasisSwitch = S.positional === true;
+  setBasis('blend');   // back to the basis "before" was measured under, positional still true
+  setPositionalAdjustment(false);
+  const back = g(byId[g(catcher, 'fg_id')], 'redraft_value');   // restore defaults for later checks
+  return { before, afterOn, back, checkedBefore, checkedOn, survivedBasisSwitch,
+          changed: before !== afterOn };
+});
+const positionalBad = !positionalResult.changed || positionalResult.checkedBefore !== false
+  || positionalResult.checkedOn !== true || !positionalResult.survivedBasisSwitch
+  || Math.abs(positionalResult.back - positionalResult.before) > 1e-6;
+if (positionalBad) console.log('  POSITIONAL-ADJUSTMENT TOGGLE MISMATCH:', JSON.stringify(positionalResult));
+
 // Auction-estimator drawer panel (klab/auction_estimator.py): must render
 // for a player who has an estimate, must be absent (not crash) for one who
 // doesn't, and its "regression fair value" must track the active basis --
@@ -292,6 +322,8 @@ console.log(suggBad.length ? `FAIL  trade-suggestion load-into-picker mismatched
 console.log(basisBad ? 'FAIL  projection-basis selector did not swap/round-trip correctly'
                      : `PASS  basis selector changes ${basisResult.changedProj}/${basisResult.total} `
                        + `players on switch and round-trips back exactly`);
+console.log(positionalBad ? 'FAIL  positional-adjustment toggle did not change values, round-trip, or survive a basis switch'
+                          : 'PASS  positional-adjustment toggle changes catcher value, round-trips, and survives a basis switch');
 console.log(auctionBad ? 'FAIL  auction-estimator panel missing, empty, or not basis-aware'
                        : 'PASS  auction-estimator panel renders, hides when absent, tracks basis');
 console.log(rosBasisBad ? 'FAIL  ROS-basis toggle did not recompute, round-trip, or survive a basis switch'
@@ -305,5 +337,5 @@ console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignore
 console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'
                          : 'PASS  Intuition tab shading moves both halves and stays sandboxed');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad
-            || boardRosBad || historyBad || keeper2027Bad || intuitionBad ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || auctionBad
+            || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || intuitionBad ? 1 : 0);
