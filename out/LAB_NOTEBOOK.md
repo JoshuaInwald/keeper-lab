@@ -847,3 +847,28 @@ app. Reported as bugs anyway without that check, this session would have
 "fixed" a mobile layout and a missing panel that were never actually
 broken -- wasted work chasing the audit method's blind spot instead of the
 app's.
+
+## 24. prorated_to_date_lines() projected Tarik Skubal for 256 more innings (2026-08-13)
+
+First version of the new season-to-date prorate (`out/FINDINGS.md` #45)
+divided each player's counting stats by his OWN `G` (games played) to get a
+per-game rate, then multiplied by the shared "team games remaining"
+estimate. Works fine for hitters, whose own `G` tracks team games
+reasonably closely. Breaks badly for pitchers: a starter's `G` counts his
+STARTS, not team games -- Tarik Skubal's 18 starts and 107.2 IP gave a rate
+of ~5.96 IP/appearance, and multiplying that by ~43 remaining TEAM games
+(as if he'd start in every one of them) projected 256 more innings, more
+than a full season for anyone. Caught immediately while sanity-checking the
+NPB trade re-analysis, not by any test -- the existing tests checked
+"non-negative" and "plausible remaining-games count," not "is this
+individual player's number sane," and a 256-IP total is still technically
+non-negative.
+
+Fixed by dividing every player's stat by the SHARED team-games-played
+estimate instead of his own `G`, for both hitters and pitchers. This
+naturally dilutes a starting pitcher's rate by the ~4 team games he doesn't
+pitch in (since his to-date innings are now divided by ALL team games
+played, not just his own starts), which is exactly the right correction
+without needing separate starter/reliever logic. Re-verified: Skubal now
+prorates to 38.7 remaining innings, close to ZiPS's own 46.0 -- sane, and a
+useful cross-check that the two independent methods roughly agree.

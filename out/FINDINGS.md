@@ -50,6 +50,7 @@ in `LAB_NOTEBOOK.md`.
 42. [A projection-basis selector — three payloads, swapped client-side, no rebuild](#42-a-projection-basis-selector--three-payloads-swapped-client-side-no-rebuild)
 43. [Auction-estimator UI integration — a player-card panel, and a real bug it exposed on the way in](#43-auction-estimator-ui-integration--a-player-card-panel-and-a-real-bug-it-exposed-on-the-way-in)
 44. [UI audit: a stale pre-#39 status string, a missing IL/LOCKED tag, and two confirmed false alarms](#44-ui-audit-a-stale-pre-39-status-string-a-missing-illocked-tag-and-two-confirmed-false-alarms)
+45. [A blended 2026 rest-of-season signal, and a real bug in the first version](#45-a-blended-2026-rest-of-season-signal-and-a-real-bug-in-the-first-version)
 
 </details>
 
@@ -2242,3 +2243,65 @@ free-agent table) now states directly why those two columns are empty,
 so it reads as a stated limitation instead of a possible bug. Logged as a
 candidate for a future modelling session, not added to `out/ROADMAP.md`'s
 numbered list since it's not yet scoped enough to size.
+
+## 45. A blended 2026 rest-of-season signal, and a real bug in the first version
+
+Requested directly: `ros_lines()` (ZiPS's own rest-of-season system) was the
+only signal feeding the win-now standings engine and `ros_value_over_replacement`.
+Added a second, independent signal and a way to blend them.
+
+**The new signal** (`klab/trade.py`'s `prorated_to_date_lines()`): each
+player's 2026 season-to-date rate, extended over however many games are
+left in the season. "Games left" is a single, shared, league-wide estimate
+— `C.SEASON_GAMES` (162) minus the `C.GAMES_PLAYED_PCTILE` (95th
+percentile) of games played among hitters with PA > 300, since that's the
+closest available proxy for "how many games has a healthy everyday
+player's team played by now" without a per-team schedule lookup. As of
+2026-08-13 that comes out to 119 team games played, 43 left.
+
+**`ros_lines_for_basis(basis)`** dispatches between `"ros"` (default —
+every existing caller's behavior is unchanged), `"prorated"`, and
+`"blend"` (the two averaged 50/50). Wired into `win_now_delta()` and
+`evaluate_trade()` via a new `ros_basis` parameter.
+
+**No "pre-season 2026" option, and why not.** Asked for directly, checked
+directly: no file in `data/` has a full-season 2026 projection made before
+the season started. The ZiPS Depth Charts exports on hand
+(`fg_zips_dc_2027_*`, `fg_zips_dc_2028_*`) are for the two out-years this
+project already uses for keeper valuation, not 2026 itself, and
+`data/README.md` lists nothing else that would qualify. Building this
+option would mean sourcing a new export, not writing new code against data
+already on hand — flagged rather than faked with e.g. the ROS-only line
+relabeled, which would silently misrepresent what the number is.
+
+**Real bug, caught before it reached any analysis:** the first version of
+`prorated_to_date_lines()` divided each player's season-to-date stats by
+his OWN `G` (games played) to get a per-game rate. Fine for hitters, whose
+own `G` tracks team games reasonably well. Wrong for pitchers: a starter's
+`G` counts his STARTS, not team games — Tarik Skubal's 18 starts and 107.2
+IP gave a rate of ~5.96 IP per appearance, multiplied by the ~43 remaining
+TEAM games as if he'd start in every one of them, projecting **256 more
+innings** — more than a full season for anyone. Caught sanity-checking the
+trade re-analysis below, not by a test (the tests written alongside this
+function checked "non-negative" and "plausible remaining-games total," not
+"is this specific player's number sane" — a lesson repeated from #41 and
+#43 this same session: aggregate/range checks don't catch a per-player
+outlier). Fixed by dividing every player's stat by the SHARED team-games-
+played estimate instead of his own `G`. This has the right effect
+automatically for both roles: it dilutes a starter's rate by the ~4 team
+games he doesn't pitch in (since his to-date innings are now divided by
+ALL team games played, not just his 18 starts), without needing separate
+starter/reliever branches. Re-verified: Skubal now prorates to 38.7
+remaining innings against ZiPS's own 46.0 — sane, and the two independent
+methods landing in the same neighborhood is itself a useful cross-check.
+See out/LAB_NOTEBOOK.md #24.
+
+**Trade re-analysis using this** (NPB No Stars ↔ Spehr's Army / Pookie
+2.0, requested with three specific framings: 2026 value via
+`ros_value_over_replacement` — team-agnostic, not a specific acquiring
+team's marginal standings swing — and 2027 value in both inflation-
+adjusted and raw draft-dollar surplus terms, plus roto points on an
+average-team basis via `d_roto_points_2027`) is written up in the
+session log rather than here, since it's advice on specific trades, not a
+model finding — matching how the earlier NPB/Spehr's Army and
+Skubal/Pookie 2.0 explorations this session were handled.

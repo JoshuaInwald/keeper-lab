@@ -104,6 +104,18 @@ CONTRACT_OVERRIDES = {
 # durability haircuts and rookie-ramp projections burying a breakout.
 KEEPER_PA_FLOOR = 600
 KEEPER_IP_FLOOR = 150
+
+# --- Rest-of-2026 projection basis (klab/trade.py) --------------------------
+# ros_lines() (ZiPS's own rest-of-season system) is the default and only
+# thing used unless a caller opts into an alternate ROS_BASIS -- see
+# out/FINDINGS.md #45. These two constants only affect
+# prorated_to_date_lines(), the "current pace" alternative.
+SEASON_GAMES = 162
+# Team games played-to-date isn't in the data directly, so it's estimated
+# from the high end of the games-played distribution among regular hitters
+# (PA > 300) -- a few days off/DH rotation sit below this, not a shorter
+# team schedule.
+GAMES_PLAYED_PCTILE = 0.95
 KEEPER_SV_FLOOR = 25
 KEEPER_RP_IP_FLOOR = 65
 # Never extrapolate a player's playing time by more than this. Beyond it the

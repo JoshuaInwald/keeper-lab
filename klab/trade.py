@@ -60,6 +60,104 @@ def ros_lines() -> pd.DataFrame:
     return H.merge(P, on="fg_id", how="outer").fillna(0.0)
 
 
+def prorated_to_date_lines(season_games: int | None = None,
+                           games_played_pctile: float | None = None) -> pd.DataFrame:
+    """Rest-of-2026 counting lines implied by each player's season-to-date
+    rate PER TEAM GAME, extended over however many team games are left in
+    the season -- a genuinely different signal from `ros_lines()`'s ZiPS
+    system, meant for blending with it (see `ros_lines_for_basis`), not for
+    use alone.
+
+    Rate is per TEAM game, not per the player's own `G`, on purpose --
+    real bug from the first version of this function, caught before it
+    shipped (out/LAB_NOTEBOOK.md #24): a starting pitcher's own `G` counts
+    his STARTS (roughly one every five team games), not team games played.
+    Dividing his to-date innings by his own 18 starts and multiplying by ~43
+    remaining TEAM games projected Tarik Skubal for 256 more innings --
+    treating every remaining team game as a start. Dividing by team games
+    played instead gives every player (hitter or pitcher, everyday or
+    part-time) a consistent "production per team game," which correctly
+    dilutes a starter's rate by the ~4 team games he doesn't pitch in, and
+    is the same idea a per-PA or per-appearance rate is trying to
+    approximate anyway -- just denominated in something that actually means
+    "how much season is left" for every role at once.
+
+    "Team games played to date" is a single, shared, league-wide estimate,
+    not a per-team schedule lookup: the `C.GAMES_PLAYED_PCTILE` percentile
+    of games played among hitters with PA > 300 (a few players below that
+    are platoon/DH rotation, not proof their own team has played fewer
+    games). `C.SEASON_GAMES` minus that is games left.
+
+    Known limitation, stated directly rather than silently accepted: an
+    injured player's healthy-pace rate gets extended over the FULL
+    remaining schedule, because this method has no notion of an expected
+    return date. That's not a bug to patch here -- it's exactly the blind
+    spot `ros_lines()` (ZiPS, injury- and role-aware) covers, which is the
+    whole reason to blend the two rather than pick one. See
+    out/FINDINGS.md #45.
+    """
+    from .io import load_hitters_history, load_pitchers_history
+    season_games = season_games or C.SEASON_GAMES
+    pctile = games_played_pctile or C.GAMES_PLAYED_PCTILE
+
+    h26 = load_hitters_history().query("season == 2026")
+    p26 = load_pitchers_history().query("season == 2026")
+
+    regulars = h26[h26["PA"] > 300]
+    team_games_played = (regulars["G"].quantile(pctile)
+                         if len(regulars) else float(season_games))
+    remaining = max(season_games - team_games_played, 0.0)
+    if team_games_played <= 0:
+        team_games_played = float(season_games)   # avoid a div-by-zero on an empty/degenerate history
+
+    hc = ["PA", "AB", "H", "HR", "R", "RBI", "SB"]
+    H = (h26[hc] / team_games_played * remaining).fillna(0.0)
+    H["fg_id"] = h26["fg_id"].values
+    H = H.groupby("fg_id", as_index=False).sum()
+
+    pc = ["IP", "W", "SV", "K", "ER", "BB", "H"]
+    P = (p26[pc] / team_games_played * remaining).fillna(0.0)
+    P["fg_id"] = p26["fg_id"].values
+    P = P.groupby("fg_id", as_index=False).sum().rename(columns={"H": "H_allowed"})
+
+    out = H.merge(P, on="fg_id", how="outer").fillna(0.0)
+    out.attrs["remaining_games"] = remaining
+    out.attrs["team_games_played_est"] = team_games_played
+    return out
+
+
+ROS_BASES = ("ros", "prorated", "blend")
+
+
+def ros_lines_for_basis(basis: str = "ros") -> pd.DataFrame:
+    """Dispatcher for which rest-of-2026 signal feeds the win-now standings
+    engine and (via the caller) `ros_value_over_replacement`.
+
+    "ros" (default -- every existing caller keeps this behavior unless it
+    opts in): `ros_lines()`, the ZiPS rest-of-season system alone.
+    "prorated": `prorated_to_date_lines()`, current pace only.
+    "blend": the two averaged 50/50, at Josh's request -- a middle ground
+    between "trust the projection system" and "trust what's actually
+    happening right now." There is no "pre-season 2026" option: no file in
+    `data/` has a full-season 2026 projection made before the season started
+    (the ZiPS Depth Charts exports on hand are for 2027/2028 only) -- see
+    `data/README.md` and out/FINDINGS.md #45.
+    """
+    if basis == "ros":
+        return ros_lines()
+    if basis == "prorated":
+        return prorated_to_date_lines()
+    if basis == "blend":
+        cols = ["PA", "AB", "H", "HR", "R", "RBI", "SB",
+               "IP", "W", "SV", "K", "ER", "BB", "H_allowed"]
+        a = ros_lines().set_index("fg_id").reindex(columns=cols, fill_value=0.0)
+        b = prorated_to_date_lines().set_index("fg_id").reindex(columns=cols, fill_value=0.0)
+        idx = a.index.union(b.index)
+        blended = (a.reindex(idx, fill_value=0.0) + b.reindex(idx, fill_value=0.0)) / 2.0
+        return blended.reset_index()
+    raise ValueError(f"unknown ROS basis {basis!r}, expected one of {ROS_BASES}")
+
+
 def ros_value_over_replacement(players: pd.DataFrame, D: dict, base: dict,
                                replacement_rp: float) -> pd.DataFrame:
     """Rest-of-season roto value over a replacement player, for the SAME
@@ -133,7 +231,8 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
                    a_sends: list[str], b_sends: list[str],
                    usd_per_point: float,
                    contention_weight: float = C.CONTENTION_WEIGHT,
-                   value_col: str = "redraft_value") -> dict:
+                   value_col: str = "redraft_value",
+                   ros_basis: str = "ros") -> dict:
     """Evaluate a proposed trade from both sides.
 
     `usd_per_point` has no default on purpose (out/FINDINGS.md #32.1): this
@@ -142,6 +241,15 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
     `klab.board.build_board()`, or `snapshot().constants["usd_per_roto_point_auction"]`
     if you're working from a `Snapshot`. A wrong number here is wrong in a
     way nothing else in this function would catch.
+
+    `ros_basis` controls which rest-of-2026 signal the win-now half uses --
+    see `ros_lines_for_basis`. Default "ros" (ZiPS alone) matches every
+    existing caller's established behavior; pass "blend" for the
+    50/50-with-current-pace read. `d_roto_points_2027` in each side's dict is
+    the *context-free* roto-point swing (this league's fixed denominators,
+    not either team's current category profile) -- the number to read when
+    the question is "how much is this player worth to an average team," as
+    opposed to `win_now`'s team-specific standings-point delta.
     """
     a_players = [find_player(board, x) for x in a_sends]
     b_players = [find_player(board, x) for x in b_sends]
@@ -181,7 +289,7 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
         "value_col": value_col,
     }
 
-    win_now = win_now_delta(board, team_a, team_b, a_players, b_players)
+    win_now = win_now_delta(board, team_a, team_b, a_players, b_players, ros_basis=ros_basis)
     res["win_now"] = win_now
     # One 2026 standings point is priced at what a roto point costs at auction,
     # discounted by how much the team cares about this season.
@@ -196,9 +304,14 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
 
 
 def win_now_delta(board: pd.DataFrame, team_a: str, team_b: str,
-                  a_players, b_players) -> dict:
-    """Rest-of-2026 standings-point change for all ten teams after the swap."""
-    ros = ros_lines()
+                  a_players, b_players, ros_basis: str = "ros") -> dict:
+    """Rest-of-2026 standings-point change for all ten teams after the swap.
+
+    `ros_basis` -- see `ros_lines_for_basis` -- selects which rest-of-season
+    signal drives this. Default "ros" preserves every existing caller's
+    established numbers.
+    """
+    ros = ros_lines_for_basis(ros_basis)
     rosters = board[["team", "fg_id"]].copy()
 
     st = load_standings_long()

@@ -455,6 +455,88 @@ def test_ros_value_over_replacement_ranks_better_rates_higher():
     assert g["ros_value_over_replacement"].iloc[0] > b["ros_value_over_replacement"].iloc[0]
 
 
+# --- ros_lines_for_basis: blended 2026 rest-of-season signal (FINDINGS #45) -
+
+def test_prorated_to_date_lines_matches_ros_lines_schema():
+    """Must be a drop-in alternative to ros_lines() -- same columns, since
+    win_now_delta() and ros_value_over_replacement() both consume whichever
+    one ros_lines_for_basis() hands back without knowing which it got."""
+    from klab.trade import prorated_to_date_lines, ros_lines
+    p = prorated_to_date_lines()
+    r = ros_lines()
+    assert set(p.columns) == set(r.columns)
+    assert (p.drop(columns="fg_id") >= 0).all().all(), "prorated counting stats must be non-negative"
+
+
+def test_prorated_to_date_lines_remaining_games_is_plausible():
+    """Mid-season, this should land somewhere between 'season just started'
+    and 'season is over' -- a wildly out-of-range value would mean the
+    games-played percentile estimate broke, not that the season did."""
+    from klab.trade import prorated_to_date_lines
+    p = prorated_to_date_lines()
+    assert 0.0 < p.attrs["remaining_games"] < C.SEASON_GAMES
+
+
+def test_prorated_to_date_lines_does_not_inflate_a_starters_innings():
+    """Real bug, caught before shipping (out/LAB_NOTEBOOK.md #24): dividing
+    a starting pitcher's to-date innings by his own G (which counts STARTS,
+    not team games) and multiplying by team games remaining projected Tarik
+    Skubal for 256 more innings. No individual pitcher's remaining-innings
+    projection should ever exceed a full season's IP -- the specific,
+    per-player sanity check the original bug would have failed and the
+    aggregate "non-negative" / "plausible total remaining games" checks did
+    not catch."""
+    from klab.io import load_pitchers_history
+    from klab.trade import prorated_to_date_lines
+    p26 = load_pitchers_history().query("season == 2026")
+    starters = p26[(p26["GS"] > 10) & (p26["IP"] > 50)]
+    assert len(starters) > 0, "test needs at least one qualifying starter"
+    prorated = prorated_to_date_lines().set_index("fg_id")
+    for fid in starters["fg_id"]:
+        if fid in prorated.index:
+            assert prorated.loc[fid, "IP"] < C.SEASON_GAMES, \
+                f"fg_id {fid} projected for an implausible {prorated.loc[fid, 'IP']:.0f} more innings"
+
+
+def test_ros_lines_for_basis_blend_is_the_average_of_its_two_inputs():
+    from klab.trade import ros_lines_for_basis, ros_lines, prorated_to_date_lines
+    blend = ros_lines_for_basis("blend").set_index("fg_id")
+    a = ros_lines().set_index("fg_id")
+    b = prorated_to_date_lines().set_index("fg_id")
+    # pick a player present in both source tables
+    common = a.index.intersection(b.index)
+    assert len(common) > 0, "test needs at least one player in both ROS sources"
+    fid = common[0]
+    for col in ["PA", "IP"]:
+        expected = (a.loc[fid, col] + b.loc[fid, col]) / 2.0
+        assert blend.loc[fid, col] == pytest.approx(expected, abs=1e-6)
+
+
+def test_ros_lines_for_basis_rejects_unknown_basis():
+    from klab.trade import ros_lines_for_basis
+    with pytest.raises(ValueError):
+        ros_lines_for_basis("preseason")
+
+
+def test_evaluate_trade_ros_basis_changes_win_now_numbers(board):
+    """Not just 'doesn't crash' -- the win-now standings delta must actually
+    respond to ros_basis, or the parameter is decorative."""
+    b, exch, meta = board
+    teams = b["team"].unique()
+    t = b[b["team"] == teams[0]]
+    other = b[b["team"] == teams[1]]
+    a_name = t.nlargest(1, "roto_points")["name"].iloc[0]
+    b_name = other.nlargest(1, "roto_points")["name"].iloc[0]
+    r1 = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name],
+                        usd_per_point=100.0, ros_basis="ros")
+    r2 = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name],
+                        usd_per_point=100.0, ros_basis="blend")
+    # the two ROS signals are different data, so at least one side's win-now
+    # points should differ between bases for a randomly-picked real trade
+    assert (r1["a"]["d_standings_points_2026"] != pytest.approx(r2["a"]["d_standings_points_2026"])
+           or r1["b"]["d_standings_points_2026"] != pytest.approx(r2["b"]["d_standings_points_2026"]))
+
+
 def test_f_contract_players_are_never_keepable(board):
     """out/FINDINGS.md #39: the extension window closes before a player's OWN
     walk-year draft, not now -- so any player observed as F in
