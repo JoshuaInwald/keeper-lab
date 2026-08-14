@@ -23,7 +23,7 @@ silently rather than loudly).
 ```bash
 pip install pandas numpy scipy statsmodels pytest
 PYTHONPATH=.:scripts python3 scripts/run_all.py   # build everything into out/
-PYTHONPATH=. python3 -m pytest tests/ -q          # 46 invariants, ~6s
+PYTHONPATH=. python3 -m pytest tests/ -q          # 71 invariants, ~55s
 open out/keeper_lab.html                          # the app — no server needed
 ```
 
@@ -33,11 +33,15 @@ and how/how often each one needs refreshing.
 
 ## The app
 
-`out/keeper_lab.html` is one self-contained file, ~3.7 MB, no server and no
-network. Six screens — keeper board, player card, league, trade evaluator,
-projected standings, free agents, model — plus an inflation-adjusted toggle,
-a projection-basis selector, and precomputed trade suggestions. It opens on
-a phone, which is where a keeper decision actually gets made.
+`out/keeper_lab.html` is one self-contained file, ~6 MB, no server and no
+network. Seven tabs — keeper board, league, trade evaluator, standings
+(live + historical + a 2027 keeper-core projection), free agents, an
+"Intuition" tab for manually shading a player's talent/health and seeing
+the ripple effect, and a model-internals tab — plus a player drawer with
+the full arithmetic, an inflation-adjusted toggle, a projection-basis
+selector, a C/SS positional-adjustment toggle, and precomputed trade
+suggestions. It opens on a phone, which is where a keeper decision actually
+gets made.
 
 One thing is re-implemented in JavaScript: the rest-of-season standings
 calculation, so a trade can be re-scored client-side. Re-implementations drift,
@@ -110,10 +114,10 @@ Full detail in `out/HANDOFF.md`. The statistical core is also written in R at
 
 | check | result |
 |---|---|
-| current rosters → 2026 standings | Spearman **0.842**, Pearson 0.899; league leader predicted 1st |
-| replacement level, two independent routes | 4.78 roto pts (projection) vs 3.98 (auction intercept) |
+| current rosters → 2026 standings | Spearman **0.863**, Pearson 0.889; league leader predicted 1st |
+| replacement level, two independent routes | 4.81 roto pts (projection) vs 3.98 (auction intercept) |
 | budget identity | top 230 sum to **exactly $2,600** |
-| decision robustness | 88% of keep/cut calls hold under all six modelling variants |
+| decision robustness | 92% of keep/cut calls hold under all six modelling variants |
 
 Honest error bar: **±34% per category** (bootstrap, 2,000 resamples of the
 pooled team-seasons; the analytic ±16% is optimistic). That is wider than most of the knobs the model debates, and it
@@ -136,6 +140,7 @@ should be read alongside every dollar figure.
 | `backtest.py` | does the engine explain seasons other than 2026 |
 | `build_app.py` | serialise the snapshot into `out/keeper_lab.html` |
 | `estimate_auction_price.py "Name"` | comp-based next-auction price range — a deliberately separate estimate from `redraft_value`, see `out/FINDINGS.md` #35 |
+| `build_trade_suggestions.py` | precompute trade suggestions for every team pair, three scenarios each — a couple minutes, deliberately not in `run_all.py`'s hot path; run it after any roster change |
 
 Cold run ≈ 2.7s; a second build in the same process ≈ 0.08s.
 

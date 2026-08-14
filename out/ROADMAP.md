@@ -7,37 +7,26 @@ couple of hours of concentrated work.
 
 ## Built and validated
 
+Updated 2026-08-14 — several rows below were stale (this table predates the
+app entirely in places). Current numbers only; rerun `scripts/validate.py` /
+open the Model tab rather than trusting a copy of this that's more than a
+session or two old.
+
 | capability | state |
 |---|---|
-| Roto denominators from league standings | pooled dispersion, 2024–25 window |
-| $/roto-point from the league's own auctions | n=404, 2024–26 |
-| 2027 + 2028 player projections | reliability-weighted blend, saves model |
-| Keeper board, surplus, optimal keeper sets | expected-PT + full-time upside columns |
+| Roto denominators from league standings | pooled dispersion, 2024–26 window, per-category standard errors shown on the Model tab |
+| $/roto-point from the league's own auctions | $9.17 auction scale / $6.48 redraft scale |
+| 2027 + 2028 player projections | reliability-weighted rate blend, DIRECTION-AWARE playing-time trust (#51/#53), saves persistence model |
+| Keeper board, surplus, optimal keeper sets | expected-PT + full-time upside, split into health vs. closer-role upside (#53) |
 | Multi-year surplus incl. extension option | discounted, contract-aware |
 | Trade evaluator, two lenses | 2027 asset + 2026 win-now standings delta |
+| Positional adjustment | catcher/shortstop only, toggle, off by default (#52) |
 | 2026 leaderboard + hindsight auction prices | `leaderboard_2026.csv` |
 | Acquisition-channel decomposition | auction vs keeper vs free agent |
-| Auction inflation rate | +52.8% projected for 2027 |
+| Auction inflation rate | +31.5% projected for 2027 (check the header — this moves with every rebuild) |
 | Final-year extension, 1 vs 2 years | priced as an option; `extension_years` on the board |
-| **The app** | single self-contained HTML file, six screens, no server |
-
----
-
-## Answering the questions you asked, automatically
-
-Everything you asked in this session is already computable from the engine.
-The gap is not analysis, it's that each answer currently requires me to run a
-script. The work below is about making them self-serve and time-aware.
-
-| your question | computable now? | what's missing for the app |
-|---|---|---|
-| Keeper value for every roster | yes | a UI and a refresh trigger |
-| Who should team X keep | yes | same |
-| Value of a dollar in this league | yes | display + trend chart |
-| Draft vs keeper vs waiver contribution | yes, for 2026 | history back to 2022 needs transaction logs |
-| Trade evaluation | yes | a picker instead of a CLI call |
-| Live standings projections | **no** | needs the projection→standings simulator wired to current rosters |
-| Tracking any of this over time | **no** | needs a snapshot store; nothing is persisted between runs |
+| Uncertainty bands | bootstrap on every rostered player's dollar value + denominator standard errors |
+| **The app** | single self-contained HTML file (~6 MB), 7 tabs, no server — board, league, trade, standings (live + historical + 2027 keeper-core), free agents, Intuition (manual shading), model internals |
 
 ---
 
@@ -181,6 +170,33 @@ copy of #52's own `min()`-based no-op bug — this time in `value_2028()`,
 which #52's fix never touched, silently making 2028 positional adjustment
 a no-op for a full extra day. See `out/FINDINGS.md` #53.
 
+**2.9 Per-category value breakdown, MLB team, denominator error bars —
+done, 2026-08-14.** Hovering/clicking a player's Worth '27 now breaks the
+dollar figure down by category, reconciled exactly (the naive per-category
+split didn't sum to the total — real replacement-level/floor math folded
+in as its own line to fix that). Real MLB team shown next to the CBS
+fantasy team everywhere a player appears. Model tab's denominator table
+shows each category's own standard error (already computed, previously
+discarded before reaching the app). "Gain" renamed to "Surplus" throughout
+for consistency with the underlying field names.
+
+**2.10 FA tab's blank "likely range" — scoped, not started.** Currently
+blank by design (`app/template.html`'s `FA_NOTE`): the uncertainty
+bootstrap needs a real contract (cost/years/salary) to band
+`surplus_multiyear`, and a free agent's contract is hypothetical. But
+`value_lo`/`value_hi` alone don't need a contract and could be extended to
+free agents relatively cheaply, reusing each FA's own hypothetical contract
+fields from `free_agent_board()` for the parts that DO need one. Not
+started — genuinely optional, not an obvious yes.
+
+**2.11 A scrollable/searchable player-data tab — scoped, not started,
+2026-08-14.** Would need to exist without an age column: no birthdate/age
+data is in any file this project has (checked directly). Buildable today
+on what already exists (MLB team, position, salary, contract, projected
+stat line) if wanted on its own; more useful once a fresh FanGraphs export
+with age/position-eligibility data exists (see the FG data-pull list in
+this session's chat log / next `LAB_NOTEBOOK.md` entry).
+
 **2.4 Auto-refresh — build pipeline is cron-safe, data ingestion is not
 (checked 2026-08-13, not scheduled on purpose, still manual by choice).**
 Two separate questions, worth not conflating:
@@ -221,12 +237,11 @@ preference (2026-08-13).
 
 ## Phase 3 — Modelling depth. ~4–5 sessions
 
-**3.1 Auction inflation, applied (0.5 session).** Standard keeper-league
-formula: `remaining budget ÷ remaining player worth`. For 2027 this league
-projects **+48.7%** inflation. Every dollar value should be displayed both
-"true" and "inflation-adjusted", because the latter is what you'll actually
-pay. Cheap, and it's the single biggest gap between my numbers and what the
-auction will feel like.
+**3.1 Auction inflation, applied — done.** Standard keeper-league
+formula: `remaining budget ÷ remaining player worth`. Shown live in the app
+header and recalculated on every rebuild (it moves with the model — check
+the header, not a number pinned here). Every dollar value can be toggled
+"true" vs "inflation-adjusted" via the board/FA/trade controls.
 
 **3.2 Prospect / upside distribution (1 session).** Currently every player is
 a point estimate. Breakouts are systematically undervalued. Minimum viable:
@@ -274,6 +289,31 @@ specifically on debut-year transitions. Concrete test case:
 Christian Scott, whose model-blended 2027 ERA lands closer to a
 conservative ZiPS forecast than to his own strong 78-inning 2026 sample.
 
+**3.9 Team-specific category value (0.5-1 session to scope, more to build) —
+identified but not started, 2026-08-14.** `out/RESEARCH.md` §6.2/§8 ranks
+this the single highest-value gap left, ahead of everything else on this
+list: roto points add up linearly today, so the model is indifferent
+between 20 more HR and 20 more K, when the real value of a category unit
+depends on where a specific TEAM sits in it (a team third in saves gains a
+lot from five more; a team tenth by 40 gains nothing). Fixing it properly
+means a team-specific marginal value per category, turning one dollar value
+per player into ten (one per team) — a real scope jump from the rest of
+this list, and the trade evaluator's win-now lens already works around this
+by re-ranking standings rather than adding roto points, so the workaround
+exists even though the general fix doesn't.
+
+**3.10 Probability-weighted closer/reliever upside (agreed direction,
+2026-08-14, not yet built).** `upside_ft` currently assumes a reliever
+already sitting on 5+ saves gets handed the closer job outright at a fixed
+25-save floor, zero risk — flagged as the weakest part of the "role"
+upside split (#53). Agreed direction: report a range (P10 / full-closer /
+incumbent-only) using the SAME bootstrap infrastructure already built for
+`value_lo`/`value_hi`, rather than a deterministic point estimate or a
+newly-fit "job security" probability model — cheaper, reuses what exists,
+and doesn't require inventing a discount factor from a guess. Explicitly
+NOT started per Josh's instruction (2026-08-14) — scope only, pending a
+green light.
+
 **3.8 Trade-finder feature — done, 2026-08-13.** `klab/trade_finder.py` +
 `scripts/build_trade_suggestions.py` + a "Suggested trades between these
 two teams" panel in the app's Trade tab (`out/FINDINGS.md` #40). Three
@@ -315,7 +355,13 @@ checked and documented (2.4, 2026-08-13 — the rebuild chain is cron-safe,
 but there's no ingestion step to schedule yet, so it stays manual),
 auction-estimator UI integration (3.6, 2026-08-13), direction-aware
 pitcher playing-time trust + the `upside_ft` role/health split (2.8,
-2026-08-14).
+2026-08-14), per-category value breakdown + MLB team + denominator error
+bars (2.9, 2026-08-14).
+
+**Next up, by priority:** 3.9 (team-specific category value — the single
+highest-value gap left per `out/RESEARCH.md` §8, not yet scoped in detail)
+and 3.10 (probability-weighted closer upside — agreed direction, 2026-08-14,
+ready to build once given the go-ahead).
 
 **Deprioritized by explicit decision (2026-08-13):** 3.7, young/rookie
 projection modeling. Josh's call: treat ZiPS as already capturing the

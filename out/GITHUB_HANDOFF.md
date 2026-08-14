@@ -1,5 +1,14 @@
 # Handoff: put Keeper Lab on GitHub
 
+**DONE.** The repo is public at
+[github.com/JoshuaInwald/keeper-lab](https://github.com/JoshuaInwald/keeper-lab)
+and has been for several sessions (see `CLAUDE.md`'s "three places" note for
+the current push/sync workflow, and `./check_sync.sh` to verify local ==
+origin). Kept here for history, same as `ORIGINAL_HANDOFF.md` — nothing below
+needs to be run again unless the repo is being re-created from scratch.
+
+---
+
 **Read this whole file before running anything.** It is written to be executed
 by a fresh Claude session with no memory of how this project was built.
 

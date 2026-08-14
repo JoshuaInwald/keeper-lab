@@ -115,10 +115,17 @@ it visible, and it was worth $25 on Ohtani alone.
 
 | check | result |
 |---|---|
-| Current rosters → 2026 standings | Spearman **0.842**, Pearson **0.899**; Pookie 2.0 predicted 1st, actually 1st |
-| Replacement level, two independent routes | 4.78 roto pts (230th projection) vs 3.98 (auction intercept) |
+| Current rosters → 2026 standings | Spearman **0.863**, Pearson **0.889**; Pookie 2.0 predicted 1st, actually 1st |
+| Replacement level, two independent routes | 4.81 roto pts (230th projection) vs 3.98 (auction intercept) |
 | Budget identity | top 230 redraft values sum to **exactly $2,600** (was $3,854 before the calibration fix) |
+| Decision robustness | 92% of keep/cut calls hold under all six modelling variants (`scripts/sensitivity.py`) |
 | Hand check | 10 players across the value spectrum, `scripts/validate.py` |
+
+Numbers above are as of 2026-08-14, after this session's positional-adjustment
+(`FINDINGS.md` #52) and playing-time (`FINDINGS.md` #51/#53) work — both moved
+the replacement level and standings correlation slightly. Rerun
+`scripts/validate.py` and `scripts/sensitivity.py` rather than trusting a
+stale copy here if it's been a while.
 
 ---
 
@@ -143,7 +150,7 @@ PYTHONPATH=. python3 scripts/draft_surplus.py    # where auction surplus lives
 PYTHONPATH=. python3 scripts/eval_trade.py "Team A" "Team B" "P1,P2" "P3,P4"
 PYTHONPATH=. python3 scripts/team_reports.py [team ...]  # keeper sets + channels
 PYTHONPATH=. python3 scripts/sensitivity.py      # how much do the knobs matter
-PYTHONPATH=. python3 -m pytest tests/ -q         # 46 invariants, ~6s
+PYTHONPATH=. python3 -m pytest tests/ -q         # 71 invariants, ~55s
 ```
 
 A cold run takes ~2.7s; a second build in the same process is ~0.08s (loaders
@@ -211,23 +218,38 @@ All in `/Users/JoshInwald/Documents/Fantasy Baseball/`.
    significant at all (+2.23, t=3.75 excluded; +0.92, t=1.82 included).
    Defensible — it is the right marginal rate for a team competing in saves —
    but every closer valuation rests on it. See `FINDINGS.md` §1.
-2. **No prospect-upside term.** Breakout candidates are valued off a
-   conservative point projection; the PT floor helps but does not model upside.
-3. **No aging curves.** The 2028 leg is raw ZiPS.
+2. **No prospect-upside term as a probability.** `upside_ft`/`redraft_value_ft`
+   report what a player is worth on a full healthy/full-role workload
+   (out/FINDINGS.md #53 splits this into a "health" case and, for a
+   non-closing reliever, a separate and much less grounded "role" case),
+   but it's a single counterfactual number, not a probability-weighted
+   expectation. Real breakout *talent* upside (a young player outperforming
+   his own rate projection, not just playing more) is still just the point
+   projection.
+3. **No aging curves.** The 2028 leg is raw ZiPS. No birthdate/age data
+   exists in any file this project has (checked directly, not assumed).
 4. **No waiver-wire value.** Teams fill ~10 of 23 slots from FA; that
-   production is invisible and is why replacement level sits as high as it does.
+   production is invisible and is why replacement level sits as high as it
+   does. Still blocked on transaction-date data (`out/FINDINGS.md` #27).
 5. **Rostered salary exceeds the cap** ($3,194 vs $2,600) — mid-season IL and
    reserve artifacts. Doesn't affect keeper math (only ever 6–13 players).
-6. **Point estimates only.** No uncertainty bands anywhere. The honest error
-   bar from fitting dispersion on 30 (17-20 for ERA/WHIP/SV) team-seasons is
-   roughly **±34% per category** (bootstrapped; methodology in FINDINGS §22.1,
-   corrected figure in §30) — larger than most of the knobs under debate, and it should be
-   printed next to every dollar figure.
-7. **No positional replacement.** Replacement is the 230th player overall,
-   with no adjustment for position. A replacement catcher or middle infielder
-   is far worse than the 230th-best player, so scarce-position keepers are
-   systematically undervalued relative to OF/1B. Standard first-order term in
-   auction valuation; currently missing.
+6. **Uncertainty is measured but not fully propagated everywhere.** Bootstrap
+   bands exist for `redraft_value`/`surplus_multiyear` (board, app drawer,
+   `p_surplus_positive`) and the Model tab now shows each denominator's own
+   standard error too — but a few secondary figures (`keep_value`, the
+   auction estimator's comps) are still point estimates. Honest error bar on
+   a single category's scale is roughly **±16-18%** for the thinnest-sampled
+   categories (SV, ERA, WHIP) down to **±13%** for the rest (Model tab); the
+   bootstrapped whole-figure error bar quoted in the app footer is **±34%**.
+7. **Positional replacement covers catcher and shortstop only, off by
+   default.** `out/FINDINGS.md` #52 built this once real C/SS eligibility
+   data existed, as a toggle rather than a default — the published evidence
+   (Razzball, FanGraphs' 13-system test, both cited in `RESEARCH.md` §1) says
+   positional adjustment barely moves outcomes, and this league's own data
+   agreed in an even stronger form: both adjusted positions came out
+   *deeper* than pooled, not scarcer. The full spectrum (1B/2B/3B/OF) is
+   still on the pooled line, blocked the same way this was until #52 — no
+   full-position eligibility export exists yet.
 **Closed:** the worry that ZiPS 2027 already incorporates 2026 (double-counting
 it in the blend) was tested and refuted — see `LAB_NOTEBOOK.md` §7.
 

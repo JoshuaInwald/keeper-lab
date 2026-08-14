@@ -247,37 +247,56 @@ Six judgment calls in this model had no clearly right answer. `scripts/sensitivi
 rebuilds the whole board under each alternative and counts how many keep-or-cut
 decisions change — the only impact that reaches a decision.
 
-| variant | keep/cut flips | % of roster | Spearman | biggest mover |
-|---|---|---|---|---|
-| denominators 2022–25 instead of 2024–25 | **17** | 6.2% | 0.951 | Skubal −$45.6 |
-| flat 50/50 blend instead of reliability-weighted | **17** | 6.2% | 0.940 | Misiorowski −$27.2 |
-| SV punters included | 3 | 1.1% | 0.986 | Cade Smith −$15.4 |
-| no future discount | 3 | 1.1% | 0.998 | Skubal |
-| heavy discount (0.6) | 1 | 0.4% | 0.997 | Skubal |
-| auction window 2022–26 | **0** | 0% | 1.000 | — |
-| no playing-time floor | **0** | 0% | 1.000 | — |
+**Rerun 2026-08-14** after this session's playing-time-decoupling (#51/#53) and
+positional-adjustment (#52) work — both changed the model's shape enough to
+move these numbers and, in one case, change which variant ranks highest. The
+table below is the current, authoritative run; the paragraph after it is
+kept for the record of what this looked like before.
 
-**34 of 275 rostered players (12%) flip on at least one choice. The other 88%
+| variant | keep/cut flips | % of roster | Spearman | median \|Δ$\| | max \|Δ$\| | biggest mover |
+|---|---|---|---|---|---|---|
+| flat 50/50 blend instead of reliability/PT-decoupled | **20** | 7.3% | 0.907 | $0.74 | $23.15 | Jacob Misiorowski |
+| denominators 2022–25 instead of 2024–26 | **10** | 3.6% | 0.978 | $0.31 | $30.42 | Paul Skenes |
+| SV punters included | 5 | 1.8% | 0.984 | $0.19 | $13.73 | Cade Smith |
+| auction window 2022–26 | **0** | 0% | 1.000 | $0 | $0 | — |
+| no playing-time floor | **0** | 0% | 1.000 | $0 | $0 | — |
+| no future discount | **0** | 0% | 1.000 | $0 | $7.47 | Paul Skenes |
+| heavy discount (0.6) | **0** | 0% | 0.999 | $0 | $10.71 | Paul Skenes |
+
+**29 of 275 rostered players (11%) flip on at least one choice. The other 89%
 are a keep — or a cut — under every variant, and can be trusted outright.**
 
-Four things worth knowing:
+Four things worth knowing, updated for the current run:
 
-1. **The denominator window is the highest-stakes call**, not the save-punter
-   rule. Widening to 2022–25 raises the ERA denominator from .043 to .097, so
-   pitching rate stats are worth less than half as much, and replacement rises
-   from 4.14 to 5.13 roto points. Skubal alone moves $46.
-2. **The save-punter rule moves dollars but barely moves decisions.** The SV
-   denominator jumps 6.57 → 11.06 (+68%) with punters included and closers
-   lose real value, yet only 3 keep/cut calls change. It matters enormously
-   for *pricing* a closer in a trade and hardly at all for whether to keep one.
-3. **Two knobs are decision-irrelevant.** The auction window changes $/roto
-   point from $7.56 to $5.83 but flips nothing, because keeper flags run off
-   the redraft scale. The playing-time floor flips nothing either — which
-   confirms that separating the full-time column from the headline value
-   (§7.1 of the lab notebook) did what it was meant to.
-4. **Skubal is the least robust decision in the league.** He is a keep in 7 of
-   8 variants; the one that flips him is the wider denominator window. Anyone
-   relying on that call should know it rests on a two-season dispersion fit.
+1. **The rate/playing-time blend is now the single highest-stakes call** —
+   reverting this session's #51 decoupling (one flat 50/50 weight for both
+   rate and playing time, instead of the current per-purpose caps) flips 20
+   keep/cut calls, more than any other variant tested. That's the clearest
+   evidence yet that #51 wasn't cosmetic: the choice it made is genuinely
+   load-bearing for real decisions, not just for point values.
+2. **The denominator window dropped to second and got smaller** — 10 flips
+   now, down from 17 in the pre-#51/#52 run. Plausible read: some of what
+   used to look like denominator-window sensitivity was actually the
+   undecoupled blend amplifying it; with playing time and rate handled
+   separately, the denominator choice has less to compound with.
+3. **The save-punter rule still moves dollars far more than decisions** — the
+   SV denominator swings from 6.57 to 11.06 (+68%, Model tab) with punters
+   included, and closers lose real value, but only 5 of 275 keep/cut calls
+   actually flip. Matters enormously for *pricing* a closer in a trade,
+   barely at all for whether to keep one — same conclusion as before, still
+   holds.
+4. **Four knobs are now fully decision-irrelevant, up from two.** The auction
+   window and playing-time floor were already at zero flips; the discount-rate
+   variants (both light and heavy) joined them this run, down from 3 and 1
+   flips respectively. Another point in favor of this session's fixes: the
+   model is now robust to more of the arbitrary judgment calls it used to be
+   sensitive to, not just re-tuned to look better on the same ones.
+
+*For the record — the pre-#51/#52 run (superseded by the table above):*
+denominators 2022-25 and flat 50/50 blend each flipped 17 (6.2%, Spearman
+0.951/0.940); SV punters and no-future-discount each flipped 3 (1.1%); heavy
+discount flipped 1; auction window and no-PT-floor flipped 0; 34 of 275 (12%)
+flipped on at least one choice.
 
 
 ---

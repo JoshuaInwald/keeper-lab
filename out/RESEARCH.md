@@ -195,18 +195,29 @@ Fixing it properly means a team-specific marginal value per category, which
 turns one dollar value per player into ten. Some serious auction players do
 exactly this. It would be a genuine differentiator.
 
-### 6.3 Everything is a point estimate
+### 6.3 Everything is a point estimate — DONE, 2026-08-13/14
 
-No distributions anywhere. A player projected for 6.0 roto points with high
-variance and one with low variance are identical to the model, when a
-rebuilder should prefer the first and a contender the second. The ZiPS export
-ships P10–P90 bands that go unused.
+Bootstrap bands (resampling the team-seasons the denominators are fit on) now
+ship `value_lo`/`value_hi`, `surplus_lo`/`surplus_hi`, and
+`p_surplus_positive` for every rostered player, shown in the app drawer and
+board. The Model tab also now shows each denominator's own standard error.
+Still not what this section originally meant, though: this is uncertainty in
+*how to score a stat line* from a small sample of team-seasons, propagated
+through the pricing math — not the ZiPS P10-P90 *talent* distribution this
+section actually asked for, which still goes unused. A player projected for
+6.0 roto points with a wide ZiPS band and one with a narrow one are still
+identical to the model. That specific gap is still open.
 
-### 6.4 Replacement level is a single number
+### 6.4 Replacement level is a single number — PARTIALLY DONE, 2026-08-14
 
-One league-wide value, no positional structure, no accounting for the fact
-that a manager who works the wire faces a different replacement than one who
-does not. The `WAIVER_VALUE` switch acknowledges this without solving it.
+Built for catcher and shortstop specifically once real per-position
+eligibility data existed (`out/FINDINGS.md` #52), off by default. The
+predicted outcome in §1 above held on this league's actual data, in an even
+stronger form: Razzball's "very close to zero impact" undersold it — both
+adjusted positions came out *deeper* than pooled here, not scarcer, so
+turning the toggle on mostly *lowers* C/SS values rather than protecting
+them. The full spectrum (1B/2B/3B/OF) is still one pooled number; no
+eligibility data exists yet for those positions the way it now does for C/SS.
 
 ### 6.5 Aging is absent
 
@@ -272,13 +283,32 @@ than match it.
 ## 8. What the evidence says to build next
 
 Ranked by expected value, given that the published literature already tells us
-where the returns are:
+where the returns are. Updated 2026-08-14 — two of the original five are done.
 
-1. **Team-specific category values (§6.2).** Nothing else on this list changes
-   a decision as much, and no competitor does it.
-2. **Uncertainty bands (§6.3).** The data to do it is already in the ZiPS
-   export. Cheap, and it is the most credible thing to show anyone.
-3. **Aging curves (§6.5).** Straightforward on the 2022–26 panel.
-4. **Waiver-value counterfactual (§6.4).** Needs transaction logs.
-5. **Positional replacement.** Only after the data exists, and the literature
-   says expect little.
+1. **Team-specific category values (§6.2). Still the top recommendation,
+   unchanged.** Nothing else on this list changes a decision as much, and no
+   competitor does it. Still not built.
+2. ~~Uncertainty bands (§6.3).~~ **Done, 2026-08-13/14** — bootstrap bands on
+   every rostered player's dollar value, plus denominator standard errors on
+   the Model tab. The ZiPS P10-P90 *talent* distribution this item actually
+   meant is still unused, though — see the caveat now in §6.3.
+3. **Aging curves (§6.5).** Still not built — and now confirmed genuinely
+   blocked, not just undone: no age/birthdate data exists in any file this
+   project has access to (checked directly). Needs a fresh FanGraphs export
+   with an age or debut-date column before this is even startable.
+4. **Waiver-value counterfactual (§6.4).** Still blocked on transaction-date
+   data that doesn't exist anywhere in this project's files.
+5. ~~Positional replacement.~~ **Done for C/SS, 2026-08-14** (`out/FINDINGS.md`
+   #52), off by default. The literature's "expect little" prediction held,
+   in a stronger form than expected: both adjusted positions came out
+   *deeper* than pooled on this league's real data, not scarcer. Full
+   spectrum (1B/2B/3B/OF) still blocked on missing eligibility data, same
+   shape of gap #52 just closed for two positions.
+
+**New since this list was written, not from the original literature review:**
+a probability-weighted range for a non-closing reliever's saves upside
+(agreed direction, not yet built — see `out/ROADMAP.md`), and the same kind
+of external validation this section is built from, but for a public $-value
+system instead of ordinal rank (checked feasibility, held off — see
+`out/FINDINGS.md`'s discussion the same day #52 shipped; not worth the
+build for what it'd add on top of the existing CBS-rank correlation, #21).
