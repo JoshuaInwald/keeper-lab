@@ -23,7 +23,7 @@ silently rather than loudly).
 ```bash
 pip install pandas numpy scipy statsmodels pytest
 PYTHONPATH=.:scripts python3 scripts/run_all.py   # build everything into out/
-PYTHONPATH=. python3 -m pytest tests/ -q          # 39 invariants, ~5s
+PYTHONPATH=. python3 -m pytest tests/ -q          # 46 invariants, ~6s
 open out/keeper_lab.html                          # the app — no server needed
 ```
 

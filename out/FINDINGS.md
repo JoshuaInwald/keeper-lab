@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (31 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (35 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -39,6 +39,8 @@ in `LAB_NOTEBOOK.md`.
 31. [A second, live copy of the same season-set bug: `teams_per_category`](#31-a-second-live-copy-of-the-same-season-set-bug-teams_per_category)
 32. [General review of the modules the earlier fixes didn't touch](#32-general-review-of-the-modules-the-earlier-fixes-didnt-touch)
 33. [Extension eligibility was applied to codes "2" and "3", not just "1"](#33-extension-eligibility-was-applied-to-codes-2-and-3-not-just-1)
+34. [A win-now metric that isn't a team-standings swap: ROS value over replacement](#34-a-win-now-metric-that-isnt-a-team-standings-swap-ros-value-over-replacement)
+35. [A comp-based next-auction price estimator — a deliberately separate tool](#35-a-comp-based-next-auction-price-estimator--a-deliberately-separate-tool)
 
 </details>
 

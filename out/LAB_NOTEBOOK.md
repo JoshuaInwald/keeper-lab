@@ -4,7 +4,7 @@ Read this before changing a modelling decision. Most of the obvious
 alternatives were tried and rejected for reasons that are not obvious.
 
 <details>
-<summary><strong>Contents</strong> (13 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (15 sections — click to expand)</summary>
 
 1. [Denominators: four estimators tried, all unstable, fixed by pooling](#1-denominators-four-estimators-tried-all-unstable-fixed-by-pooling)
 2. [Contract codes: the correction, and how it was established](#2-contract-codes-the-correction-and-how-it-was-established)
@@ -21,6 +21,7 @@ alternatives were tried and rejected for reasons that are not obvious.
 12. [BB and H reliability were copy-pasted from WHIP](#12-bb-and-h-reliability-were-copy-pasted-from-whip-2026-08-13)
 13. [Fixing #26 didn't fix all of #26](#13-fixing-26-didnt-fix-all-of-26-2026-08-13)
 14. [Extension eligibility applied to the wrong contract codes — caught by Josh, not by review](#14-extension-eligibility-applied-to-the-wrong-contract-codes--caught-by-josh-not-by-review-2026-08-13)
+15. [Building the auction-price estimator: two forks tried and rejected in the regression itself](#15-building-the-auction-price-estimator-two-forks-tried-and-rejected-in-the-regression-itself)
 
 </details>
 
