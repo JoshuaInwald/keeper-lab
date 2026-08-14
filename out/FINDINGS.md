@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (39 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (40 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -45,6 +45,7 @@ in `LAB_NOTEBOOK.md`.
 37. [Uncertainty bands were already done in the app — the roadmap said otherwise](#37-uncertainty-bands-were-already-done-in-the-app--the-roadmap-said-otherwise)
 38. [Roster update — two real trades, one FA move, resolved cleanly against 268-of-277 players untouched](#38-roster-update--two-real-trades-one-fa-move-resolved-cleanly-against-268-of-277-players-untouched)
 39. [F-contract players were never actually extendable right now — a bigger correction than #33](#39-f-contract-players-were-never-actually-extendable-right-now--a-bigger-correction-than-33)
+40. [A trade-finder feature: precomputed suggestions, three scenarios, three real bugs caught building it](#40-a-trade-finder-feature-precomputed-suggestions-three-scenarios-three-real-bugs-caught-building-it)
 
 </details>
 
@@ -1880,3 +1881,78 @@ a much bigger way — the two corrections compound rather than offset.
 the real board has `keepable=False`, `keep_2027=False`,
 `extension_option==0`, and `surplus_multiyear==0` — not just the ones
 `already_extended()` would have caught before. 47/47 tests pass.
+
+## 40. A trade-finder feature: precomputed suggestions, three scenarios, three real bugs caught building it
+
+Built after manually searching for good trades between two teams earlier
+this session (the NPB No Stars / Spehr's Army analysis) and being asked
+whether that search could become a UI feature. It can, with one
+architectural constraint worth stating plainly: the app is a single static
+HTML file with no server, and only one thing was previously re-implemented
+in JS for that reason (already a source of real drift bugs twice this
+session — #32.1, and indirectly #37). A live "generate trades on click"
+button would need either a full JS port of the search (a third
+re-implementation to keep in sync) or a server (which the app deliberately
+doesn't have). Built as a **precompute step** instead:
+`klab/trade_finder.py` (the search), `scripts/build_trade_suggestions.py`
+(runs it for all 45 team pairs, ~135s, `out/trade_suggestions.json`),
+`build_app.py` ships the result as static payload data — same pattern as
+every other number in the app.
+
+**Three scenarios, one shared search.** All three draw from the same
+per-team shortlist and evaluate the same 1-for-1 candidates through
+`evaluate_trade()` once; only the scoring differs:
+
+1. **Win-now for future** — only considered when two teams' 2026 standings
+   are ≥8 points apart. Maximize the buyer's standings gain, subject to the
+   seller's multi-year surplus gain being positive.
+2. **Challenge trade** — maximize the *minimum* of both teams' standings
+   gains; both must be positive. For two teams both live in the race with
+   complementary category needs.
+3. **Mutual value swap** — maximize the minimum of both teams' multi-year
+   surplus gains; both must be positive. For two teams both out of 2026
+   contention.
+
+**"No trade found" is a real, returned result, not a search failure** — of
+45 pairs, 2 came back 0/3 (McBlocks/Spehr's Army, Pookie 2.0/Producers) and
+most came back 1-2/3. Nothing forces a weak suggestion to fill a slot.
+
+**Three real bugs, caught by testing against real data before shipping,
+not found in review afterward:**
+
+1. **Worthless-return scoring.** First version of Scenario 1 suggested
+   Vladimir Guerrero Jr. (NPB, −$13.0 surplus, a bad contract) for James
+   Wood (Spehr's Army, $0 surplus — an F-contract rental, per #39). Scored
+   positive because the *outgoing* piece was such a bad contract that
+   anything looked like an upgrade, including a player worth nothing
+   coming back. Fixed by requiring the specific player returning to the
+   seller have positive *standalone* `surplus_multiyear`, not just a
+   positive net delta.
+2. **Shortlist too narrow.** Top-10-by-`roto_points` alone put 6 of Spehr's
+   Army's 10 shortlisted players at zero keeper value (F-contract rentals
+   with real talent but no future surplus), crowding out their actual
+   positive-surplus trade chips (Langeliers, Lile, Stott) entirely out of
+   the search. Fixed: shortlist is the union of top-10-by-talent and
+   top-10-by-surplus, so both "good rental" and "good keeper" candidates
+   are always in the pool.
+3. **HTML/JS quote collision in the UI.** Embedding player/team names
+   (`Spehr's Army`, `O'Brien`) as `JSON.stringify()`'d string literals
+   inside a double-quoted `onclick="..."` attribute breaks HTML parsing —
+   the literal apostrophe in the name terminates the attribute early.
+   Caught by a targeted click-through test, not the existing generic
+   tab-walk in `app/verify.mjs` (which renders the panel but never clicks
+   inside it). Fixed with `data-*` attributes instead of inline literals,
+   and the click-through test is now permanently part of `verify.mjs`
+   itself, not a throwaway script — it would have caught this before ship.
+
+**UI audit, requested in the same pass**: checked whether the hover-tooltip
+"explain this column" feature Josh asked about already existed before
+building it. It did — `COL_HELP` and `sortableTable()`'s per-column `help`
+strings already cover the board, free-agent, teams, and standings tables,
+built before this session. Found and fixed two real gaps instead of
+building a duplicate: the Model tab's small denominator table had no
+header tooltips at all, and the footer text along with the `contract`
+column's own tooltip both still said "±38%" / "F = final year: extend or
+lose him" — stale relative to #26/#39 earlier in this session. Neither was
+caught by `verify.mjs`, which checks for JS errors and JS/Python numeric
+parity, not prose content.

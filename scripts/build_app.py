@@ -107,8 +107,16 @@ def build_payload() -> dict:
     teams["points_2026"] = teams["team"].map(s.standings["points_2026"])
 
     cols = PLAYER_COLS + ros_cols
+    # Precomputed separately (scripts/build_trade_suggestions.py) -- a real
+    # search across 45 team pairs is a couple minutes, not a build-step cost.
+    # Missing file -> empty list rather than a crash, so a normal build_app
+    # run still works if suggestions haven't been (re)generated yet.
+    sugg_path = C.OUT / "trade_suggestions.json"
+    trade_suggestions = json.loads(sugg_path.read_text()) if sugg_path.exists() else []
+
     return {
         "built": date.today().isoformat(),
+        "trade_suggestions": trade_suggestions,
         "band": {"lo": 10, "hi": 90, "draws": BOOTSTRAP_DRAWS},
         "cats": C.CATS,
         "neg_cats": sorted(C.NEG_CATS),

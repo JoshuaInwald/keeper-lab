@@ -106,6 +106,10 @@ tbody tr.sel{background:#22303a}
 .picker div{padding:4px 9px;cursor:pointer;font-size:12.5px;display:flex;justify-content:space-between}
 .picker div:hover{background:var(--panel2)}
 .picker div.taken{opacity:.35;pointer-events:none}
+.sugg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:900px){.sugg-grid{grid-template-columns:1fr}}
+.sugg-card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.sugg-card.dim{opacity:.55}
 .verdict{font-size:16px;font-family:var(--mono);padding:9px 0}
 .bars{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
 footer{color:var(--dimmer);font-size:11.5px;padding:0 20px 30px;max-width:1000px;line-height:1.6}
@@ -135,6 +139,8 @@ const ROS = ["AB","H","HR","R","RBI","SB","IP","W","SV","K","ER","BB","H_allowed
 const TEAMS = Object.keys(D.cur_totals);
 const BOARD = D.board, FA = D.fa;
 const byId = {}; BOARD.concat(FA).forEach(r=>byId[g(r,"fg_id")]=r);
+const idByName = {}; BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
+const TRADE_SUGGESTIONS = D.trade_suggestions || [];
 
 // ---------- formatting ----------
 const $ = (id)=>document.getElementById(id);
@@ -209,7 +215,7 @@ $("hdr").innerHTML = `10-team 5×5 roto keeper auction · $${D.league.budget}/te
   + `built ${D.built} · <span class="dim">$${nf(D.constants.usd_per_roto_point_redraft,2)}/roto pt · `
   + `+${nf((INFL-1)*100,0)}% projected auction inflation</span>`;
 $("foot").innerHTML = `Values are 2027 projections priced off this league's own auction history `
-  + `(n≈677 purchases). Honest error bar is <b>±38% per category</b> — read every dollar figure `
+  + `(n≈677 purchases). Honest error bar is <b>±34% per category</b> — read every dollar figure `
   + `with that in mind. Methodology in <code>out/METHODS.md</code>; `
   + `what was tried and rejected in <code>out/LAB_NOTEBOOK.md</code>.`;
 
@@ -229,7 +235,8 @@ const COL_HELP = {
   team:"Current fantasy roster.",
   role:"H hitter · P pitcher · H/P two-way.",
   salary:"What his owner pays in 2026.",
-  contract:"Seasons left AFTER 2026. F = final year: extend or lose him.",
+  contract:"Seasons left AFTER 2026. F = confirmed free agent after 2026, not extendable — "
+    +"the extension window closes before his own walk-year draft, and it already has.",
   keeper_cost:"What it costs to roster him in 2027, extension included.",
   roto_points:"Projected 2027 standings points he adds, all ten categories.",
   redraft_value:"What he'd be worth in a 2027 auction, in dollars.",
@@ -300,7 +307,7 @@ function playerRow(r){
   <td class="l"><span class="name" onclick="showPlayer(${g(r,"fg_id")})">${esc(g(r,"name"))}</span>`
   + (keep?'<span class="tag keep" title="in the recommended keeper set">KEEP</span>':"")
   + (il?'<span class="tag il" title="on the injured list">IL</span>':"")
-  + (block?'<span class="tag il" title="cannot be kept: final year and the extension is already spent">LOCKED</span>':"")
+  + (block?'<span class="tag il" title="confirmed free agent after 2026 -- the extension window closes before this player\'s own walk-year draft, and it already has">LOCKED</span>':"")
   + (opt?`<span class="tag ext" title="${esc(extLabel(r))} — worth ${usd(adj(g(r,"extension_option")))}">`
         + (String(g(r,"contract")).toUpperCase()==="F"?"EXT×2":"OPT") + `</span>`:"")
   + (used&&!block?'<span class="tag" title="extension already used on this contract">USED</span>':"")
@@ -572,11 +579,72 @@ function tradeView(){
         onchange="S.infl=this.checked;render()"> inflation-adjusted</label>
       <button class="act" onclick="T.aOut=[];T.bOut=[];render()">clear</button>
     </div>
+    ${suggestedTradesPanel()}
     <div class="grid2">${side("a",T.a,T.b)}${side("b",T.b,T.a)}</div>
     <div id="verdict">${tradeResult()}</div>`;
 }
 function add(k,id){ if(!T[k+"Out"].includes(id)) T[k+"Out"].push(id); render(); }
 function drop(k,id){ T[k+"Out"]=T[k+"Out"].filter(x=>x!==id); render(); }
+
+const SCENARIO_LABEL = {
+  win_now_for_future: "Win-now for future",
+  challenge_trade: "Challenge trade",
+  mutual_value_swap: "Mutual value swap",
+};
+const SCENARIO_HINT = {
+  win_now_for_future: "one team is competing, one isn't — the contender buys a rest-of-season rental, the seller banks real multi-year value",
+  challenge_trade: "both teams are live in the 2026 race with complementary category needs — a swap that raises BOTH teams' standings points",
+  mutual_value_swap: "both teams are effectively out of 2026 — a dynasty-style trade where both sides' keeper value goes up",
+};
+
+function loadSuggestionFromBtn(btn){
+  loadSuggestion(btn.dataset.teamA, btn.dataset.aSends, btn.dataset.bSends);
+}
+function loadSuggestion(entryTeamA, aName, bName){
+  // a_sends/b_sends are always relative to entry.team_a/entry.team_b, which
+  // may not match whichever team is currently picker-side T.a vs T.b.
+  const aGoesTo = entryTeamA === T.a ? "a" : "b";
+  const bGoesTo = aGoesTo === "a" ? "b" : "a";
+  T.aOut = []; T.bOut = [];
+  T[aGoesTo+"Out"] = [idByName[aName]];
+  T[bGoesTo+"Out"] = [idByName[bName]];
+  render();
+}
+
+function suggestedTradesPanel(){
+  const entry = TRADE_SUGGESTIONS.find(e =>
+    (e.team_a===T.a && e.team_b===T.b) || (e.team_a===T.b && e.team_b===T.a));
+  if(!entry) return "";
+  const cards = ["win_now_for_future","challenge_trade","mutual_value_swap"].map(key=>{
+    const s = entry[key];
+    if(!s) return `<div class="sugg-card dim"><b>${SCENARIO_LABEL[key]}</b><div style="font-size:12px">no trade cleared this bar for these two teams</div></div>`;
+    let detail;
+    if(key==="win_now_for_future"){
+      const sellerSends = entry.team_a===s.seller ? s.a_sends : s.b_sends;
+      const buyerSends = entry.team_a===s.seller ? s.b_sends : s.a_sends;
+      detail = `<b>${esc(s.buyer)}</b> gets <b>${esc(sellerSends)}</b>`
+        + ` (+${s.buyer_standings_gain} 2026 pts) for <b>${esc(buyerSends)}</b>`
+        + ` — <b>${esc(s.seller)}</b> +$${s.seller_surplus_gain} multi-yr surplus`;
+    } else if(key==="challenge_trade"){
+      detail = `<b>${esc(entry.team_a)}</b> sends <b>${esc(s.a_sends)}</b> (+${s.a_standings_gain} pts) ↔ `
+        + `<b>${esc(entry.team_b)}</b> sends <b>${esc(s.b_sends)}</b> (+${s.b_standings_gain} pts)`;
+    } else {
+      detail = `<b>${esc(entry.team_a)}</b> sends <b>${esc(s.a_sends)}</b> (+$${s.a_surplus_gain}) ↔ `
+        + `<b>${esc(entry.team_b)}</b> sends <b>${esc(s.b_sends)}</b> (+$${s.b_surplus_gain})`;
+    }
+    return `<div class="sugg-card">
+      <b>${SCENARIO_LABEL[key]}</b>
+      <div class="dim" style="font-size:11px;margin:2px 0 6px">${SCENARIO_HINT[key]}</div>
+      <div style="font-size:12px">${detail}</div>
+      <button class="act" style="margin-top:6px"
+        data-team-a="${esc(entry.team_a)}" data-a-sends="${esc(s.a_sends)}" data-b-sends="${esc(s.b_sends)}"
+        onclick="loadSuggestionFromBtn(this)">load into picker</button>
+    </div>`;
+  }).join("");
+  return `<div class="panel"><h3>Suggested trades between these two teams</h3>
+    <div class="dim" style="font-size:11px;margin-bottom:8px">Precomputed 1-for-1 search, out/FINDINGS.md #40 — "no trade cleared this bar" is a real result, not a gap.</div>
+    <div class="sugg-grid">${cards}</div></div>`;
+}
 
 function tradeResult(){
   if(!T.aOut.length && !T.bOut.length)
@@ -646,7 +714,11 @@ function modelView(){
     `<div class="k">${k.toLowerCase().replace(/_/g," ")}</div><div class="v">${esc(Array.isArray(v)?v.join(", "):v)}</div>`).join("");
   return `<div class="grid2">
     <div class="panel"><h3>Denominators — units per standings point</h3>
-      <table><thead><tr><th class="l">Cat</th><th>Units / pt</th><th class="l">Kind</th></tr></thead>
+      <table><thead><tr>
+        <th class="l" title="Roto category.">Cat</th>
+        <th title="How many units of this stat buy one standings point, pooled from this league's own history — see out/FINDINGS.md #26.">Units / pt</th>
+        <th class="l" title="Counting stats sum directly; rate stats (AVG/ERA/WHIP) are computed as a marginal shift against a league-average team, not the player's raw rate — out/ARCHITECTURE.md §1.2.">Kind</th>
+      </tr></thead>
       <tbody>${rows}</tbody></table>
       <div class="note">Estimated from pooled relative dispersion across
         ${D.settings.DENOM_SEASONS} team-seasons, scaled by the expected range of a

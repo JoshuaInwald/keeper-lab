@@ -178,6 +178,19 @@ specifically on debut-year transitions. Concrete test case:
 Christian Scott, whose model-blended 2027 ERA lands closer to a
 conservative ZiPS forecast than to his own strong 78-inning 2026 sample.
 
+**3.8 Trade-finder feature — done, 2026-08-13.** `klab/trade_finder.py` +
+`scripts/build_trade_suggestions.py` + a "Suggested trades between these
+two teams" panel in the app's Trade tab (`out/FINDINGS.md` #40). Three
+scenarios per team pair (win-now-for-future, challenge trade, mutual value
+swap), 1-for-1 only, precomputed for all 45 pairs since the app has no
+server to search live from. **Maintenance note**: `out/trade_suggestions.json`
+is a snapshot, not live — rerun `scripts/build_trade_suggestions.py`
+(~135s) after roster changes or it'll suggest trades using stale rosters.
+Not wired into `scripts/run_all.py`'s hot path on purpose (the search is
+meaningfully slower than the rest of the build), so this is a manual step,
+easy to forget. Natural next extension: 2-for-1/2-for-2 packages, currently
+out of scope to keep the search tractable for a build step.
+
 ---
 
 ## Phase 4 — Portfolio polish. ~1–2 sessions

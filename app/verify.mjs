@@ -75,6 +75,34 @@ await page.evaluate(() => { S.infl = false; S.only = ''; S.q = ''; sortBy('redra
 await page.evaluate(() => { go('fa'); S.role = 'PIT'; refilter(); S.role = ''; });
 await page.waitForTimeout(100);
 
+// Trade-suggestion cards: this caught a real bug once (embedding a player
+// name with an apostrophe -- "Spehr's Army", "O'Brien" -- as a raw JS
+// string literal inside a double-quoted onclick attribute breaks HTML
+// parsing; fixed by moving to data-* attributes). The generic tab walk
+// above only renders the panel for whichever pair T.a/T.b default to, and
+// never clicks anything inside it, so it would not have caught this.
+const suggResult = await page.evaluate(() => {
+  const pairs = [["NPB No Stars", "Spehr's Army"], ["McBlocks", "Spehr's Army"],
+                 ["Pookie 2.0", "Producers"], ["All-Stars", "Lisbon Long Balls"]];
+  const out = [];
+  go('trade');
+  for (const [a, b] of pairs) {
+    T.a = a; T.b = b; T.aOut = []; T.bOut = [];
+    render();
+    const buttons = document.querySelectorAll('.sugg-card button.act');
+    let loadedOk = 0;
+    buttons.forEach(btn => {
+      btn.click();
+      if (T.aOut.length === 1 && T.bOut.length === 1) loadedOk++;
+      T.aOut = []; T.bOut = [];
+    });
+    out.push({ pair: `${a}/${b}`, buttons: buttons.length, loadedOk });
+  }
+  return out;
+});
+const suggBad = suggResult.filter(r => r.loadedOk !== r.buttons);
+if (suggBad.length) console.log('  SUGGESTION PANEL MISMATCH:', JSON.stringify(suggBad));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -91,5 +119,7 @@ console.log(bad ? `FAIL  ${bad}/${n} quantities disagree`
                 : `PASS  JS matches pandas on all ${n} quantities`);
 console.log(errs.length ? 'JS ERRORS:\n  ' + errs.join('\n  ')
                         : 'PASS  no console errors across six tabs, drawer, filters, re-sort');
+console.log(suggBad.length ? `FAIL  trade-suggestion load-into-picker mismatched on ${suggBad.length} pair(s)`
+                            : 'PASS  trade-suggestion panel renders and loads correctly on every tested pair');
 await browser.close();
-process.exit(bad || errs.length ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length ? 1 : 0);

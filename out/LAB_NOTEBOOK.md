@@ -4,7 +4,7 @@ Read this before changing a modelling decision. Most of the obvious
 alternatives were tried and rejected for reasons that are not obvious.
 
 <details>
-<summary><strong>Contents</strong> (18 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (19 sections — click to expand)</summary>
 
 1. [Denominators: four estimators tried, all unstable, fixed by pooling](#1-denominators-four-estimators-tried-all-unstable-fixed-by-pooling)
 2. [Contract codes: the correction, and how it was established](#2-contract-codes-the-correction-and-how-it-was-established)
@@ -25,6 +25,7 @@ alternatives were tried and rejected for reasons that are not obvious.
 16. [I repeated a stale claim from out/ROADMAP.md without checking the code first](#16-i-repeated-a-stale-claim-from-outroadmapmd-without-checking-the-code-first-2026-08-13)
 17. [The app's self-test reference trade broke the moment a real trade happened](#17-the-apps-self-test-reference-trade-broke-the-moment-a-real-trade-happened-2026-08-13)
 18. [F was never actually extendable right now, and #33 didn't catch it](#18-f-was-never-actually-extendable-right-now-and-33-didnt-catch-it-2026-08-13)
+19. [Building the trade finder: a bad suggestion that looked good on paper](#19-building-the-trade-finder-a-bad-suggestion-that-looked-good-on-paper-2026-08-13)
 
 </details>
 
@@ -675,3 +676,46 @@ rule itself* was simply wrong about when the extension decision happens,
 and every downstream piece of code correctly implemented that wrong rule.
 No amount of internal-consistency checking catches a premise everyone
 involved, including two rounds of dedicated review, shared.
+
+## 19. Building the trade finder: a bad suggestion that looked good on paper (2026-08-13)
+
+The first working version of the win-now scenario search
+(`klab/trade_finder.py`, `out/FINDINGS.md` #40) suggested trading Vladimir
+Guerrero Jr. for James Wood. On its own terms the score was real: NPB's
+surplus went up. It just went up because Guerrero was such a bad contract
+that NOTHING coming back could fail to look like an improvement by the net
+math — including Wood, who is an F-contract rental worth exactly $0 to
+whoever holds him. The search wasn't wrong about the arithmetic. It was
+answering a subtly different question than the one it was supposed to:
+"does this net improve the seller's position" instead of "does the seller
+actually receive something of value."
+
+**Caught by looking at the actual suggested trade, not by reviewing the
+scoring formula in the abstract.** The formula (`seller_surplus_delta >
+0`) reads correct in isolation -- it's a totally reasonable thing to
+require. It just isn't SUFFICIENT on its own, and that only became visible
+once a specific, real, checkable trade came out of it and looked wrong to
+a human. Fixed by adding a second condition: the specific player coming
+back has to have positive standalone value, not just make the net number
+work out. Same lesson as several entries in this notebook already --
+arithmetic consistency and correctness are different properties, and only
+one of them shows up by staring at the formula.
+
+**A second, unrelated bug found the same way**: the shortlist feeding the
+search (top-10-by-`roto_points` per team) put 6 of Spehr's Army's 10
+candidates at zero keeper value, because raw talent and keeper value are
+different things for a team loaded with unkeepable-but-talented rentals.
+The search wasn't broken, its INPUT was too narrow to contain the answer.
+Widened to the union of top-10-by-talent and top-10-by-surplus.
+
+**A third bug, this one a UI mechanics trap, not a modeling one**: player
+and team names containing an apostrophe (Spehr's Army itself!) broke the
+"load into picker" button, because `JSON.stringify()`-ing a name into a
+JS literal embedded inside a double-quoted HTML `onclick` attribute
+produces a raw `'` that HTML doesn't know is supposed to be data, not
+markup. `app/verify.mjs`'s existing tab-walk didn't catch it because it
+renders the trade tab but never clicks anything inside the new panel.
+Wrote a targeted click-through check, confirmed it actually failed before
+the fix and passed after, then folded it permanently into `verify.mjs`
+rather than leaving it as a one-off script -- the whole point of a
+regression test is that the NEXT session gets it for free.
