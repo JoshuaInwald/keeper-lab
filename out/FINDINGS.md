@@ -1540,3 +1540,81 @@ on the corrected number, this was overstated surplus on players who didn't
 need it to justify keeping them, not a flip-changing error. Verified with
 `node app/verify.mjs` (Node installed this session specifically to run
 it): `PASS` on all 25 quantities, `PASS` on console errors across every tab.
+
+## 34. A win-now metric that isn't a team-standings swap: ROS value over replacement
+
+`evaluate_trade`'s `verdict_score` blends two things that shouldn't be
+blended into one dollar figure: `d_surplus` (multi-year asset value, on the
+league-average redraft scale — appropriate, since a keeper's future value
+isn't tied to any specific team's current standing) and the 2026 win-now
+term, which converts a team-specific standings-point delta into dollars
+using one league-wide average $/point. That conversion has no sense of
+*where* a team sits in a category — a marginal point is not worth the same
+to a team about to pass a rival in SB as to one already locked into last
+place there. Flagged directly by Josh; this is the same category-balance
+blind spot `out/RESEARCH.md` §6.2 already names as shared across every
+published system, applied here specifically to trade win-now pricing.
+
+Josh asked for something more specific and more useful as a first step:
+a **player-intrinsic** number — how much better is this player than a
+replacement player, over exactly the playing time he individually has left
+this season — separate from any specific team's standings context, and
+dynamic per player rather than one global "season is X% over" constant.
+
+**Built `klab.trade.ros_value_over_replacement()`.** Mechanically:
+
+- Uses the *same* full-season denominators and team baseline as the 2027
+  keeper board (`build_2027_scorer`) — these are stable "units per standings
+  point" conversion factors, already validated, and don't need re-deriving
+  for a partial season. (The old ad hoc version in `scripts/eval_trade.py`,
+  now removed, built a *separate* set of denominators keyed to the 2026
+  season's current level — an unnecessary complication that also happened
+  to produce different numbers than the standard board for reasons that
+  were never isolated. Not calling that a confirmed bug; it's gone now, in
+  favor of reusing the already-validated calculation rather than
+  maintaining two.)
+- **What does need to scale down**: the marginal-team dilution baseline
+  behind AVG/ERA/WHIP (`base_AB`, `base_H`, etc.). Diluting a six-week rest-
+  of-season sample against a *full season's* team volume would shrink a
+  rate stat's marginal impact by roughly 4x too much — the same shape of
+  error considered (and ruled out, on inspection, for a different function)
+  earlier this session. Each player's `remaining_frac` — his own ROS PA or
+  IP as a fraction of the standard keeper-floor full season (600 PA / 150
+  IP) — scales the team baseline down proportionally, so the "1 player
+  diluting a 13/14-man team" ratio stays consistent regardless of how much
+  season is actually left.
+- The replacement comparator is `replacement_rp` (4.78, the board's own
+  standard) prorated by that same `remaining_frac` — "what would a
+  replacement player be worth over the same amount of time."
+
+**Applied to both trades under review:**
+
+| player | ROS frac of season left | ROS value over replacement |
+|---|---|---|
+| Cristopher Sánchez | 0.34 | +1.92 |
+| Elly De La Cruz | 0.30 | +1.59 |
+| Ketel Marte | 0.28 | +0.78 |
+| Jesús Luzardo | 0.32 | +0.36 |
+| Brandon Lowe | 0.25 | +0.26 |
+| Kazuma Okamoto | 0.26 | +0.12 |
+| Tarik Skubal | 0.31 | +4.99 |
+| Freddie Freeman | 0.29 | +1.70 |
+| Jordan Walker | 0.29 | +0.60 |
+| Christian Scott | 0.23 | **−2.23** |
+
+Trade 1: Spehr's Army nets **+3.55** ROS roto points over replacement
+(receiving 4.29, sending 0.74); All-Stars nets **−3.55**. Trade 2: Spehr's
+Army nets **+8.32** (receiving 6.69, sending −1.63, since Scott actively
+grades below replacement); NPB No Stars nets **−8.32**. Both point the same
+direction as the multi-year dollar surplus already reported for each trade
+— this isn't a case where the two lenses disagree — but they're now two
+separately legible numbers instead of one blended one, per the ask.
+
+**What this doesn't do yet**: it's still not the team-specific marginal
+value Josh originally asked about (a point's worth depending on where a
+*specific* team sits in a *specific* category race). That's a bigger
+build — a real per-category, per-team marginal value curve, not a
+prorated replacement comparison — and is a roadmap item, not something
+built this session. `ros_value_over_replacement` is the honest, smaller
+piece: a fair player-vs-player comparison for "how good is this rest of
+this year," decoupled from any specific trade partner's standings context.

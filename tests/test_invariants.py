@@ -15,7 +15,7 @@ from klab.auction import match_drafts
 from klab.board import build_board, fit_exchange_rate, keeper_status, value_players
 from klab.denoms import teams_per_category
 from klab.keeper import keeper_cost, years_controlled
-from klab.trade import evaluate_trade, standings_points
+from klab.trade import evaluate_trade, ros_value_over_replacement, standings_points
 from klab.io import load_hitters_history, load_pitchers_history
 
 
@@ -394,3 +394,56 @@ def test_evaluate_trade_verdict_responds_to_usd_per_point(board):
     high = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name], usd_per_point=100.0)
     if abs(low["a"]["d_standings_points_2026"]) > 0.01:
         assert low["a"]["verdict_score"] != pytest.approx(high["a"]["verdict_score"])
+
+
+# --- ros_value_over_replacement: rest-of-season value, not a full year ----
+
+def test_ros_value_over_replacement_scales_with_remaining_playing_time():
+    """A player projected for twice the remaining PA of an otherwise-identical
+    player should be worth roughly twice the counting-stat roto points, and
+    the replacement baseline he's compared against should scale the same way
+    -- the whole point of this metric is that it's a fair per-player
+    comparison regardless of how much season each individually has left."""
+    from klab.board import build_2027_scorer
+    scorer, D, base, sigma = build_2027_scorer()
+
+    def make(pa_frac):
+        pa = C.KEEPER_PA_FLOOR * pa_frac
+        return pd.DataFrame([{
+            "fg_id": 1, "role": "HIT", "PA": pa, "AB": pa * 0.9,
+            "H": pa * 0.9 * 0.27, "HR": pa * 0.04, "R": pa * 0.13,
+            "RBI": pa * 0.13, "SB": pa * 0.02,
+            "IP": 0.0, "W": 0.0, "SV": 0.0, "K": 0.0, "ER": 0.0, "BB": 0.0,
+            "H_allowed": 0.0,
+        }])
+
+    half = ros_value_over_replacement(make(0.5), D, base, 4.78)
+    full = ros_value_over_replacement(make(1.0), D, base, 4.78)
+    assert half["remaining_frac"].iloc[0] == pytest.approx(0.5, abs=0.01)
+    assert full["remaining_frac"].iloc[0] == pytest.approx(1.0, abs=0.01)
+    # same per-PA rate, half the PA -> roughly half the value over replacement
+    ratio = half["ros_value_over_replacement"].iloc[0] / full["ros_value_over_replacement"].iloc[0]
+    assert 0.4 < ratio < 0.6
+
+
+def test_ros_value_over_replacement_ranks_better_rates_higher():
+    """Holding remaining playing time equal, a better rate line must score
+    higher -- the specific thing this metric exists to compare across
+    players with different amounts of season left is not supposed to also
+    scramble the ranking of players with the SAME amount left."""
+    from klab.board import build_2027_scorer
+    scorer, D, base, sigma = build_2027_scorer()
+    pa = C.KEEPER_PA_FLOOR * 0.3
+
+    good = pd.DataFrame([{
+        "fg_id": 1, "role": "HIT", "PA": pa, "AB": pa * 0.9,
+        "H": pa * 0.9 * 0.31, "HR": pa * 0.06, "R": pa * 0.16, "RBI": pa * 0.16,
+        "SB": pa * 0.03, "IP": 0.0, "W": 0.0, "SV": 0.0, "K": 0.0, "ER": 0.0,
+        "BB": 0.0, "H_allowed": 0.0,
+    }])
+    bad = good.copy()
+    bad[["H", "HR", "R", "RBI", "SB"]] *= 0.5
+
+    g = ros_value_over_replacement(good, D, base, 4.78)
+    b = ros_value_over_replacement(bad, D, base, 4.78)
+    assert g["ros_value_over_replacement"].iloc[0] > b["ros_value_over_replacement"].iloc[0]

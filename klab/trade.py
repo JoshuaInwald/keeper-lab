@@ -60,6 +60,61 @@ def ros_lines() -> pd.DataFrame:
     return H.merge(P, on="fg_id", how="outer").fillna(0.0)
 
 
+def ros_value_over_replacement(players: pd.DataFrame, D: dict, base: dict,
+                               replacement_rp: float) -> pd.DataFrame:
+    """Rest-of-season roto value over a replacement player, for the SAME
+    remaining playing time -- not a full season, not a team-standings swap.
+
+    This answers a different question than `win_now_delta`: not "what does
+    this trade do to two specific teams' 2026 standings" but "how much
+    better is this player than a replacement-level guy, for however much of
+    the season he individually has left." Dynamic per player on purpose --
+    `remaining_frac` comes from each player's own ROS playing time (already
+    ZiPS-forecast-specific to his own team's remaining schedule and his own
+    role), not a single league-wide "season is X% over" constant.
+
+    Uses the SAME full-season denominators (`D`) and baseline (`base`) as the
+    2027 keeper board -- these are stable, already-validated "units per
+    standings point" conversion factors and don't need re-deriving for a
+    partial season. What DOES need to scale down is the marginal-team
+    dilution baseline (`base_AB`/`base_H`/etc.): comparing a 6-week rest-of-
+    season sample against a FULL season's team volume would dilute a rate
+    stat's marginal impact by roughly 4x too much. Scaling the baseline by
+    each player's own `remaining_frac` keeps the "1 player diluting a
+    13/14-man team" ratio consistent with how the full-season board computes
+    it, just at a smaller volume.
+    """
+    from .denoms import RotoScorer
+
+    out = players.copy()
+    is_hit = out["role"] == "HIT"
+    frac_hit = (out["PA"] / C.KEEPER_PA_FLOOR).clip(lower=0.02, upper=1.0)
+    frac_pit = (out["IP"] / C.KEEPER_IP_FLOOR).clip(lower=0.02, upper=1.0)
+    out["remaining_frac"] = frac_hit.where(is_hit, frac_pit)
+
+    rp = pd.Series(0.0, index=out.index)
+    repl = pd.Series(0.0, index=out.index)
+    for frac, grp in out.groupby(out["remaining_frac"].round(3)):
+        scaled_base = dict(base)
+        for k in ("team_AB", "team_IP"):
+            scaled_base[k] = base[k] * frac
+        scaled_base["team_H"] = scaled_base["team_AB"] * base["team_AVG"]
+        scaled_base["team_ER"] = scaled_base["team_IP"] * base["team_ERA"] / 9.0
+        scaled_base["team_WH"] = scaled_base["team_IP"] * base["team_WHIP"]
+        sc = RotoScorer(D, scaled_base)
+        h = sc.hitters(grp[["PA", "AB", "H", "HR", "R", "RBI", "SB"]])
+        p = sc.pitchers(grp.rename(columns={"H_allowed": "H_scorer"})
+                        [["IP", "W", "SV", "K", "ER", "BB", "H_scorer"]]
+                        .rename(columns={"H_scorer": "H"}))
+        rp.loc[grp.index] = h["roto_points"].where(is_hit.loc[grp.index], p["roto_points"])
+        repl.loc[grp.index] = replacement_rp * frac
+
+    out["ros_rp"] = rp
+    out["ros_replacement_rp"] = repl
+    out["ros_value_over_replacement"] = rp - repl
+    return out
+
+
 def standings_points(wide: pd.DataFrame) -> pd.DataFrame:
     """Roto points from category totals: N points for best, 1 for worst.
 
