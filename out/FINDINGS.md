@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (53 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (54 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -59,6 +59,7 @@ in `LAB_NOTEBOOK.md`.
 51. [Playing time gets its own weight, decoupled from the rate/talent blend](#51-playing-time-gets-its-own-weight-decoupled-from-the-ratetalent-blend)
 52. [Positional adjustment for catchers and shortstops — and a surprise: both positions are deep, not scarce](#52-positional-adjustment-for-catchers-and-shortstops--and-a-surprise-both-positions-are-deep-not-scarce)
 53. [Direction-aware pitcher playing-time trust, an upside_ft split, and a second copy of #52's own bug](#53-direction-aware-pitcher-playing-time-trust-an-upside_ft-split-and-a-second-copy-of-52s-own-bug)
+54. [Checked against FanGraphs' own rest-of-season auction calculator — mostly agrees, systematically compressed at the top](#54-checked-against-fangraphs-own-rest-of-season-auction-calculator--mostly-agrees-systematically-compressed-at-the-top)
 
 </details>
 
@@ -2807,3 +2808,72 @@ already-correct 2027 change. New regression test added
 (`test_positional_adjustment_2028_actually_uses_the_position_specific_bar`)
 so a third copy of this bug, if one gets introduced elsewhere, fails loudly
 instead of shipping silently a second time.
+
+## 54. Checked against FanGraphs' own rest-of-season auction calculator — mostly agrees, systematically compressed at the top
+
+Josh supplied two FanGraphs Auction Calculator exports (hitters, pitchers).
+First step was figuring out what they actually were, since that determines
+what they're a valid comparison for: PA tops out at 174 and IP at 51 — far
+short of a full season — and `Dollars` sums deeply negative (hitters
+−$10,989 total), which is normal for a partial-season tool but not a
+full-season one. **These are rest-of-2026 values, not full 2026 and not
+2027.** That rules out comparing them to `redraft_value` (a full 2027
+projection) — but this app already computes a rest-of-2026 figure of its
+own (`ros_value`, out/FINDINGS.md #45-47), which is exactly the same scope.
+Compared those two.
+
+**Overall correlation is weak (Spearman 0.491) — but that's a floor-convention
+artifact, not a real disagreement.** FanGraphs' calculator has no $0 floor:
+a deep-roster scrub with no real fantasy value goes to −$40 or lower, while
+this app's `ros_value` is "value over a free replacement," which sits near
+$0 for the same player by construction. Hundreds of players both systems
+consider irrelevant (ADP 999, undrafted anywhere) are scored on totally
+different scales for that reason alone, and they dominate the naive
+correlation. Restricting to players either system actually rates (ADP <
+400 — drafted somewhere, real) fixes this: **Spearman 0.678 for hitters,
+0.835 for pitchers.** Both systems also agree on direction against ADP
+itself (Spearman −0.38 to −0.47, correctly signed — lower ADP means more
+valuable in both systems).
+
+**The real, structural disagreement: this engine's value curve is flatter
+than FanGraphs' for both hitters and pitchers**, most visible split by
+FanGraphs-value quartile among notable players (mean `ros_value − Dollars`):
+
+| FanGraphs quartile | hitters | pitchers |
+|---|---|---|
+| bottom 25% | +$18.6 | +$0.6 |
+| mid-low | −$1.2 | −$4.4 |
+| mid-high | −$9.6 | −$11.4 |
+| top 25% | −$21.0 | −$19.6 |
+
+This app rates replacement-tier-but-notable players noticeably *higher*
+than FanGraphs and elite players noticeably *lower*, for both roles, by a
+similar magnitude. The leading explanation: FanGraphs' calculator's exact
+league settings aren't visible in the export (no header row states them),
+but a flatter curve than a generic tool is exactly what you'd expect from
+correctly calibrating to *this* league's real shape rather than a generic
+one — the replacement level here is anchored to this specific 10-team,
+230-active-roster-spot league (the Last Player Picked method, #27), and a
+bigger or shallower-replacement league (more common among the "leagues" a
+generic calculator defaults to) mechanically stretches the whole curve
+wider, making stars relatively richer and scrubs relatively poorer. That's
+a real, plausible, and *not necessarily wrong* explanation for the
+compression — but it's a hypothesis, not confirmed, since the export
+doesn't expose FanGraphs' assumed league shape to check it against.
+
+**What this does and doesn't say about whether this project is "modeling
+value correctly."** It doesn't move any number — this was a one-off
+analysis, not a shipped comparison feature (weighed and explicitly declined
+as a build item the same day these files arrived; see the chat log around
+this date). What it does say: the *ordering* of who's good is validated
+again, independently, at a level (0.68-0.84 among real players) consistent
+with this project's other external checks (CBS rank, #21: 0.893; standings
+reproduction: 0.863) — a third, differently-sourced system landing in the
+same range is a real corroboration, not a coincidence. The compression
+finding is the more interesting outcome: it's the kind of thing that WOULD
+be worth chasing if this project used generic budget/pool assumptions like
+FanGraphs does, but it's the predictable, intended consequence of this
+project's whole differentiator (real league calibration instead of a
+generic pool assumption) — so the honest read is "expected, not alarming,"
+while flagging plainly that it rests on an unconfirmed guess about
+FanGraphs' own league settings.

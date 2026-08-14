@@ -219,12 +219,21 @@ turning the toggle on mostly *lowers* C/SS values rather than protecting
 them. The full spectrum (1B/2B/3B/OF) is still one pooled number; no
 eligibility data exists yet for those positions the way it now does for C/SS.
 
-### 6.5 Aging is absent
+### 6.5 Aging is absent — will not be built, explicit decision, 2026-08-14
 
-The 2028 leg is raw ZiPS. There is no explicit age curve, so a 23-year-old and
-a 34-year-old with identical projections carry identical multi-year value.
-That is wrong in an obvious direction and matters for exactly the decisions
-the tool exists to make.
+The 2028 leg is raw ZiPS. There is no explicit age curve of this project's
+own, so a 23-year-old and a 34-year-old with identical *projections* carry
+identical multi-year value — but Josh's pushback on that framing is fair:
+ZiPS itself is an age-aware system, so those two players wouldn't usually
+land on identical projections in the first place if ZiPS is doing its job.
+Building a second aging adjustment on top of an already age-aware forecast
+risks double-counting age, not correcting for its absence. His call: keep
+pulling a fresh out-year projection close to the actual keeper decision
+(already this project's stated refresh cadence) rather than build a curve.
+Narrower gap that decision doesn't close: contract years beyond what ZiPS
+actually publishes (year 3 of a 3-year deal) reuse the year-2 figure with a
+flat discount, which has no age-awareness of its own — small dollar impact,
+second-order, not in scope either.
 
 ### 6.6 The draft is modelled as a price, not a game
 
@@ -292,10 +301,12 @@ where the returns are. Updated 2026-08-14 — two of the original five are done.
    every rostered player's dollar value, plus denominator standard errors on
    the Model tab. The ZiPS P10-P90 *talent* distribution this item actually
    meant is still unused, though — see the caveat now in §6.3.
-3. **Aging curves (§6.5).** Still not built — and now confirmed genuinely
-   blocked, not just undone: no age/birthdate data exists in any file this
-   project has access to (checked directly). Needs a fresh FanGraphs export
-   with an age or debut-date column before this is even startable.
+3. ~~Aging curves (§6.5).~~ **Will not build — explicit decision, 2026-08-14.**
+   Josh's call: a fresh out-year projection close to the actual keeper
+   decision already carries age-appropriate expectations (ZiPS is itself
+   age-aware), so a separate curve on top risks double-counting rather than
+   correcting an absence. See §6.5 for the one narrower gap this doesn't
+   close (contract years beyond what ZiPS publishes).
 4. **Waiver-value counterfactual (§6.4).** Still blocked on transaction-date
    data that doesn't exist anywhere in this project's files.
 5. ~~Positional replacement.~~ **Done for C/SS, 2026-08-14** (`out/FINDINGS.md`
@@ -307,8 +318,15 @@ where the returns are. Updated 2026-08-14 — two of the original five are done.
 
 **New since this list was written, not from the original literature review:**
 a probability-weighted range for a non-closing reliever's saves upside
-(agreed direction, not yet built — see `out/ROADMAP.md`), and the same kind
-of external validation this section is built from, but for a public $-value
-system instead of ordinal rank (checked feasibility, held off — see
-`out/FINDINGS.md`'s discussion the same day #52 shipped; not worth the
-build for what it'd add on top of the existing CBS-rank correlation, #21).
+(agreed direction, deprioritized 2026-08-14 — not eliminated, just low
+priority; see `out/ROADMAP.md` 3.10); the same kind of external validation
+this section is built from, but for a public $-value system instead of
+ordinal rank — done as a one-off analysis rather than a shipped feature
+once FanGraphs auction-calculator exports arrived (`out/FINDINGS.md` #54:
+agrees well on ordering among real players, 0.68-0.84 Spearman, and turned
+up a real, plausible structural difference — this engine's value curve
+runs flatter than FanGraphs' generic one, consistent with correctly
+calibrating to this league's actual roster shape instead of a generic pool
+assumption); and an app homepage routing five common owner questions
+straight to the right tab with the right filters pre-applied
+(`out/ROADMAP.md` 2.12).

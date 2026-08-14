@@ -226,8 +226,17 @@ All in `/Users/JoshInwald/Documents/Fantasy Baseball/`.
    expectation. Real breakout *talent* upside (a young player outperforming
    his own rate projection, not just playing more) is still just the point
    projection.
-3. **No aging curves.** The 2028 leg is raw ZiPS. No birthdate/age data
-   exists in any file this project has (checked directly, not assumed).
+3. **No aging curves — by explicit decision, not oversight (2026-08-14).**
+   The 2028 leg is raw ZiPS, and stays that way: ZiPS is itself an
+   age-aware system, so a fresh out-year projection pulled close to the
+   actual keeper decision already carries age-appropriate expectations for
+   that specific player. A separate curve on top would risk double-counting
+   age, not fixing an absence. `out/RESEARCH.md` §6.5 has the full
+   reasoning. No birthdate/age data exists in any file this project has
+   anyway (checked directly, not assumed) — moot for this decision, but
+   would block a curve even if one were wanted. Narrower gap this doesn't
+   close: a 3-year contract's final year reuses the 2028 figure with a flat
+   discount, no age-awareness of its own — small dollar impact, out of scope.
 4. **No waiver-wire value.** Teams fill ~10 of 23 slots from FA; that
    production is invisible and is why replacement level sits as high as it
    does. Still blocked on transaction-date data (`out/FINDINGS.md` #27).

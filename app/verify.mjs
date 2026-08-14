@@ -129,6 +129,38 @@ const basisBad = basisResult.changedProj === 0 || basisResult.changedAct === 0
   || basisResult.selAfterBlend !== 'blend';
 if (basisBad) console.log('  BASIS SELECTOR MISMATCH:', JSON.stringify(basisResult));
 
+// Homepage 5-question router (out/ROADMAP.md 2.12): the app now opens on
+// "Home," and each question button must be disabled without a team picked
+// (for the two team-specific ones) and land on the right tab with the
+// right state pre-applied once one is.
+const homeResult = await page.evaluate(() => {
+  S.team = ''; S.tab = 'model'; render();
+  const startTab = S.tab;
+  const keepDisabledNoTeam = document.querySelector('.qbtn[onclick*="keep"]')?.disabled === true;
+  S.team = TEAMS[0]; render();
+  const keepEnabledWithTeam = document.querySelector('.qbtn[onclick*="keep"]')?.disabled === false;
+  goQuestion('keep');
+  const keepLandedOnBoard = S.tab === 'board' && S.only === 'keep' && S.team === TEAMS[0];
+  go('model'); S.team = TEAMS[1];
+  goQuestion('trade');
+  const tradeLandedRight = S.tab === 'trade' && T.a === TEAMS[1];
+  go('model');
+  goQuestion('fa');
+  const faLandedRight = S.tab === 'fa' && S.sort === 'surplus_multiyear' && S.desc === true;
+  go('model');
+  goQuestion('2027');
+  const standingsLandedRight = S.tab === 'standings' && S.standSeason === 'keepers2027';
+  go('model');   // restore defaults for any later checks in this file
+  S.standSeason = 'live'; S.only = ''; S.team = '';
+  return { startTab, keepDisabledNoTeam, keepEnabledWithTeam, keepLandedOnBoard,
+          tradeLandedRight, faLandedRight, standingsLandedRight };
+});
+const homeBad = homeResult.startTab !== 'model' || !homeResult.keepDisabledNoTeam
+  || !homeResult.keepEnabledWithTeam || !homeResult.keepLandedOnBoard
+  || !homeResult.tradeLandedRight || !homeResult.faLandedRight
+  || !homeResult.standingsLandedRight;
+if (homeBad) console.log('  HOMEPAGE QUESTION ROUTER MISMATCH:', JSON.stringify(homeResult));
+
 // Positional-adjustment toggle (out/FINDINGS.md #52): switching it must move
 // a catcher's dollar value, must round-trip back to identical numbers, the
 // checkbox must reflect the active setting, and -- the same cross-toggle
@@ -345,6 +377,8 @@ console.log(basisBad ? 'FAIL  projection-basis selector did not swap/round-trip 
                        + `players on switch and round-trips back exactly`);
 console.log(positionalBad ? 'FAIL  positional-adjustment toggle did not change values, round-trip, or survive a basis switch'
                           : 'PASS  positional-adjustment toggle changes catcher value, round-trips, and survives a basis switch');
+console.log(homeBad ? 'FAIL  homepage question router disabled state or destination state is wrong'
+                    : 'PASS  homepage opens first and each question lands on the right tab, pre-filtered');
 console.log(auctionBad ? 'FAIL  auction-estimator panel missing, empty, or not basis-aware'
                        : 'PASS  auction-estimator panel renders, hides when absent, tracks basis');
 console.log(rosBasisBad ? 'FAIL  ROS-basis toggle did not recompute, round-trip, or survive a basis switch'
@@ -360,6 +394,6 @@ console.log(upsideKindBad ? 'FAIL  upside_ft role/health split missing a case or
 console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'
                          : 'PASS  Intuition tab shading moves both halves and stays sandboxed');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || auctionBad
+process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || homeBad || auctionBad
             || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || upsideKindBad
             || intuitionBad ? 1 : 0);

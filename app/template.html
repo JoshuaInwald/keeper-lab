@@ -82,6 +82,14 @@ tbody tr.sel{background:var(--sel)}
 .panel h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;
   color:var(--dim);font-weight:650;border-left:2px solid var(--accent);padding-left:8px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:10px}
+.qbtn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+  text-align:left;cursor:pointer;color:var(--ink);font-family:inherit;transition:border-color .12s,background .12s}
+.qbtn:hover{border-color:var(--accent);background:var(--hover)}
+.qbtn:disabled{opacity:.45;cursor:not-allowed}
+.qbtn:disabled:hover{border-color:var(--line);background:var(--panel2)}
+.qbtn .qt{font-size:14px;font-weight:600}
+.qbtn .qd{color:var(--dim);font-size:12px;margin-top:4px;line-height:1.35}
 @media(max-width:900px){.grid2{grid-template-columns:1fr}}
 /* On a phone the board keeps the six columns a keeper decision actually needs:
    who, what he costs, what he is worth, and the two surplus figures. */
@@ -196,7 +204,7 @@ const sgn = (v,d=1,pre="")=>{
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 // ---------- shared state ----------
-const S = {tab:"board", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
+const S = {tab:"model", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
            desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
            rosBasis: D.ros_basis_default || "ros", standSeason: "live", positional: false,
            shades: {}, intuitionQ: "", intuitionCalculated: false};
@@ -337,8 +345,8 @@ function recomputeProjections(){   // re-run after setRosBasis() changes ros_* f
 }
 
 // ---------- nav ----------
-const TABS=[["board","Keeper board"],["teams","League"],["trade","Trade"],
-            ["standings","Standings"],["fa","Free agents"],["intuition","Intuition"],["model","Model"]];
+const TABS=[["model","Home"],["board","Keeper board"],["teams","League"],["trade","Trade"],
+            ["standings","Standings"],["fa","Free agents"],["intuition","Intuition"]];
 $("nav").innerHTML = TABS.map(([k,l])=>
   `<button data-t="${k}" onclick="go('${k}')">${l}</button>`).join("");
 function go(t){S.tab=t;render();}
@@ -1245,6 +1253,59 @@ function intuitionView(){
   `;
 }
 
+// ---------- homepage: the 5 questions an owner actually asks -----------
+// Deliberately reuses existing state (S.team, S.only, S.sort, T.a) rather
+// than inventing parallel state -- so a question button and the normal
+// controls on the destination tab stay in sync with each other, not two
+// separate sources of truth for the same filter.
+const QUESTIONS = [
+  {key:"keep", q:"Who should I keep?",
+   d:"The model's own recommended keeper set for your team, ranked by surplus.",
+   go:()=>{ S.tab="board"; S.only="keep"; S.sort="surplus_multiyear"; S.desc=true; }},
+  {key:"trade", q:"Is this trade fair?",
+   d:"Opens the trade evaluator with your team on one side -- pick who's involved on both.",
+   go:()=>{ S.tab="trade"; if(S.team) T.a=S.team; }},
+  {key:"worth", q:"What's my team worth, and how do I compare?",
+   d:"Every team's keeper worth, surplus, and projected 2026 finish, sortable.",
+   go:()=>{ S.tab="teams"; }},
+  {key:"2027", q:"How strong is my keeper core for 2027?",
+   d:"Projected 2027 standings from your CURRENT keepers alone -- not a real-auction forecast.",
+   go:()=>{ S.tab="standings"; S.standSeason="keepers2027"; }},
+  {key:"fa", q:"Which free agents should I grab?",
+   d:"The waiver wire, priced the same way as your roster, best surplus first.",
+   go:()=>{ S.tab="fa"; S.sort="surplus_multiyear"; S.desc=true; }},
+];
+function goQuestion(key){
+  const item = QUESTIONS.find(x=>x.key===key);
+  if(!item) return;
+  if((key==="keep"||key==="trade") && !S.team) return;   // button is disabled in this state anyway
+  item.go();
+  render();
+}
+function homePanel(){
+  const teamPicker = `<select onchange="S.team=this.value;render()" style="font-size:14px">
+    <option value="">choose your team…</option>
+    ${TEAMS.map(t=>`<option value="${esc(t)}" ${S.team===t?"selected":""}>${esc(t)}</option>`).join("")}
+  </select>`;
+  const cards = QUESTIONS.map(x=>{
+    const needsTeam = (x.key==="keep"||x.key==="trade") && !S.team;
+    return `<button class="qbtn" ${needsTeam?"disabled":""} onclick="goQuestion('${x.key}')"
+      title="${needsTeam?esc('Pick your team above first -- this one is about your own roster.'):""}">
+      <div class="qt">${esc(x.q)}</div><div class="qd">${esc(x.d)}</div>
+    </button>`;}).join("");
+  return `<div class="panel">
+    <h3>Start here</h3>
+    <div class="note">A dollar-value engine for this league's 10-team 5×5 roto keeper auction,
+      built on the league's own auction history rather than generic projections. Pick your team,
+      then click whichever question below is closest to what you're actually asking -- it opens
+      the right screen with the right filters already set, not a blank tab you have to figure out.
+      Every number on every screen has an honest error bar; read the footer at the bottom of any
+      tab before treating a dollar figure as more precise than it is.</div>
+    <div style="margin:12px 0 4px">${teamPicker}</div>
+    <div class="qgrid">${cards}</div>
+  </div>`;
+}
+
 function modelView(){
   const c=D.constants, den=c.denominators, denSe=c.denominators_se||{};
   // Was a two-way test that labelled anything not in NEG_CATS a counting stat,
@@ -1270,7 +1331,10 @@ function modelView(){
   }).join("");
   const kvHelp=(label,valueHtml,help)=>
     `<div class="k" title="${esc(help)}">${label}</div><div class="v" title="${esc(help)}">${valueHtml}</div>`;
-  return `<div class="grid2">
+  return homePanel() + `<div class="panel"><h3>Model internals — how the numbers above are made</h3>
+      <div class="note">Everything below is the engine room: skip it unless you want to see the
+        arithmetic or push back on a modelling choice.</div></div>
+    <div class="grid2">
     <div class="panel"><h3>Denominators — units per standings point</h3>
       <table><thead><tr>
         <th class="l" title="Roto category.">Cat</th>

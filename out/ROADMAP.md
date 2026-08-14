@@ -197,6 +197,20 @@ stat line) if wanted on its own; more useful once a fresh FanGraphs export
 with age/position-eligibility data exists (see the FG data-pull list in
 this session's chat log / next `LAB_NOTEBOOK.md` entry).
 
+**2.12 App homepage + 5-question router — done, 2026-08-14.** The "Model"
+tab is now "Home," moved first, and is what the app opens on. A team
+picker plus five buttons for the questions an owner actually asks ("who
+should I keep," "is this trade fair," "what's my team worth," "how strong
+is my 2027 keeper core," "which free agents should I grab") jump straight
+to the right tab with the right filters already applied — reusing existing
+state (`S.team`, `S.only`, `S.sort`, the trade tab's `T.a`) rather than
+inventing a parallel set, so a question button and the destination tab's
+own controls never disagree about what's currently filtered. The
+model-internals content that used to be the whole tab is still there,
+unchanged, just below the new panel and clearly labeled as optional. Not
+done: mobile nav overflow (7 tabs on a narrow viewport) — explicitly
+deprioritized, 2026-08-14, Josh's call.
+
 **2.4 Auto-refresh — build pipeline is cron-safe, data ingestion is not
 (checked 2026-08-13, not scheduled on purpose, still manual by choice).**
 Two separate questions, worth not conflating:
@@ -253,8 +267,22 @@ production** at $10–20 each. That is the largest single channel and the model
 treats it as invisible. Quantifying it properly would sharpen replacement
 level, which is the anchor for every dollar figure.
 
-**3.4 Aging curves (0.5 session).** The 2028 leg is raw ZiPS. Fit age curves
-on the 2022–26 panel.
+**3.4 Aging curves — will not build, explicit decision, 2026-08-14.** Josh's
+call: ZiPS (and whichever projection system feeds an out-year in the
+future) already bakes age-appropriate expectations into its own forecast
+for that specific player at that specific age, as part of how those systems
+are built. A separately-fit aging CURVE on top of that would risk
+double-counting age rather than adding information the projection doesn't
+already have — so the real fix isn't building a curve, it's making sure a
+fresh out-year projection gets pulled before every keeper decision, which
+is already this project's stated `data/README.md` refresh cadence, not new
+work. This narrows, but doesn't fully close, one specific gap worth naming:
+years beyond what ZiPS actually publishes (a 3-year keeper contract's final
+year, e.g. 2029 when only 2027/2028 exist) still have no fresh per-player
+projection at all -- `surplus_y2029` extrapolates the 2028 figure with a
+flat discount rate, which has no age-awareness of its own. Not in scope
+either, per the same reasoning (small dollar impact, discounted anyway, and
+still second-order compared to getting *this* year's numbers right).
 
 **3.5 Transaction logs → roster reconstruction (2 sessions).** Requires
 scraping CBS. Unlocks: historical acquisition-channel analysis back to 2022,
@@ -302,17 +330,18 @@ this list, and the trade evaluator's win-now lens already works around this
 by re-ranking standings rather than adding roto points, so the workaround
 exists even though the general fix doesn't.
 
-**3.10 Probability-weighted closer/reliever upside (agreed direction,
-2026-08-14, not yet built).** `upside_ft` currently assumes a reliever
+**3.10 Probability-weighted closer/reliever upside — DEPRIORITIZED,
+2026-08-14, kept on the list at low priority (not eliminated).** Josh's
+call: doesn't matter much to him. `upside_ft` currently assumes a reliever
 already sitting on 5+ saves gets handed the closer job outright at a fixed
 25-save floor, zero risk — flagged as the weakest part of the "role"
-upside split (#53). Agreed direction: report a range (P10 / full-closer /
-incumbent-only) using the SAME bootstrap infrastructure already built for
-`value_lo`/`value_hi`, rather than a deterministic point estimate or a
-newly-fit "job security" probability model — cheaper, reuses what exists,
-and doesn't require inventing a discount factor from a guess. Explicitly
-NOT started per Josh's instruction (2026-08-14) — scope only, pending a
-green light.
+upside split (#53), and the agreed direction if this ever gets picked back
+up is still: report a range (P10 / full-closer / incumbent-only) using the
+SAME bootstrap infrastructure already built for `value_lo`/`value_hi`,
+rather than a deterministic point estimate or a newly-fit "job security"
+probability model. Sits below 3.9 (team-specific category value) and every
+other open item on this list now — pick it up only if everything above it
+is done and there's still appetite for it specifically.
 
 **3.8 Trade-finder feature — done, 2026-08-13.** `klab/trade_finder.py` +
 `scripts/build_trade_suggestions.py` + a "Suggested trades between these
@@ -356,15 +385,21 @@ but there's no ingestion step to schedule yet, so it stays manual),
 auction-estimator UI integration (3.6, 2026-08-13), direction-aware
 pitcher playing-time trust + the `upside_ft` role/health split (2.8,
 2026-08-14), per-category value breakdown + MLB team + denominator error
-bars (2.9, 2026-08-14).
+bars (2.9, 2026-08-14), the app homepage + 5-question router (2.12,
+2026-08-14).
 
 **Next up, by priority:** 3.9 (team-specific category value — the single
-highest-value gap left per `out/RESEARCH.md` §8, not yet scoped in detail)
-and 3.10 (probability-weighted closer upside — agreed direction, 2026-08-14,
-ready to build once given the go-ahead).
+highest-value gap left per `out/RESEARCH.md` §8, not yet scoped in detail).
+3.10 (probability-weighted closer upside) is deprioritized (2026-08-14, not
+eliminated) — pick it up only after everything else is done.
 
-**Deprioritized by explicit decision (2026-08-13):** 3.7, young/rookie
-projection modeling. Josh's call: treat ZiPS as already capturing the
+**Deprioritized or declined by explicit decision:** 3.4, aging curves
+(2026-08-14 — Josh's call: a fresh out-year projection close to the actual
+keeper decision already carries age-appropriate expectations, so a
+separate curve risks double-counting rather than adding information; see
+3.4's own entry for the one narrower gap this doesn't close). 3.7,
+young/rookie projection modeling (2026-08-13). Josh's call on 3.7: treat
+ZiPS as already capturing the
 rookie/debut-year case well enough, rather than spend a session building a
 second reliability table for it. Left as a scoped-but-parked item below in
 case that judgment changes later.
