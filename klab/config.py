@@ -4,6 +4,7 @@ Every knob that drives the valuation lives here. Nothing downstream should
 hard-code a league rule.
 """
 
+import os
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parents[1] / "data"
@@ -244,7 +245,12 @@ PROJ_2028_PITCHERS = "fg_zips_dc_2028_pitchers_projections.csv"
 #   "blend"         reliability-weighted mix of 2026 form and the projection
 #   "projection"    the projection system alone
 #   "actuals"       2026 actuals + rest-of-season alone
-PROJECTION_BASIS = "blend"
+PROJECTION_BASIS = os.environ.get("KLAB_PROJECTION_BASIS", "blend")
+# ^ env override exists so scripts/build_app.py can rebuild the whole board
+# three times in three fresh subprocesses (blend/projection/actuals) without
+# in-process cache pollution -- klab.io.cached() memoises on function args
+# only, not on this global, so flipping it mid-process would silently hand
+# back stale results from whichever basis ran first. See out/FINDINGS.md #42.
 
 # --- Projection knobs -------------------------------------------------------
 # 50/50 blend of (2026 actuals + ROS ZiPS) and pre-season ZiPS 2027.

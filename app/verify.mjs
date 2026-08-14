@@ -103,6 +103,32 @@ const suggResult = await page.evaluate(() => {
 const suggBad = suggResult.filter(r => r.loadedOk !== r.buttons);
 if (suggBad.length) console.log('  SUGGESTION PANEL MISMATCH:', JSON.stringify(suggBad));
 
+// Projection-basis selector: swapping BOARD/FA/teams/constants in place
+// (app/template.html's setBasis()) must actually change displayed numbers,
+// must round-trip back to identical numbers, and the <select> must reflect
+// the active basis after each switch.
+const basisResult = await page.evaluate(() => {
+  go('board');
+  const before = Object.fromEntries(BOARD.map(r => [g(r, 'fg_id'), g(r, 'roto_points')]));
+  setBasis('projection');
+  const afterProj = Object.fromEntries(BOARD.map(r => [g(r, 'fg_id'), g(r, 'roto_points')]));
+  const changedProj = Object.keys(before).filter(id => before[id] !== afterProj[id]).length;
+  const selAfterProj = document.querySelector('#basisbar select')?.value;
+  setBasis('actuals');
+  const afterAct = Object.fromEntries(BOARD.map(r => [g(r, 'fg_id'), g(r, 'roto_points')]));
+  const changedAct = Object.keys(before).filter(id => before[id] !== afterAct[id]).length;
+  setBasis('blend');
+  const back = Object.fromEntries(BOARD.map(r => [g(r, 'fg_id'), g(r, 'roto_points')]));
+  const mismatchRoundtrip = Object.keys(before).filter(id => before[id] !== back[id]).length;
+  const selAfterBlend = document.querySelector('#basisbar select')?.value;
+  return { total: Object.keys(before).length, changedProj, changedAct, mismatchRoundtrip,
+          selAfterProj, selAfterBlend };
+});
+const basisBad = basisResult.changedProj === 0 || basisResult.changedAct === 0
+  || basisResult.mismatchRoundtrip !== 0 || basisResult.selAfterProj !== 'projection'
+  || basisResult.selAfterBlend !== 'blend';
+if (basisBad) console.log('  BASIS SELECTOR MISMATCH:', JSON.stringify(basisResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -121,5 +147,8 @@ console.log(errs.length ? 'JS ERRORS:\n  ' + errs.join('\n  ')
                         : 'PASS  no console errors across six tabs, drawer, filters, re-sort');
 console.log(suggBad.length ? `FAIL  trade-suggestion load-into-picker mismatched on ${suggBad.length} pair(s)`
                             : 'PASS  trade-suggestion panel renders and loads correctly on every tested pair');
+console.log(basisBad ? 'FAIL  projection-basis selector did not swap/round-trip correctly'
+                     : `PASS  basis selector changes ${basisResult.changedProj}/${basisResult.total} `
+                       + `players on switch and round-trips back exactly`);
 await browser.close();
-process.exit(bad || errs.length || suggBad.length ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length || basisBad ? 1 : 0);

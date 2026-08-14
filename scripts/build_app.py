@@ -15,13 +15,15 @@ it is the same arithmetic as `trade.win_now_delta`, ported to JavaScript.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from datetime import date
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from klab import config as C
@@ -29,6 +31,12 @@ from klab.api import snapshot
 from klab.denoms import team_baselines
 from klab.io import load_standings_long
 from klab.trade import ros_lines, standings_points
+
+# The three forks PROJECTION_BASIS can take (klab/config.py). Shipped as
+# three parallel payloads rather than one, so the app can let a user flip
+# between them instead of hiding the model's biggest fork behind a rebuild.
+# See out/ROADMAP.md 2.2, out/FINDINGS.md #42.
+BASES = ["blend", "projection", "actuals"]
 
 # Columns carried into the payload, in order. Kept explicit rather than
 # "everything" so the file stays small and the schema is reviewable.
@@ -69,7 +77,21 @@ def _rows(df: pd.DataFrame, cols: list[str]) -> list[list]:
     return [[_round(v) for v in rec] for rec in d.itertuples(index=False, name=None)]
 
 
-def build_payload() -> dict:
+def _variant_payload() -> dict:
+    """Board, free agents, team summaries and constants for whichever
+    PROJECTION_BASIS is ambient in THIS process (klab/config.py's
+    PROJECTION_BASIS, overridable via the KLAB_PROJECTION_BASIS env var).
+
+    Deliberately does not try to flip C.PROJECTION_BASIS mid-process to get
+    all three bases from one run: `klab.io.cached()` memoises every loader
+    on its function arguments only, not on this global, so a second basis
+    computed in the same process would silently return the first basis's
+    cached intermediate results. See `_basis_variants()`, which runs this
+    function in three separate fresh processes instead, and
+    out/FINDINGS.md #42 for the version of this bug that was actually
+    shipped and caught (klab/trade_finder.py, a different memoisation
+    hazard, same root cause: process-global state and per-arg caching don't
+    mix)."""
     s = snapshot()
     # Prefix EVERY ros column, not just the ones the win-now maths uses.
     # `ros_lines()` also carries PA, which silently collided with the board's
@@ -98,15 +120,57 @@ def build_payload() -> dict:
     fa = fa.merge(ros, on="fg_id", how="left")
     fa[ros_cols] = fa[ros_cols].fillna(0.0)
 
+    cols = PLAYER_COLS + ros_cols
+    return {
+        "cols": cols,
+        "board": _rows(board, cols),
+        "fa": _rows(fa, cols),
+        # points_2026 isn't attached here -- it comes from live 2026
+        # standings, which don't depend on PROJECTION_BASIS, so the caller
+        # attaches it once from its own snapshot() rather than every
+        # subprocess repeating an identical lookup.
+        "teams_raw": json.loads(s.teams.reset_index().to_json(orient="records")),
+        "constants": {k: _round(v) if not isinstance(v, dict) else
+                      {kk: _round(vv) for kk, vv in v.items()}
+                      for k, v in s.constants.items()},
+    }
+
+
+def _basis_variants() -> dict:
+    """_variant_payload() under all three PROJECTION_BASIS settings. The
+    ambient process computes its own basis in-process (typically "blend",
+    the default); the other two run in fresh `python3 build_app.py
+    --variant` subprocesses via an env-var override, each with its own
+    empty caches, so there's no risk of one basis's cached loaders leaking
+    into another's numbers."""
+    out = {}
+    for basis in BASES:
+        if basis == C.PROJECTION_BASIS:
+            out[basis] = _variant_payload()
+            continue
+        env = {**os.environ, "KLAB_PROJECTION_BASIS": basis}
+        r = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--variant"],
+                           env=env, capture_output=True, text=True, check=True)
+        out[basis] = json.loads(r.stdout)
+    return out
+
+
+def build_payload() -> dict:
+    variants = _basis_variants()
+    default = C.PROJECTION_BASIS
+
+    s = snapshot()   # ambient basis; standings and trade suggestions don't
+                      # vary by basis, so one snapshot covers all three
+    pts_2026 = s.standings["points_2026"].to_dict()
+    for v in variants.values():
+        for t in v["teams_raw"]:
+            t["points_2026"] = pts_2026.get(t["team"])
+
     st = load_standings_long()
     cur = st[st["season"] == 2026].pivot(index="team", columns="category",
                                          values="total")
     b26 = team_baselines([2026]).iloc[0]
 
-    teams = s.teams.reset_index()
-    teams["points_2026"] = teams["team"].map(s.standings["points_2026"])
-
-    cols = PLAYER_COLS + ros_cols
     # Precomputed separately (scripts/build_trade_suggestions.py) -- a real
     # search across 45 team pairs is a couple minutes, not a build-step cost.
     # Missing file -> empty list rather than a crash, so a normal build_app
@@ -116,23 +180,30 @@ def build_payload() -> dict:
 
     return {
         "built": date.today().isoformat(),
+        "projection_basis": default,
+        # Everything below marked (default basis) is a straight alias into
+        # basis_variants[default] -- kept as top-level keys so every screen
+        # that predates the selector keeps working unchanged; the selector
+        # itself (app/template.html's setBasis()) is the only thing that
+        # reads basis_variants directly.
+        "basis_variants": {b: {"cols": v["cols"], "board": v["board"], "fa": v["fa"],
+                               "teams": v["teams_raw"], "constants": v["constants"]}
+                           for b, v in variants.items()},
         "trade_suggestions": trade_suggestions,
         "band": {"lo": 10, "hi": 90, "draws": BOOTSTRAP_DRAWS},
         "cats": C.CATS,
         "neg_cats": sorted(C.NEG_CATS),
         "hit_cats": C.HIT_CATS,
         "pit_cats": C.PIT_CATS,
-        "cols": cols,
-        "board": _rows(board, cols),
-        "fa": _rows(fa, cols),
-        "teams": json.loads(teams.to_json(orient="records")),
+        "cols": variants[default]["cols"],                 # (default basis)
+        "board": variants[default]["board"],                # (default basis)
+        "fa": variants[default]["fa"],                      # (default basis)
+        "teams": variants[default]["teams_raw"],             # (default basis)
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
                        for t in cur.index},
         "base26": {"AB": _round(b26["team_AB"]), "IP": _round(b26["team_IP"])},
-        "constants": {k: _round(v) if not isinstance(v, dict) else
-                      {kk: _round(vv) for kk, vv in v.items()}
-                      for k, v in s.constants.items()},
+        "constants": variants[default]["constants"],        # (default basis)
         "settings": {k: _round(v) if not isinstance(v, list) else v
                      for k, v in s.settings.items()},
         "league": {
@@ -212,4 +283,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if "--variant" in sys.argv:
+        # Worker mode for _basis_variants(): print ONLY the JSON payload to
+        # stdout, so the parent process's subprocess.run(capture_output=True)
+        # can parse it directly. KLAB_PROJECTION_BASIS is read by
+        # klab/config.py at import time.
+        print(json.dumps(_variant_payload(), separators=(",", ":"), allow_nan=False))
+    else:
+        main()

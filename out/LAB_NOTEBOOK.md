@@ -759,3 +759,36 @@ caught this, because one process reuses one hash seed for its whole
 lifetime -- the two tests I actually wrote instead check the sortedness
 directly and construct a synthetic tie to exercise the tie-break logic,
 which is the part that was actually wrong.
+
+## 21. Projection-basis selector: the League tab almost lied about itself (2026-08-13)
+
+Building the basis selector (`out/FINDINGS.md` #42), the first design I
+almost shipped only swapped the per-player board table -- roto_points,
+redraft_value, surplus -- and left `D.teams`/`D.constants` (keeper counts,
+keeper salary, aggregate surplus, inflation) fixed at whatever basis the
+page happened to build with. Caught before writing any code by asking
+"which of these fields are actually just aggregates of the board" --
+answer: nearly all of them -- and confirmed by actually computing both:
+inflation is +31% at blend, +41% at actuals; keeper salary $1998 vs $1944.
+A selector that changed the board but left the League tab's cards fixed
+would have been quietly self-contradictory on exactly the screen someone
+would use to sanity-check the switch.
+
+Second thing caught, this time in manual screenshot testing after the
+feature worked: the Model tab's "active settings" panel kept displaying
+`projection basis: blend` no matter what the header selector showed,
+because it read `D.settings.PROJECTION_BASIS` -- a value baked in at
+build time that the selector never touches. `verify.mjs`'s new basis check
+didn't catch this either; it asserts on `roto_points` numbers and the
+`<select>` element itself, not on prose text elsewhere in the page. Same
+blind spot as the earlier "±38%" staleness (`out/FINDINGS.md` #40's UI
+audit) and the same lesson: a numeric-parity test doesn't read English.
+Fixed by overriding the one displayed key with the live client-side state
+at render time.
+
+Neither bug would have been "wrong" in a way that crashed anything or
+failed a test -- both are the specific kind of mistake that only shows up
+when you actually look at the rendered page with the feature turned on,
+which is the reason screenshotting every affected tab after a UI change
+stayed part of the routine rather than trusting `node app/verify.mjs`'s
+green output alone.

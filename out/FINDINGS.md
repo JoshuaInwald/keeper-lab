@@ -47,6 +47,7 @@ in `LAB_NOTEBOOK.md`.
 39. [F-contract players were never actually extendable right now — a bigger correction than #33](#39-f-contract-players-were-never-actually-extendable-right-now--a-bigger-correction-than-33)
 40. [A trade-finder feature: precomputed suggestions, three scenarios, three real bugs caught building it](#40-a-trade-finder-feature-precomputed-suggestions-three-scenarios-three-real-bugs-caught-building-it)
 41. [The trade finder was non-deterministic across identical reruns — caught checking auto-refresh safety](#41-the-trade-finder-was-non-deterministic-across-identical-reruns--caught-checking-auto-refresh-safety)
+42. [A projection-basis selector — three payloads, swapped client-side, no rebuild](#42-a-projection-basis-selector--three-payloads-swapped-client-side-no-rebuild)
 
 </details>
 
@@ -2016,3 +2017,86 @@ wouldn't reliably reproduce the original bug.
 audited the same way but had no live example in this league's current data
 to reproduce against — added defensively, on the same reasoning, not
 because a concrete instance was found.
+
+## 42. A projection-basis selector — three payloads, swapped client-side, no rebuild
+
+`PROJECTION_BASIS` (`klab/config.py`) is the biggest live fork in the whole
+model: it decides whether 2027 numbers come from a reliability-weighted
+blend of 2026 form and the ZiPS 2027 projection ("blend", the default), the
+projection alone ("projection"), or 2026 actuals + rest-of-season alone
+("actuals"). Roughly 17% of keep/cut calls flip depending on which one is
+active, and until now seeing that meant editing `config.py` and rerunning
+the whole build — not something a person evaluating a keeper decision at
+the draft table was ever going to do.
+
+**Why three full payloads, not a smarter diff.** The naive version of this
+feature ships only the columns that visibly change (roto_points,
+redraft_value, surplus_*) and reuses everything else. That's wrong: almost
+nothing downstream of the board is actually basis-invariant.
+`klab.api.snapshot()`'s `s.teams` (keeper counts, keeper salary, keeper
+worth, aggregate surplus per team) and `s.constants` (inflation, $/roto
+point, replacement level) are both aggregates *of* the board, so they move
+with it too. Checked directly rather than assumed: at "blend" the league's
+projected inflation is +31%, keeper salary $1998 against $1525 of
+remaining talent; at "actuals" it's +41%, $1944 against $1374. A selector
+that swapped the per-player table but left those cards fixed would have
+been internally inconsistent on the very screen (League tab) most likely to
+get compared line-by-line. So the unit of variation is the whole
+board+free-agents+teams+constants bundle, not a handful of columns — three
+full copies, not a clever diff. Confirmed the one thing that correctly
+*shouldn't* move also doesn't: live 2026 standings ("points now" in the
+League tab) were identical to the decimal across all three bases in
+manual testing, since those come from this season's actual results, not a
+projection.
+
+**Why three fresh processes, not one process flipping a global.**
+`klab.io.cached()` (see its own docstring) memoises every loader on its
+function arguments only — never on ambient state like
+`C.PROJECTION_BASIS`. Building all three bases in one Python process by
+mutating that global between calls would silently hand the second and
+third basis back the first basis's cached intermediate results the moment
+any shared loader got hit twice. (This is exactly the failure mode #41
+found in a different module, from a different angle — `_shortlist()`'s
+sets weren't a caching bug, but the underlying lesson, "don't trust
+in-process state to reset itself between logically separate runs," is the
+same one.) Fixed by giving `PROJECTION_BASIS` an env-var override
+(`KLAB_PROJECTION_BASIS`) and having `scripts/build_app.py`'s
+`_basis_variants()` compute the ambient basis directly and spawn a fresh
+`python3 build_app.py --variant` subprocess for each of the other two —
+empty cache every time, by construction, not by discipline.
+
+**The app side.** `app/template.html`'s `BOARD`/`FA`/`byId`/`idByName`
+stay `const` bindings but get their *contents* replaced in place
+(`.length = 0; .push(...)`), and `D.teams`/`D.constants` likewise —
+deliberately, so every function that closured over the original array/object
+reference keeps working without being rewritten to re-read `D.basis_variants`
+itself. A header `<select>` calls `setBasis(basis)`, which does the swap,
+recomputes `INFL` (`let`, not `const`, specifically so this could reassign
+it), and calls the existing `render()` — no new rendering path, the
+existing one just runs against new data.
+
+**One bug caught in manual testing, before it shipped**: the Model tab's
+"Active settings" panel showed `projection basis: blend` even while the
+header selector displayed "2026 only" and every number on the page had
+already changed — because that panel read `D.settings.PROJECTION_BASIS`,
+a build-time value that `setBasis()` never touches (`D.settings` isn't one
+of the objects the selector mutates, on purpose — it also holds unrelated
+config like `SV_PUNT_THRESHOLD` that genuinely doesn't vary with the
+selector). Fixed by overriding just that one displayed key with the live
+`S.basis` at render time rather than mutating `D.settings` itself. Caught
+by screenshotting every tab after a basis switch, not by `verify.mjs` —
+its basis check (added the same session) only asserts on `roto_points`
+numbers and the `<select>`'s own value, not on prose elsewhere in the page,
+same blind spot #40 and #26 already noted for that script.
+
+**Testing.** `tests/` doesn't cover this (it's a pure front-end feature —
+Python only produces the three payloads, and that part is exercised
+indirectly by every existing board test running with each basis in
+practice unchanged). `app/verify.mjs` gained a fourth permanent check:
+switches to "projection" and "actuals" and back to "blend", asserts a
+majority of players' `roto_points` actually changed on each switch (272 of
+275 in this league's current data), and asserts the round trip back to
+"blend" reproduces the original numbers exactly — round-tripping matters
+because `setBasis()` mutates shared objects in place rather than
+reassigning them, which is exactly the kind of code that can leave stale
+leftovers behind if a clear-then-refill step is missed.

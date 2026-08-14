@@ -116,11 +116,15 @@ found the `PA_x`/`PA_y` column collision described in FINDINGS §24.1.
 copy; nothing yet reads the history back into the app. "How has Ohtani's keeper
 value moved since June" needs a fourth-dimension chart, not a database.
 
-**2.2 Projection-basis selector.** `PROJECTION_BASIS` switches the whole board
-between blend / projection-only / 2026-only and 17% of keeper calls depend on
-it. Making it a control rather than a rebuild means shipping three payloads in
-one file — cheap, and it turns the model's biggest fork into something you can
-see rather than something you have to trust.
+**2.2 Projection-basis selector — done, 2026-08-13.** `PROJECTION_BASIS`
+switches the whole board between blend / projection-only / 2026-only and 17%
+of keeper calls depend on it. Shipped as a header control
+(`app/template.html`'s `setBasis()`) backed by three full payloads
+(`scripts/build_app.py`'s `_basis_variants()`) instead of a rebuild —
+switching is a re-render. Board, free agents, per-team keeper summaries, and
+every fitted constant that depends on the board (inflation, replacement
+level, $/roto point) all swap together; live 2026 standings don't, correctly,
+since they're not a projection. See `out/FINDINGS.md` #42.
 
 **2.4 Auto-refresh — build pipeline is cron-safe, data ingestion is not
 (checked 2026-08-13, not scheduled on purpose, still manual by choice).**
@@ -198,7 +202,10 @@ black box). Real blind spot to fix or document prominently in the UI: no
 age/debut-year data anywhere in `data/`, so it can't do age-based comps.
 
 **3.7 Young/rookie-player projection modeling (0.5-1 session to scope,
-more to build).** Researched 2026-08-13, not implemented: the current
+more to build) — parked by explicit decision, 2026-08-13.** Josh's call:
+ZiPS is judged good enough at the rookie/debut-year case as-is, so this
+isn't worth a session against the other open items right now. Researched
+2026-08-13, not implemented: the current
 `RELIABILITY` blend weights (`klab/project.py`) were fit exclusively on
 players with an existing multi-year MLB track record, then applied
 uniformly to first-full-season players too. The research (cited sources in
@@ -245,20 +252,26 @@ opened locally.
 Done: sensitivity harness (1.1), inflation display (3.1), waiver-value settings
 (3.3, three anchored levels), positional-adjustment investigation (1.3, tested
 and left off), the app, uncertainty bands (1.2 — done in the app for a while,
-extended to the board CSV and eval_trade.py 2026-08-13).
+extended to the board CSV and eval_trade.py 2026-08-13), projection-basis
+selector (2.2, 2026-08-13), auto-refresh checked and documented (2.4,
+2026-08-13 — the rebuild chain is cron-safe, but there's no ingestion step to
+schedule yet, so it stays manual).
 
-1. **Projection-basis selector (2.2)** — ship three payloads, let the user
-   watch 17% of the keep/cut calls move. Half a session.
+**Deprioritized by explicit decision (2026-08-13):** 3.7, young/rookie
+projection modeling. Josh's call: treat ZiPS as already capturing the
+rookie/debut-year case well enough, rather than spend a session building a
+second reliability table for it. Left as a scoped-but-parked item below in
+case that judgment changes later.
+
+1. **Auction-estimator UI integration (3.6)** — in progress, 2026-08-13.
 2. **Prospect / upside distribution (3.2)** — ZiPS percentile bands are already
    in the export; value the option rather than the mean.
-3. **Auto-refresh (2.4)** — makes the tool live.
-4. **Aging curves (3.4)**, then **transaction logs (3.5)** if you want the
+3. **Aging curves (3.4)**, then **transaction logs (3.5)** if you want the
    manager-skill analysis.
-5. **Young-player/rookie modeling (3.7)** and **auction-estimator UI
-   integration (3.6)** — both new 2026-08-13, both scoped, neither started.
+4. **Young-player/rookie modeling (3.7)** — parked, see above.
 
-Items 1 and 2 are mechanical and belong on a cheap model. Items 3 and 5 are
-modelling judgment and are worth the expensive one.
+Item 2 is mechanical and belongs on a cheap model. Item 3 is modelling
+judgment and is worth the expensive one.
 
 ---
 

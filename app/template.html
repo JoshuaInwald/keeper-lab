@@ -121,6 +121,7 @@ code{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--pa
 <header>
   <h1>Keeper <span>Lab</span></h1>
   <div class="sub" id="hdr"></div>
+  <div class="sub" id="basisbar"></div>
 </header>
 <nav id="nav"></nav>
 <main>
@@ -156,9 +157,40 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 
 // ---------- shared state ----------
 const S = {tab:"board", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
-           desc:true, fa:false, infl:false};
-const INFL = D.constants.inflation || 1;
+           desc:true, fa:false, infl:false, basis: D.projection_basis || "blend"};
+let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
+
+// ---------- projection basis ----------
+// PROJECTION_BASIS is the model's biggest fork (out/ROADMAP.md 2.2): ~17%
+// of keep/cut calls move depending on it. All three variants ship in the
+// payload (klab/config.py's PROJECTION_BASIS values) so switching is a
+// re-render, not a rebuild.
+const BASES_ORDER = ["blend", "projection", "actuals"];
+const BASIS_LABEL = {blend: "blend", projection: "projection only", actuals: "2026 only"};
+const BASIS_HELP = "Which source drives every 2027 number on this page. "
+  + "\"blend\" (default) mixes 2026 form with the ZiPS 2027 projection, weighted "
+  + "by each stat's year-over-year reliability. \"projection only\" trusts ZiPS "
+  + "2027 alone and ignores 2026 entirely. \"2026 only\" extrapolates this year's "
+  + "actual performance and ignores the projection system entirely. About 17% of "
+  + "keep/cut calls move depending on this choice.";
+function setBasis(b){
+  if(!D.basis_variants[b]) return;
+  S.basis = b;
+  const v = D.basis_variants[b];
+  BOARD.length = 0; BOARD.push(...v.board);
+  FA.length = 0; FA.push(...v.fa);
+  Object.keys(byId).forEach(k=>delete byId[k]);
+  BOARD.concat(FA).forEach(r=>byId[g(r,"fg_id")]=r);
+  Object.keys(idByName).forEach(k=>delete idByName[k]);
+  BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
+  D.teams.length = 0; D.teams.push(...v.teams);
+  Object.keys(D.constants).forEach(k=>delete D.constants[k]);
+  Object.assign(D.constants, v.constants);
+  INFL = D.constants.inflation || 1;
+  renderHeader();
+  render();
+}
 
 // ---------- roto engine (mirrors trade.win_now_delta) ----------
 function rosterAgg(swap){
@@ -211,9 +243,16 @@ const TABS=[["board","Keeper board"],["teams","League"],["trade","Trade"],
 $("nav").innerHTML = TABS.map(([k,l])=>
   `<button data-t="${k}" onclick="go('${k}')">${l}</button>`).join("");
 function go(t){S.tab=t;render();}
-$("hdr").innerHTML = `10-team 5×5 roto keeper auction · $${D.league.budget}/team · `
-  + `built ${D.built} · <span class="dim">$${nf(D.constants.usd_per_roto_point_redraft,2)}/roto pt · `
-  + `+${nf((INFL-1)*100,0)}% projected auction inflation</span>`;
+function renderHeader(){
+  $("hdr").innerHTML = `10-team 5×5 roto keeper auction · $${D.league.budget}/team · `
+    + `built ${D.built} · <span class="dim">$${nf(D.constants.usd_per_roto_point_redraft,2)}/roto pt · `
+    + `+${nf((INFL-1)*100,0)}% projected auction inflation</span>`;
+  $("basisbar").innerHTML = `<label class="chk" title="${esc(BASIS_HELP)}">projection basis `
+    + `<select onchange="setBasis(this.value)">`
+    + BASES_ORDER.map(b=>`<option value="${b}" ${b===S.basis?"selected":""}>${BASIS_LABEL[b]}</option>`).join("")
+    + `</select></label>`;
+}
+renderHeader();
 $("foot").innerHTML = `Values are 2027 projections priced off this league's own auction history `
   + `(n≈677 purchases). Honest error bar is <b>±34% per category</b> — read every dollar figure `
   + `with that in mind. Methodology in <code>out/METHODS.md</code>; `
@@ -710,7 +749,11 @@ function modelView(){
     const d=den[x];
     return `<tr><td class="l">${x}</td><td>${nf(d, d<1?4:2)}</td>
       <td class="l dim">${kind(x)}</td></tr>`;}).join("");
-  const set=Object.entries(D.settings).map(([k,v])=>
+  // PROJECTION_BASIS is overridden with the live S.basis, not the
+  // build-time D.settings value -- the selector in the header can change
+  // it without a rebuild, and this panel needs to say what's actually
+  // showing, not what shipped in the file.
+  const set=Object.entries({...D.settings, PROJECTION_BASIS: S.basis}).map(([k,v])=>
     `<div class="k">${k.toLowerCase().replace(/_/g," ")}</div><div class="v">${esc(Array.isArray(v)?v.join(", "):v)}</div>`).join("");
   return `<div class="grid2">
     <div class="panel"><h3>Denominators — units per standings point</h3>
