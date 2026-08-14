@@ -23,7 +23,7 @@ silently rather than loudly).
 ```bash
 pip install pandas numpy scipy statsmodels pytest
 PYTHONPATH=.:scripts python3 scripts/run_all.py   # build everything into out/
-PYTHONPATH=. python3 -m pytest tests/ -q          # 71 invariants, ~55s
+PYTHONPATH=. python3 -m pytest tests/ -q          # 76 invariants, ~2 min
 open out/keeper_lab.html                          # the app — no server needed
 ```
 
@@ -34,13 +34,17 @@ and how/how often each one needs refreshing.
 ## The app
 
 `out/keeper_lab.html` is one self-contained file, ~6 MB, no server and no
-network. Seven tabs — keeper board, league, trade evaluator, standings
-(live + historical + a 2027 keeper-core projection), free agents, an
+network. Eight tabs — a homepage routing five common owner questions to the
+right screen with the right filters pre-applied; keeper board; league;
+"Contention" (Monte Carlo odds of actually finishing top 2, the only spots
+this league pays — `out/FINDINGS.md` #55); trade evaluator (now reporting
+Δ P(top-2), not just Δ points, for a proposed trade); standings (live +
+historical + a 2027 keeper-core projection); free agents; and an
 "Intuition" tab for manually shading a player's talent/health and seeing
-the ripple effect, and a model-internals tab — plus a player drawer with
-the full arithmetic, an inflation-adjusted toggle, a projection-basis
-selector, a C/SS positional-adjustment toggle, and precomputed trade
-suggestions. It opens on a phone, which is where a keeper decision actually
+the ripple effect — plus a player drawer with the full arithmetic, an
+inflation-adjusted toggle, a projection-basis selector, and a C/SS
+positional-adjustment toggle. It opens on a phone, which is where a keeper
+decision actually
 gets made.
 
 One thing is re-implemented in JavaScript: the rest-of-season standings

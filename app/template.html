@@ -344,8 +344,81 @@ function recomputeProjections(){   // re-run after setRosBasis() changes ros_* f
   PROJ_PTS = rotoPoints(PROJ_TOT);
 }
 
+// ---------- Monte Carlo top-2 odds (out/ROADMAP.md Phase 5) -------------
+// This league only pays the top 2 places, so a point ESTIMATE of final
+// standings ("PROJ_PTS" above) answers the wrong question -- what matters
+// is how OFTEN a team actually finishes top 2, given real player-outcome
+// uncertainty. Mirrors klab/standings_sim.py exactly (same shock
+// mechanism, same category-reliability scaling, same SV-uses-W's-
+// reliability convention) so the two stay consistent -- verified
+// statistically, not byte-for-byte, in app/verify.mjs (a Monte Carlo
+// result can't be byte-matched between two different RNGs, so that check
+// confirms the two AGREE within sampling noise, not that they're
+// identical draw for draw).
+//
+// Reuses rosterAgg(swap, shadeCols) as-is: that function already supports
+// BOTH a team-swap override (for a hypothetical trade) and a per-player,
+// per-category multiplier map (built for the Intuition tab) at once, so
+// one simulator function serves both the standalone Contention tab
+// (swap=null) and the Trade tab's what-if view (swap={fg_id: newTeam}).
+const SHOCK_CATEGORY = {H:"H", HR:"HR", R:"R", RBI:"RBI", SB:"SB",
+                        W:"W", K:"K", ER:"ER", BB:"BB", H_allowed:"H"};
+const DEFAULT_SHOCK_SCALE = 0.35;
+// Box-Muller for a standard normal draw -- the only thing a random-normal
+// library would be needed for here.
+function randNormal(){
+  let u=0, v=0;
+  while(u===0) u=Math.random();
+  while(v===0) v=Math.random();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+// One shared "hot/cold" draw per player -- a player running hot tends to
+// run hot across HR/R/RBI together, not independently per stat -- scaled
+// per category by (1 - reliability), so a less-reliable stat (pitcher
+// wins) swings further for the same underlying shock than a more-reliable
+// one (stolen bases). SV has no D.reliability entry (2027 saves come from
+// a separate persistence model, never blended through reliability) and
+// uses W's, the lowest real entry -- both are context/opportunity-driven,
+// not skill-driven, and both are known to swing on a single role change.
+function jitteredShadeCols(shockScale){
+  const relMax = D.reliability_max;
+  const svUnreliability = 1 - D.reliability.W/relMax;
+  const unrel = {};
+  for(const col in SHOCK_CATEGORY) unrel[col] = 1 - D.reliability[SHOCK_CATEGORY[col]]/relMax;
+  const cols = {};
+  for(const r of BOARD){
+    const t = randNormal();
+    const m = {};
+    for(const col in unrel) m[col] = Math.max(0, 1 + t*shockScale*unrel[col]);
+    m.SV = Math.max(0, 1 + t*shockScale*svUnreliability);
+    cols[g(r,"fg_id")] = m;
+  }
+  return cols;
+}
+// swap: {fg_id: newTeam}, same shape rosterAgg() already takes -- null for
+// "current rosters," set for "what if this trade happened."
+function simulateTopTwoOdds(swap, B, shockScale){
+  B = B || 500;
+  shockScale = shockScale==null ? DEFAULT_SHOCK_SCALE : shockScale;
+  const first={}, second={};
+  TEAMS.forEach(t=>{first[t]=0; second[t]=0;});
+  for(let i=0;i<B;i++){
+    const shade = jitteredShadeCols(shockScale);
+    const pts = rotoPoints(catTotals(rosterAgg(swap, shade)));
+    const order = TEAMS.slice().sort((a,b)=>pts[b].TOTAL-pts[a].TOTAL);
+    first[order[0]]++;
+    second[order[1]]++;
+  }
+  const out = {};
+  TEAMS.forEach(t=>{
+    out[t] = {p_first: first[t]/B, p_second: second[t]/B, p_top2: (first[t]+second[t])/B};
+  });
+  return out;
+}
+
 // ---------- nav ----------
-const TABS=[["model","Home"],["board","Keeper board"],["teams","League"],["trade","Trade"],
+const TABS=[["model","Home"],["board","Keeper board"],["teams","League"],
+            ["contention","Contention"],["trade","Trade"],
             ["standings","Standings"],["fa","Free agents"],["intuition","Intuition"]];
 $("nav").innerHTML = TABS.map(([k,l])=>
   `<button data-t="${k}" onclick="go('${k}')">${l}</button>`).join("");
@@ -790,6 +863,44 @@ function teamsView(){
     "Every column sorts — click a header, click again to reverse.");
 }
 
+// ---------- contention (out/ROADMAP.md Phase 5) -------------------------
+// This league only pays the top 2 places, so a point-estimate "projected
+// finish" (Standings tab) answers the wrong question. This tab answers the
+// right one: how OFTEN does each team actually land top 2, simulated many
+// times over real player-outcome uncertainty (klab/standings_sim.py).
+function contentionLabel(p){
+  if(p>=0.50) return {text:"Contender", cls:"pos"};
+  if(p>=0.05) return {text:"Bubble", cls:""};
+  return {text:"Rebuild", cls:"neg"};
+}
+const CONTENTION_HELP = "Monte Carlo odds of finishing 1st or 2nd, the only spots this league "
+  + `pays out -- ${D.top2_sim.draws} simulated rest-of-2026 seasons, jittering real `
+  + "player-outcome uncertainty (a hot/cold stretch, not a denominator-fit question -- "
+  + "different uncertainty source than the ± bands elsewhere in the app). "
+  + "Contender: 50%+. Bubble: 5-50%. Rebuild: under 5%. Judgment-call thresholds, not a hard line.";
+function contentionView(){
+  const basisData = D.top2_odds[S.rosBasis] || D.top2_odds.ros;
+  const rows = TEAMS.map(t=>{
+    const o = basisData[t] || {p_first:0, p_second:0, p_top2:0, current_points:0};
+    return {team:t, current_points:o.current_points, p_first:o.p_first,
+            p_second:o.p_second, p_top2:o.p_top2};
+  });
+  const cols = [
+    ["team","Team","l",x=>`<span class="name" onclick="S.tab='board';S.team=${JSON.stringify(esc(x.team))};render()">${esc(x.team)}</span>`,
+      "Click to see this team's players."],
+    ["current_points","Points now","",x=>nf(x.current_points,1),"Roto points in the live 2026 standings."],
+    ["p_top2","P(top 2)","",x=>{
+        const lab = contentionLabel(x.p_top2);
+        return `${nf(x.p_top2*100,0)}% <span class="${lab.cls}" style="font-size:11px;margin-left:4px">${lab.text}</span>`;
+      }, CONTENTION_HELP],
+    ["p_first","P(1st)","",x=>`${nf(x.p_first*100,0)}%`,"Simulated odds of finishing in first place outright."],
+    ["p_second","P(2nd)","",x=>`${nf(x.p_second*100,0)}%`,"Simulated odds of finishing second."],
+  ];
+  return `<div class="bar">${rosBasisPicker()}</div>`
+    + sortableTable(rows, cols, "sortContention", CONTENTION_HELP
+      + " Change the \"rest-of-2026 basis\" dropdown above to see how the signal driving this changes the picture.");
+}
+
 // ---------- standings ----------
 const CAT_DP = c=> c==="AVG" ? 3 : (c==="ERA"||c==="WHIP") ? 2 : 0;
 // Which signal projects the REST of 2026 -- Standings and the Trade tab's
@@ -1006,6 +1117,16 @@ function tradeResult(){
   const usdpt=D.constants.usd_per_roto_point_auction;
   const cw=D.league.contention_weight;
 
+  // Top-2 odds (out/ROADMAP.md Phase 5): this league only pays the top 2
+  // places, so Δ standings points above isn't actually the question that
+  // matters -- Δ P(top 2) is. "Before" reads the SAME precomputed figure
+  // the Contention tab shows (not re-simulated here, so the two screens
+  // can't disagree with each other); "after" is a live simulation of this
+  // specific proposed swap, reusing the exact swap map already built for
+  // the points math above.
+  const topBefore = D.top2_odds[S.rosBasis] || D.top2_odds.ros;
+  const topAfter = simulateTopTwoOdds(swap, 800);
+
   const block=(team,outIds,inIds)=>{
     const vIn=sum(inIds,"redraft_value"), vOut=sum(outIds,"redraft_value");
     const cIn=sum(inIds,"keeper_cost"),   cOut=sum(outIds,"keeper_cost");
@@ -1017,6 +1138,9 @@ function tradeResult(){
       const d=after[team][c]-PROJ_PTS[team][c];
       return Math.abs(d)<0.01?"":`${c} ${sgn(d,1)}`;
     }).filter(Boolean).join(" · ") || '<span class="dim">no category moves</span>';
+    const p2Before = (topBefore[team] && topBefore[team].p_top2) || 0;
+    const p2After = (topAfter[team] && topAfter[team].p_top2) || 0;
+    const dTop2 = p2After - p2Before;
     return `<div class="panel">
       <h3>${esc(team)}</h3>
       <div class="verdict">${sgn(adj(score),0,"$")} <span class="dim" style="font-size:12px">combined</span></div>
@@ -1026,6 +1150,8 @@ function tradeResult(){
         <div class="k">Δ surplus, 2027</div><div class="v">${sgn(adj(dS),1,"$")}</div>
         <div class="k">Δ surplus, multi-year</div><div class="v">${sgn(adj(dMY),1,"$")}</div>
         <div class="k">Δ 2026 standings points</div><div class="v">${sgn(dP,1)}</div>
+        <div class="k" title="This league only pays top 2 -- this is the trade's effect on how OFTEN this team actually lands there, not just its point total. Simulated live for this specific swap (klab/standings_sim.py, out/ROADMAP.md Phase 5).">Δ P(top 2), this trade</div>
+        <div class="v">${sgn(dTop2*100,1)}pp <span class="dim" style="font-size:11px">(${nf(p2Before*100,0)}%→${nf(p2After*100,0)}%)</span></div>
       </div>
       <div class="bars" style="margin-top:8px">${cats}</div>
     </div>`;
@@ -1390,6 +1516,7 @@ function render(){
   if(S.tab==="board") v.innerHTML=controls()+boardView(curRows());
   else if(S.tab==="fa") v.innerHTML=controls(false)+boardView(curRows(), FA_NOTE);
   else if(S.tab==="teams") v.innerHTML=teamsView();
+  else if(S.tab==="contention") v.innerHTML=contentionView();
   else if(S.tab==="trade") v.innerHTML=tradeView();
   else if(S.tab==="standings") v.innerHTML=standingsView();
   else if(S.tab==="intuition") v.innerHTML=intuitionView();

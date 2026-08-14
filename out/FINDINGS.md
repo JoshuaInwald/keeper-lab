@@ -4,7 +4,7 @@ Empirical results about how this league actually behaves. Methods and caveats
 in `LAB_NOTEBOOK.md`.
 
 <details>
-<summary><strong>Contents</strong> (54 sections — click to expand)</summary>
+<summary><strong>Contents</strong> (55 sections — click to expand)</summary>
 
 1. [Saves look underpriced — but only if you assume you're competing in them](#1-saves-look-underpriced--but-only-if-you-assume-youre-competing-in-them)
 2. [Cheap players out-earn expensive ones — but this is mostly arithmetic, not a market inefficiency](#2-cheap-players-out-earn-expensive-ones--but-this-is-mostly-arithmetic-not-a-market-inefficiency)
@@ -60,6 +60,7 @@ in `LAB_NOTEBOOK.md`.
 52. [Positional adjustment for catchers and shortstops — and a surprise: both positions are deep, not scarce](#52-positional-adjustment-for-catchers-and-shortstops--and-a-surprise-both-positions-are-deep-not-scarce)
 53. [Direction-aware pitcher playing-time trust, an upside_ft split, and a second copy of #52's own bug](#53-direction-aware-pitcher-playing-time-trust-an-upside_ft-split-and-a-second-copy-of-52s-own-bug)
 54. [Checked against FanGraphs' own rest-of-season auction calculator — mostly agrees, systematically compressed at the top](#54-checked-against-fangraphs-own-rest-of-season-auction-calculator--mostly-agrees-systematically-compressed-at-the-top)
+55. [A Monte Carlo top-2 simulator — the tool now answers the question this league's payout structure actually asks](#55-a-monte-carlo-top-2-simulator--the-tool-now-answers-the-question-this-leagues-payout-structure-actually-asks)
 
 </details>
 
@@ -2877,3 +2878,95 @@ project's whole differentiator (real league calibration instead of a
 generic pool assumption) — so the honest read is "expected, not alarming,"
 while flagging plainly that it rests on an unconfirmed guess about
 FanGraphs' own league settings.
+
+## 55. A Monte Carlo top-2 simulator — the tool now answers the question this league's payout structure actually asks
+
+This league only pays out for 1st and 2nd place. Every number the tool
+produced before this — `roto_points`, `redraft_value`, the $/point exchange
+rate, the Standings tab's "projected finish" — treats a marginal standings
+point as worth the same amount everywhere in the distribution. That's only
+correct if the payoff is linear in final rank, and it isn't: crossing 3rd
+into 2nd is worth real money, moving from 5th to 4th is worth nothing.
+Full reasoning in `out/ROADMAP.md` Phase 5's own writeup. This entry is the
+build.
+
+**What it computes.** `klab/standings_sim.py`'s `simulate_top2_odds()`
+runs many hypothetical rest-of-2026 seasons, jittering real player-outcome
+uncertainty, and reports how *often* each team actually lands top 2 — not
+a single point-estimate finish. Deliberately does not reuse the existing
+bootstrap (`klab/uncertainty.py`): that resamples *denominator* uncertainty
+(how many units of a stat buy a point), which is the wrong source for "will
+my closer's saves hold up." This resamples *player-outcome* uncertainty
+instead, built on the `RELIABILITY` table already fit and trusted elsewhere
+in this project (the same reliability weights that drive the 2027 rate
+blend) rather than introducing a new, less-understood data source: one
+shared "hot/cold" draw per player per simulated season (a player running
+hot tends to run hot across HR/R/RBI together, not independently per stat),
+scaled per category by `1 - reliability` so a less-reliable stat (pitcher
+wins, r=0.15) swings further for the same underlying shock than a
+more-reliable one (stolen bases, r=0.74). Saves have no `RELIABILITY`
+entry (2027 saves come from a separate persistence model, never blended
+through `rel_weight()`) and borrow wins' reliability as the closest
+analogue — both are context/opportunity-driven, not skill-driven, and both
+are known to swing on a single role change. Playing time (AB/IP) is not
+jittered — this simulates performance variance, not injury/role variance,
+a separate and still-unbuilt question.
+
+**Verified on real current standings.** 2nd and 3rd currently sit half a
+point apart (Spehr's Army 67.0, McBlocks 66.5) — the simulator resolves
+that into genuinely different odds: Pookie 2.0 (1st, 76.0, a 9-point
+cushion) 92% to finish top 2; Spehr's Army 72%; McBlocks 36%; every team
+7+ points back effectively 0%. The half-point gap between 2nd and 3rd
+does NOT translate into similar odds for the two teams — Spehr's Army's
+established edge is worth far more than half a point of raw standings
+math suggests, which is exactly the kind of thing a point estimate can't
+show and a simulation can.
+
+**Real trade example, run directly**: swapping Spehr's Army's and
+McBlocks' best players raises Spehr's Army's 2027 surplus by $13-55 —
+looks like a clean win by every dollar figure this tool showed before —
+but *drops* their title odds 11.5 points (72%→60%), because it costs them
+2026 standings points right now. McBlocks is the mirror image: loses
+dollar value, gains 3.6 points of title odds (36%→39%). A trade that looks
+good in every number the tool showed before this build can be bad for the
+number that actually determines a payout, and vice versa.
+
+**Architecture, and the one place this couldn't reuse the existing
+pattern.** Every other stochastic-feeling number in this app is exact,
+verified by byte-diffing JavaScript against pandas (`app/verify.mjs`).
+A Monte Carlo simulator can't be byte-matched — two different RNGs never
+produce the same draw sequence. Verification here checks *statistical*
+agreement instead: both implementations run at high draw counts and must
+land within a tolerance sized to Monte Carlo noise (8 percentage points),
+not exact equality. Measured agreement in practice has run 0.4-1.0
+percentage points apart across several rebuilds — comfortably inside
+tolerance, and a real confirmation the two independently-written
+implementations compute the same thing, not just a loose check that
+happens to pass. The JS port reuses the Intuition tab's existing
+`rosterAgg(swap, shadeCols)` almost as-is — that function already supports
+both a team-swap override (for a hypothetical trade) and a per-player,
+per-category multiplier map (built for manual shading) simultaneously, so
+one simulator function serves both the standalone Contention tab
+(`swap=null`) and the Trade tab's live what-if view (`swap={fg_id:
+newTeam}`) with no new plumbing. Both are fast enough to be genuinely
+interactive: 2000 draws in JS runs in well under a second in the browser.
+
+**Shipped**: a new "Contention" tab (team, current points, P(1st)/P(2nd)/
+P(top 2), and a Contender/Bubble/Rebuild label at 50%/5% judgment-call
+thresholds), and a "Δ P(top 2), this trade" line added to both sides of
+the Trade tab's verdict panel — "before" reads the same precomputed figure
+the Contention tab shows, so the two screens can't disagree with each
+other; "after" is a live simulation of whatever trade is currently being
+built. `klab/trade.py` gained a small, safety-net refactor along the way:
+`win_now_delta()`'s standings-total arithmetic was pulled out of an inline
+closure into three module-level functions (`_season_baseline`,
+`_team_volume`, `_totals_from`) so the simulator computes team totals with
+the *exact* same math, not a second hand-written copy that could drift.
+
+**Not done in this pass, on purpose**: Stage 3 from `out/ROADMAP.md` Phase
+5 — extending this to 2027 keeper-core odds, so a keeper decision's effect
+on next year's title odds (not just this year's) can be evaluated the same
+way. Deliberately separate: it needs its own baseline (keeper set +
+replacement-level fill, not current accumulated standings) and its own
+uncertainty layer (a full future season carries more uncertainty than a
+partial current one), not just a reuse of this session's machinery.

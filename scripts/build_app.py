@@ -31,6 +31,7 @@ from klab.api import snapshot
 from klab.denoms import team_baselines
 from klab.io import load_standings_long
 from klab.trade import ros_lines, standings_points
+from klab.project import RELIABILITY, REL_MAX
 
 # The three forks PROJECTION_BASIS can take (klab/config.py). Shipped as
 # three parallel payloads rather than one, so the app can let a user flip
@@ -58,6 +59,10 @@ ROS_COLS = ["AB", "H", "HR", "R", "RBI", "SB",
             "IP", "W", "SV", "K", "ER", "BB", "H_allowed"]
 
 BOOTSTRAP_DRAWS = 1000      # ~11s; the bands are stable well below this
+TOP2_SIM_DRAWS = 2000       # ~10s per ROS basis, x3 bases -- klab/standings_sim.py
+TOP2_SHOCK_SCALE = 0.35     # klab.standings_sim.DEFAULT_SHOCK_SCALE, made explicit here
+                            # so the payload's "top2_sim" metadata can't drift from
+                            # what was actually run
 
 
 def _round(v):
@@ -233,6 +238,31 @@ def _ros_values(board: pd.DataFrame, fa: pd.DataFrame, D: dict, base: dict,
         rv = ros_value_over_replacement(p, D, base, replacement_rp)
         out[basis] = {str(int(fid)): _round(val) for fid, val in
                      zip(rv["fg_id"], rv["ros_value_over_replacement"])}
+    return out
+
+
+def _top2_odds(board: pd.DataFrame, B: int = TOP2_SIM_DRAWS,
+               shock_scale: float = TOP2_SHOCK_SCALE) -> dict:
+    """Monte Carlo top-2-finish odds (klab.standings_sim, out/ROADMAP.md
+    Phase 5), one run per ROS basis, for the Contention tab's precomputed
+    current-roster view.
+
+    Computed ONCE, not nested per PROJECTION_BASIS the way `_ros_values()`
+    is: the simulator only touches rest-of-season stat lines and the
+    already-realized 2026 standings, neither of which PROJECTION_BASIS
+    affects -- that toggle is strictly about 2027 dollar valuation, and
+    this feature has nothing to do with 2027. Any of the positional/basis
+    board variants works as the roster source (team/fg_id don't change
+    across those toggles, only dollar VALUES do), so the ambient snapshot's
+    board is fine."""
+    from klab.standings_sim import simulate_top2_odds
+    out = {}
+    for basis in ROS_BASES:
+        odds = simulate_top2_odds(board, ros_basis=basis, B=B, shock_scale=shock_scale)
+        out[basis] = {row["team"]: {
+            "p_first": _round(row["p_first"]), "p_second": _round(row["p_second"]),
+            "p_top2": _round(row["p_top2"]), "current_points": _round(row["current_points"]),
+        } for _, row in odds.iterrows()}
     return out
 
 
@@ -496,6 +526,14 @@ def build_payload() -> dict:
         "keeper_standings_2027": variants[default]["keeper_standings_2027"],  # (default basis)
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "history_standings": _historical_standings(),
+        "top2_odds": _top2_odds(s.board, B=TOP2_SIM_DRAWS),
+        "top2_sim": {"draws": TOP2_SIM_DRAWS, "shock_scale": TOP2_SHOCK_SCALE},
+        # For the client-side port of klab.standings_sim's jitter (out/
+        # ROADMAP.md Phase 5) -- ships the same numbers the Python
+        # reference uses rather than hand-duplicating them in JS, so the
+        # two can't silently drift on a future RELIABILITY refit.
+        "reliability": {k: _round(v) for k, v in RELIABILITY.items()},
+        "reliability_max": _round(REL_MAX),
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
                        for t in cur.index},
         "base26": {"AB": _round(b26["team_AB"]), "IP": _round(b26["team_IP"])},

@@ -303,6 +303,59 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
     return res
 
 
+def _season_baseline(cur: pd.DataFrame) -> pd.DataFrame:
+    """Implied season-to-date volume behind each team's current rate stats,
+    anchored on the league-wide 2026 pace. Shared by `win_now_delta()` and
+    `klab.standings_sim`'s Monte Carlo simulator, so both compute standings
+    totals with the exact same arithmetic rather than two hand-written
+    copies that can silently drift apart."""
+    from .denoms import team_baselines
+    b26 = team_baselines([2026]).iloc[0]
+    add_base = pd.DataFrame(index=cur.index)
+    add_base["AB_now"] = b26["team_AB"]
+    add_base["H_now"] = cur["AVG"] * b26["team_AB"]
+    add_base["IP_now"] = b26["team_IP"]
+    add_base["ER_now"] = cur["ERA"] * b26["team_IP"] / 9.0
+    add_base["WH_now"] = cur["WHIP"] * b26["team_IP"]
+    return add_base
+
+
+def _team_volume(rosters_df: pd.DataFrame, ros: pd.DataFrame, cur_index) -> pd.DataFrame:
+    """Sum each team's rest-of-season counting-stat volume from a roster map
+    (fg_id -> team) and a rest-of-season stat-line table. Shared the same
+    way `_season_baseline` is."""
+    m = rosters_df.merge(ros, on="fg_id", how="left").fillna(0.0)
+    g = m.groupby("team")[["AB", "H", "HR", "R", "RBI", "SB",
+                           "IP", "W", "SV", "K", "ER", "BB",
+                           "H_allowed"]].sum()
+    return g.reindex(cur_index).fillna(0.0)
+
+
+def _totals_from(cur: pd.DataFrame, vol_df: pd.DataFrame) -> pd.DataFrame:
+    """Full-season-to-date category totals: current totals + rest-of-season
+    volume. Rate categories are rebuilt from implied volume, not averaged as
+    raw rates -- averaging ignores how much support each rate has, the same
+    mistake #45 fixed in a different layer. `vol_df` is `_team_volume()`'s
+    output concatenated with `_season_baseline()`'s -- both live in one
+    frame because every rate reconstruction needs both. Shared the same way
+    the two functions above are."""
+    w = pd.DataFrame(index=cur.index)
+    add = vol_df
+    w["R"] = cur["R"] + add["R"]
+    w["HR"] = cur["HR"] + add["HR"]
+    w["RBI"] = cur["RBI"] + add["RBI"]
+    w["SB"] = cur["SB"] + add["SB"]
+    w["W"] = cur["W"] + add["W"]
+    w["SV"] = cur["SV"] + add["SV"]
+    w["K"] = cur["K"] + add["K"]
+    ab_now = add["AB_now"]; h_now = add["H_now"]
+    w["AVG"] = (h_now + add["H"]) / (ab_now + add["AB"])
+    ip_now = add["IP_now"]; er_now = add["ER_now"]; wh_now = add["WH_now"]
+    w["ERA"] = (er_now + add["ER"]) * 9.0 / (ip_now + add["IP"])
+    w["WHIP"] = (wh_now + add["BB"] + add["H_allowed"]) / (ip_now + add["IP"])
+    return w
+
+
 def win_now_delta(board: pd.DataFrame, team_a: str, team_b: str,
                   a_players, b_players, ros_basis: str = "ros") -> dict:
     """Rest-of-2026 standings-point change for all ten teams after the swap.
@@ -317,53 +370,19 @@ def win_now_delta(board: pd.DataFrame, team_a: str, team_b: str,
     st = load_standings_long()
     cur = st[st["season"] == 2026].pivot(index="team", columns="category",
                                          values="total")
-
-    def totals_from(vol_df):
-        w = pd.DataFrame(index=cur.index)
-        # counting categories: current total + rest-of-season contribution
-        add = vol_df
-        w["R"] = cur["R"] + add["R"]
-        w["HR"] = cur["HR"] + add["HR"]
-        w["RBI"] = cur["RBI"] + add["RBI"]
-        w["SB"] = cur["SB"] + add["SB"]
-        w["W"] = cur["W"] + add["W"]
-        w["SV"] = cur["SV"] + add["SV"]
-        w["K"] = cur["K"] + add["K"]
-        # rate categories: rebuild from implied volume
-        ab_now = add["AB_now"]; h_now = add["H_now"]
-        w["AVG"] = (h_now + add["H"]) / (ab_now + add["AB"])
-        ip_now = add["IP_now"]; er_now = add["ER_now"]; wh_now = add["WH_now"]
-        w["ERA"] = (er_now + add["ER"]) * 9.0 / (ip_now + add["IP"])
-        w["WHIP"] = (wh_now + add["BB"] + add["H_allowed"]) / (ip_now + add["IP"])
-        return w
-
-    # implied season-to-date volume behind each team's current rate stats,
-    # anchored on the league-wide 2026 pace
-    from .denoms import team_baselines
-    b26 = team_baselines([2026]).iloc[0]
-    add_base = pd.DataFrame(index=cur.index)
-    add_base["AB_now"] = b26["team_AB"]
-    add_base["H_now"] = cur["AVG"] * b26["team_AB"]
-    add_base["IP_now"] = b26["team_IP"]
-    add_base["ER_now"] = cur["ERA"] * b26["team_IP"] / 9.0
-    add_base["WH_now"] = cur["WHIP"] * b26["team_IP"]
+    add_base = _season_baseline(cur)
 
     def build(rosters_df):
-        m = rosters_df.merge(ros, on="fg_id", how="left").fillna(0.0)
-        g = m.groupby("team")[["AB", "H", "HR", "R", "RBI", "SB",
-                               "IP", "W", "SV", "K", "ER", "BB",
-                               "H_allowed"]].sum()
-        g = g.reindex(cur.index).fillna(0.0)
-        return pd.concat([g, add_base], axis=1)
+        return pd.concat([_team_volume(rosters_df, ros, cur.index), add_base], axis=1)
 
-    before = totals_from(build(rosters))
+    before = _totals_from(cur, build(rosters))
 
     moved = rosters.copy()
     a_ids = [int(p["fg_id"]) for p in a_players]
     b_ids = [int(p["fg_id"]) for p in b_players]
     moved.loc[moved["fg_id"].isin(a_ids), "team"] = team_b
     moved.loc[moved["fg_id"].isin(b_ids), "team"] = team_a
-    after = totals_from(build(moved))
+    after = _totals_from(cur, build(moved))
 
     p_before = standings_points(before)
     p_after = standings_points(after)

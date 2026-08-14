@@ -427,7 +427,7 @@ rather than a reimplementation.
 
 ---
 
-## Phase 5 — Threshold-aware valuation (top-2-only payouts). Proposed 2026-08-14, unscoped, nothing built
+## Phase 5 — Threshold-aware valuation (top-2-only payouts). Proposed 2026-08-14; 5.1/5.2/5.5 done 2026-08-14
 
 This league only pays out for 1st and 2nd place. Every number this tool
 produces (`roto_points`, `redraft_value`, the $/point exchange rate) treats
@@ -438,47 +438,67 @@ function: crossing 3rd into 2nd is worth real money, moving from 5th to 4th
 is worth nothing, and piling up points once comfortably in 1st is close to
 worthless too. That means the RIGHT strategy is team-state-dependent
 (minimize variance if safely ahead, seek variance if just below the
-cutoff, ignore this year's standings entirely if hopelessly behind), and
-nothing in the current pipeline knows which state any given team is in --
-every team is priced off the same flat rate. Full reasoning and a concrete
-illustration (2nd and 3rd currently separated by half a point) in this
-session's chat log.
+cutoff, ignore this year's standings entirely if hopelessly behind).
 
-**5.1 P(finish top 2) simulator — the foundational piece, everything else
-depends on it.** Extends the existing bootstrap machinery (already
-resamples category dispersion 1000x for player-level value bands) to
-simulate full-season standings across all 10 teams simultaneously and
-tally how often each team lands top 2, instead of the single point-estimate
-"projected finish" the Standings tab currently shows.
+**5.1 P(finish top 2) simulator — done, 2026-08-14.** `klab/standings_sim.py`.
+Built on the existing `RELIABILITY` table (already fit and trusted
+elsewhere -- the same weights driving the 2027 rate blend), NOT the
+existing bootstrap (`klab/uncertainty.py`, resamples denominator
+uncertainty -- the wrong source for "will my closer's saves hold up").
+One shared per-player "hot/cold" draw per simulated season, scaled per
+category by `1 - reliability`. Verified on real current standings: 2nd and
+3rd sit half a point apart in raw standings (Spehr's Army 67.0, McBlocks
+66.5) but resolve to very different odds (72% vs. 36%) once simulated --
+exactly the kind of thing a point estimate can't show. See
+`out/FINDINGS.md` #55 for the full writeup, including the one place this
+couldn't reuse the app's usual byte-diff verification pattern (a Monte
+Carlo result can't be exact-matched between two RNGs -- verified
+statistically instead, agreement measured at 0.4-1.0 percentage points in
+practice, well inside the 8-point tolerance).
 
-**5.2 A team-situation classifier** (contender / bubble / rebuild), derived
-from 5.1, refreshed on every rebuild.
+**5.2 A team-situation classifier — done, 2026-08-14**, shipped as the new
+Contention tab: every team's P(1st)/P(2nd)/P(top 2) plus a Contender
+(50%+) / Bubble (5-50%) / Rebuild (under 5%) label. Judgment-call
+thresholds, not a hard boundary.
 
-**5.3 Team-conditional marginal value**, replacing the single flat $/point
-rate for team-specific views. Generalizes RESEARCH.md's already-identified
-top open priority (§8 #1, team-specific category value) into team-specific
-*standings-threshold* value -- a bigger version of the same underlying gap
-(§6.2: roto points add up linearly today with no notion of where a team
-actually sits in a category, let alone in the standings overall).
+**5.5 Trade evaluator upgrade — done, 2026-08-14.** A "Δ P(top 2), this
+trade" line on both sides of the Trade tab's verdict panel, live-simulated
+for whatever trade is currently being built. Real example run directly:
+swapping Spehr's Army's and McBlocks' best players raises Spehr's Army's
+2027 surplus $13-55 (looks like a clean win by every number the tool
+showed before this build) but drops their title odds 11.5 points
+(72%→60%), because it costs them 2026 standings points right now --
+McBlocks is the mirror image, losing dollar value while gaining title
+odds. Exactly the disconnect this whole phase exists to surface.
 
-**5.4 Surface player-level variance as a first-class stat.** ZiPS's own
-P10-P90 bands exist in the export and have gone unused (RESEARCH.md §6.3,
-still open). Pairing that with 5.2/5.3 lets a bubble team filter for "high
-variance, borderline talent" and a leader filter for "safest floor" --
-the whole point once team situation is known. Directly reframes the
-deprioritized closer/reliever upside item (3.10): a bubble team specifically
-may value that exact kind of asset far more than the "doesn't matter much"
-framing that deprioritized it assumed, since it wasn't conditioned on team
-state. Not reopening 3.10 by itself -- just noting the two are connected.
+**5.3 Team-conditional marginal value — still open.** Replacing the single
+flat $/point rate for team-specific views. Generalizes RESEARCH.md's
+already-identified top open priority (§8 #1, team-specific category value)
+into team-specific *standings-threshold* value -- a bigger version of the
+same underlying gap (§6.2: roto points add up linearly today with no
+notion of where a team actually sits in a category, let alone in the
+standings overall). 5.1's simulator is the foundation this would build on.
 
-**5.5 Trade evaluator upgrade: report Δ P(top-2) for a proposed trade, not
-just Δ points.** The most literal translation of "does this actually help
-me win," once 5.1 exists to compute it from.
+**5.4 Surface player-level variance as a first-class stat — still open.**
+ZiPS's own P10-P90 bands exist in the export and have gone unused
+(RESEARCH.md §6.3, still open). Pairing that with 5.2/5.3 lets a bubble
+team filter for "high variance, borderline talent" and a leader filter for
+"safest floor." Directly reframes the deprioritized closer/reliever upside
+item (3.10): a bubble team specifically may value that exact kind of asset
+far more than the "doesn't matter much" framing that deprioritized it
+assumed, since it wasn't conditioned on team state. Not reopening 3.10 by
+itself -- just noting the two are connected.
 
 **5.6 Research note, not a build item: revisit the flat-exchange-rate
-finding (chat log, the FanGraphs comparison discussion) through this lens.**
-Real hypothesis worth writing up once 5.1 gives real P(top-2) numbers to
+finding (out/FINDINGS.md #54) through this lens -- still open.** Real
+hypothesis worth writing up now that 5.1 gives real P(top-2) numbers to
 check it against: with only 2 of 10 spots paying, the average team in most
 seasons isn't a contender, so broad value-accumulation instead of
 star-chasing may be this league's rational aggregate bidding behavior for
 its own payout structure -- not a market inefficiency to correct.
+
+**Stage 3 (2027 keeper-core odds) -- still open, deliberately not attempted
+in the same pass as 5.1/5.2/5.5.** Needs its own baseline (keeper set +
+replacement-level fill, not current accumulated standings) and its own
+uncertainty layer (a full future season carries more uncertainty than a
+partial current one) -- a real extension of 5.1, not a trivial one.
