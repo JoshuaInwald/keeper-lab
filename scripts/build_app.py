@@ -60,6 +60,9 @@ ROS_COLS = ["AB", "H", "HR", "R", "RBI", "SB",
 
 BOOTSTRAP_DRAWS = 1000      # ~11s; the bands are stable well below this
 FINISH_SIM_DRAWS = 2000     # ~10s per ROS basis, x3 bases -- klab/standings_sim.py
+KEEPER_FINISH_SIM_DRAWS = 800   # ~15-20s per PROJECTION_BASIS, x3 bases -- higher
+                                # per-draw cost than FINISH_SIM_DRAWS (see
+                                # _keeper_finish_odds()), so fewer draws
 FINISH_SHOCK_SCALE = 0.35   # klab.standings_sim.DEFAULT_SHOCK_SCALE, made explicit here
                             # so the payload's "finish_sim" metadata can't drift from
                             # what was actually run
@@ -269,6 +272,33 @@ def _finish_odds(board: pd.DataFrame, B: int = FINISH_SIM_DRAWS,
     return out
 
 
+def _keeper_finish_odds(board: pd.DataFrame, fa: pd.DataFrame,
+                        replacement_rp: float, B: int = KEEPER_FINISH_SIM_DRAWS,
+                        shock_scale: float = FINISH_SHOCK_SCALE) -> dict:
+    """Monte Carlo in-the-money-finish odds for each team's CURRENT KEEPER
+    SET in a hypothetical 2027 season (klab.standings_sim's Stage 3, out/
+    ROADMAP.md Phase 5) -- the Contention tab's "2027 (keeper core)" view.
+
+    Computed INSIDE the per-PROJECTION_BASIS subprocess, same as
+    `_keeper_standings_2027()` right above it and unlike `_finish_odds()`
+    above: which players are flagged `keep_2027` depends on PROJECTION_BASIS
+    (~17% of keep/cut calls move with it, out/FINDINGS.md #42), so this
+    feature -- unlike the rest-of-2026 simulator, which only touches
+    already-realized standings and rest-of-season lines neither of which
+    PROJECTION_BASIS affects -- genuinely needs one run per basis, x3 total.
+    Fewer draws than `_finish_odds()`'s (`KEEPER_FINISH_SIM_DRAWS` <
+    `FINISH_SIM_DRAWS`): this one's per-draw cost is ~4x higher (a
+    DataFrame rebuild + groupby every draw, not a single merge), and three
+    basis-subprocess runs of it already add real build time."""
+    from klab.standings_sim import simulate_keeper_finish_odds
+    odds = simulate_keeper_finish_odds(board, fa, replacement_rp, B=B, shock_scale=shock_scale)
+    finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
+    return {row["team"]: {
+        **{c: _round(row[c]) for c in finish_cols},
+        "p_money": _round(row["p_money"]),
+    } for _, row in odds.iterrows()}
+
+
 def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
     """Comp-based next-auction price estimate for every player with a
     projection, keyed by fg_id (as a string -- JSON object keys are always
@@ -441,6 +471,7 @@ def _variant_payload() -> dict:
         "ros_values": _ros_values(board_raw, fa_raw, _meta["denominators"], _meta["baseline"],
                                   _meta["replacement_rp"]),
         "keeper_standings_2027": _keeper_standings_2027(board_raw, fa_raw, _meta["replacement_rp"]),
+        "keeper_finish_odds": _keeper_finish_odds(board_raw, fa_raw, _meta["replacement_rp"]),
     }
 
 
@@ -510,6 +541,7 @@ def build_payload() -> dict:
                                "auction_estimates": v["auction_estimates"],
                                "ros_values": v["ros_values"],
                                "keeper_standings_2027": v["keeper_standings_2027"],
+                               "keeper_finish_odds": v["keeper_finish_odds"],
                                "positional_variants": v["positional_variants"]}
                            for b, v in variants.items()},
         "trade_suggestions": trade_suggestions,
@@ -527,11 +559,13 @@ def build_payload() -> dict:
         "auction_estimates": variants[default]["auction_estimates"],  # (default basis)
         "ros_values": variants[default]["ros_values"],      # (default proj basis; keyed by [rosBasis][fg_id])
         "keeper_standings_2027": variants[default]["keeper_standings_2027"],  # (default basis)
+        "keeper_finish_odds": variants[default]["keeper_finish_odds"],  # (default basis)
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "history_standings": _historical_standings(),
         "finish_odds": _finish_odds(s.board, B=FINISH_SIM_DRAWS),
         "finish_sim": {"draws": FINISH_SIM_DRAWS, "shock_scale": FINISH_SHOCK_SCALE,
                       "payout_spots": C.PAYOUT_SPOTS, "payout_share": C.PAYOUT_SHARE},
+        "keeper_finish_sim": {"draws": KEEPER_FINISH_SIM_DRAWS, "shock_scale": FINISH_SHOCK_SCALE},
         # For the client-side port of klab.standings_sim's jitter (out/
         # ROADMAP.md Phase 5) -- ships the same numbers the Python
         # reference uses rather than hand-duplicating them in JS, so the

@@ -332,6 +332,25 @@ const keeper2027Result = await page.evaluate(() => {
 const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
+// Contention tab's 2027 season toggle (out/ROADMAP.md Phase 5 Stage 3):
+// must render all 10 teams and must vary with PROJECTION_BASIS, since
+// which players are flagged keep_2027 is basis-dependent -- unlike the
+// 2026 rest-of-season view, which isn't.
+const contention2027Result = await page.evaluate(() => {
+  go('contention');
+  S.contentionSeason = '2027';
+  render();
+  const rowsShown = document.querySelectorAll('#view tbody tr').length;
+  const before = D.basis_variants[S.basis].keeper_finish_odds['NPB No Stars']?.p_money;
+  setBasis('actuals');
+  const after = D.basis_variants[S.basis].keeper_finish_odds['NPB No Stars']?.p_money;
+  setBasis('blend');
+  S.contentionSeason = '2026'; render();
+  return { rowsShown, before, after, basisAware: before !== after };
+});
+const contention2027Bad = contention2027Result.rowsShown !== 10 || !contention2027Result.basisAware;
+if (contention2027Bad) console.log('  CONTENTION 2027 TOGGLE MISMATCH:', JSON.stringify(contention2027Result));
+
 // upside_ft's role/health split (out/FINDINGS.md #53): a reliever whose
 // full-time upside comes from being scaled to a closer's save total must be
 // tagged "role" in both the board cell and the drawer, and at least one
@@ -424,11 +443,13 @@ console.log(historyBad ? 'FAIL  historical standings did not render or did not r
                        : 'PASS  historical standings render and return to the live view cleanly');
 console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignores projection basis'
                           : 'PASS  2027 keeper standings render all 10 teams and track projection basis');
+console.log(contention2027Bad ? 'FAIL  Contention tab 2027 toggle missing teams or ignores projection basis'
+                              : 'PASS  Contention tab 2027 toggle renders all 10 teams and tracks projection basis');
 console.log(upsideKindBad ? 'FAIL  upside_ft role/health split missing a case or not tagged correctly'
                           : 'PASS  upside_ft tags closer-role upside separately from health upside');
 console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'
                          : 'PASS  Intuition tab shading moves both halves and stays sandboxed');
 await browser.close();
 process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || homeBad || finishBad || auctionBad
-            || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || upsideKindBad
-            || intuitionBad ? 1 : 0);
+            || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || contention2027Bad
+            || upsideKindBad || intuitionBad ? 1 : 0);

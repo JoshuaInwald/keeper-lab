@@ -427,7 +427,7 @@ rather than a reimplementation.
 
 ---
 
-## Phase 5 — Threshold-aware valuation (top-4 payout, 50/25/15/breakeven). Proposed 2026-08-14; 5.1/5.2/5.5 done 2026-08-14, corrected same day
+## Phase 5 — Threshold-aware valuation (top-4 payout, 50/25/15/breakeven). Proposed 2026-08-14; 5.1/5.2/5.5/Stage 3 done 2026-08-14, corrected same day
 
 **Correction, 2026-08-14, same day 5.1/5.2/5.5 shipped**: this phase and
 the feature it describes were first built assuming a flat top-2-only
@@ -516,8 +516,22 @@ profit, so broad value-accumulation instead of star-chasing may be this
 league's rational aggregate bidding behavior for its own payout structure
 -- not a market inefficiency to correct.
 
-**Stage 3 (2027 keeper-core odds) -- still open, next up.** Needs its own
-baseline (keeper set + replacement-level fill, not current accumulated
-standings) and its own uncertainty layer (a full future season carries
-more uncertainty than a partial current one) -- a real extension of 5.1,
-not a trivial one.
+**Stage 3 (2027 keeper-core odds) -- done, 2026-08-14.**
+`simulate_keeper_finish_odds()`, a genuinely different function from 5.1's
+rest-of-2026 version, not a copy with a different input: no already-
+realized baseline exists for a season that hasn't happened, so each kept
+player's own full-2027-season line is jittered directly, while the
+replacement-level fill for open roster slots stays fixed (it's a
+15-player band average, not one real player's uncertain outcome). Also
+genuinely basis-dependent in a way 5.1 isn't (`keep_2027` moves ~17% with
+`PROJECTION_BASIS`, #42), so it runs once per basis. Real finding on the
+first run: keeper-core strength doesn't track current 2026 standing at
+all -- Producers and New York Polar Bears (mid-pack in the live race) have
+the two strongest 2027 cores (74% odds of the money each); Pookie 2.0, the
+current runaway 2026 leader, sits at 21%. Shipped as a season toggle on
+the Contention tab. See `out/FINDINGS.md` #55 for the full writeup.
+**Not done**: live Trade-tab integration for 2027 odds (a "Δ P(2027
+money)" line mirroring 5.5) -- `simulate_keeper_finish_odds()` already
+accepts a `keeper_override` parameter shaped for it, but wiring it into
+the Trade tab live is its own scoped piece of work, deliberately not
+attempted in the same pass.

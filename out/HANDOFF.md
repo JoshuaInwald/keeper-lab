@@ -150,7 +150,7 @@ PYTHONPATH=. python3 scripts/draft_surplus.py    # where auction surplus lives
 PYTHONPATH=. python3 scripts/eval_trade.py "Team A" "Team B" "P1,P2" "P3,P4"
 PYTHONPATH=. python3 scripts/team_reports.py [team ...]  # keeper sets + channels
 PYTHONPATH=. python3 scripts/sensitivity.py      # how much do the knobs matter
-PYTHONPATH=. python3 -m pytest tests/ -q         # 76 invariants, ~2 min
+PYTHONPATH=. python3 -m pytest tests/ -q         # 78 invariants, ~2.5 min
 ```
 
 A cold run takes ~2.7s; a second build in the same process is ~0.08s (loaders

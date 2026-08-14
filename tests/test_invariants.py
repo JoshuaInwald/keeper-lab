@@ -872,3 +872,52 @@ def test_swap_changes_the_odds_in_the_expected_direction(board):
     p_after = after.set_index("team")["p_money"]
     assert p_after[recipient] > p_before[recipient]
     assert p_after[donor_team] < p_before[donor_team]
+
+
+# --- Stage 3: 2027 keeper-core finish odds (out/ROADMAP.md Phase 5) --------
+
+def test_keeper_finish_odds_probabilities_are_internally_consistent(board):
+    """Same identity check as the rest-of-2026 simulator, for the 2027
+    keeper-core version: p_money must equal the sum of the per-place
+    columns, every probability must be valid, and each place column must
+    sum to ~1.0 across teams."""
+    from klab.standings_sim import simulate_keeper_finish_odds
+    from klab.freeagents import free_agent_board
+    b, _, meta = board
+    fa = free_agent_board()
+    out = simulate_keeper_finish_odds(b, fa, meta["replacement_rp"], B=300, seed=0)
+    finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
+    assert out["p_money"].to_numpy() == pytest.approx(out[finish_cols].sum(axis=1).to_numpy())
+    assert ((out[finish_cols + ["p_money"]] >= 0).all().all())
+    assert ((out[finish_cols + ["p_money"]] <= 1).all().all())
+    for col in finish_cols:
+        assert out[col].sum() == pytest.approx(1.0, abs=1e-9)
+
+
+def test_keeper_finish_odds_reassignment_moves_the_odds(board):
+    """Moving a real keeper from one team's keeper set to another's (the
+    `keeper_override` mechanism) must raise the receiving team's odds and
+    lower the sending team's -- mirrors the rest-of-2026 simulator's own
+    swap-direction test, using whichever two teams have the closest to 50%
+    baseline odds so neither is already at a ceiling or floor with no room
+    to move."""
+    from klab.standings_sim import simulate_keeper_finish_odds
+    from klab.freeagents import free_agent_board
+    b, _, meta = board
+    fa = free_agent_board()
+    repl = meta["replacement_rp"]
+    before = simulate_keeper_finish_odds(b, fa, repl, B=600, seed=5)
+    by_uncertainty = before.assign(dist=(before["p_money"] - 0.5).abs()).sort_values("dist")
+    recipient, donor_team = by_uncertainty["team"].iloc[0], by_uncertainty["team"].iloc[1]
+
+    kept = b[b["keep_2027"] & (b["team"] == donor_team)]
+    assert len(kept) > 0, "test needs a donor team with at least one keeper"
+    donor = kept.nlargest(1, "roto_points").iloc[0]
+    fid = int(donor["fg_id"])
+
+    after = simulate_keeper_finish_odds(b, fa, repl, keeper_override={fid: recipient},
+                                        B=600, seed=5)
+    p_before = before.set_index("team")["p_money"]
+    p_after = after.set_index("team")["p_money"]
+    assert p_after[recipient] > p_before[recipient]
+    assert p_after[donor_team] < p_before[donor_team]

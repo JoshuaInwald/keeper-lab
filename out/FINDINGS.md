@@ -2983,10 +2983,51 @@ module-level functions (`_season_baseline`, `_team_volume`,
 `_totals_from`) so the simulator computes team totals with
 the *exact* same math, not a second hand-written copy that could drift.
 
-**Not done in this pass, on purpose**: Stage 3 from `out/ROADMAP.md` Phase
-5 — extending this to 2027 keeper-core odds, so a keeper decision's effect
-on next year's title odds (not just this year's) can be evaluated the same
-way. Deliberately separate: it needs its own baseline (keeper set +
-replacement-level fill, not current accumulated standings) and its own
-uncertainty layer (a full future season carries more uncertainty than a
-partial current one), not just a reuse of this session's machinery.
+**Stage 3, shipped the same day: 2027 keeper-core odds.**
+`klab/standings_sim.py`'s `simulate_keeper_finish_odds()` answers a
+genuinely different question than the rest-of-2026 version above, not a
+copy with a different input: there is no already-realized baseline here —
+the whole 2027 season is in the future — so a KEPT player's own
+full-season projected line is what gets jittered directly (not an
+increment on top of known partial-season totals), while the
+replacement-level fill for a team's open roster slots (the same 15-player
+band average `_keeper_standings_2027`'s point estimate already used) is
+left FIXED. That's a deliberate choice, not an oversight: the fill isn't
+one real player's own uncertain outcome, so there's no principled
+distribution to draw it from. Also genuinely basis-dependent in a way the
+2026 simulator isn't: which players are flagged `keep_2027` moves ~17%
+with `PROJECTION_BASIS` (#42), so this runs once per basis inside the
+same per-basis subprocess `_keeper_standings_2027` already uses, not once
+overall.
+
+**A real, non-obvious finding on the first run**: keeper-core strength for
+2027 does not track 2026 standing position at all. Producers and New York
+Polar Bears — mid-pack in the live 2026 race — have the two strongest 2027
+keeper cores in the league (74% odds of finishing in the money on keeper
+talent alone); Pookie 2.0, the current runaway 2026 leader, sits at only
+21%. The read: a team built to win now (established vets, short remaining
+control, not extended) doesn't automatically have a strong keeper core for
+next year, and a team that isn't currently winning may be quietly building
+one. A second example from the same run: Orange and Black Attack and
+Producers both carry 7 keepers, but Orange and Black Attack's core
+projects at 0% and Producers' at 74% — count alone says nothing about
+quality.
+
+**Shipped**: a season toggle on the Contention tab ("2026 — rest of
+season" / "2027 — keeper core"), same P(1st)-through-P(`PAYOUT_SPOTS`)/
+P(money)/Contender-Bubble-Rebuild columns, sourced from whichever season
+is selected. The 2027 view's context column shows keeper count instead of
+current standings points (current points isn't a meaningful concept for a
+season that hasn't happened), and reads
+`D.basis_variants[S.basis].keeper_finish_odds` directly at render time
+rather than caching a global that would need its own explicit refresh on
+every basis switch — simpler than the pattern the rest of the app uses for
+basis-dependent globals, and correct by construction rather than by
+remembering to keep something in sync.
+
+**Deliberately not attempted in this pass**: live trade evaluation against
+2027 keeper-core odds (a Trade-tab "Δ P(2027 money)" line, mirroring
+Stage 2's rest-of-2026 version). `simulate_keeper_finish_odds()` already
+accepts a `keeper_override` parameter shaped for exactly this, but wiring
+it into the Trade tab live is its own scoped piece of work, not shipped
+here.

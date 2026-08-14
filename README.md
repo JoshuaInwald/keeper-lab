@@ -23,7 +23,7 @@ silently rather than loudly).
 ```bash
 pip install pandas numpy scipy statsmodels pytest
 PYTHONPATH=.:scripts python3 scripts/run_all.py   # build everything into out/
-PYTHONPATH=. python3 -m pytest tests/ -q          # 76 invariants, ~2 min
+PYTHONPATH=. python3 -m pytest tests/ -q          # 78 invariants, ~2.5 min
 open out/keeper_lab.html                          # the app — no server needed
 ```
 
@@ -36,15 +36,16 @@ and how/how often each one needs refreshing.
 `out/keeper_lab.html` is one self-contained file, ~6 MB, no server and no
 network. Eight tabs — a homepage routing five common owner questions to the
 right screen with the right filters pre-applied; keeper board; league;
-"Contention" (Monte Carlo odds of actually finishing top 2, the only spots
-this league pays — `out/FINDINGS.md` #55); trade evaluator (now reporting
-Δ P(top-2), not just Δ points, for a proposed trade); standings (live +
-historical + a 2027 keeper-core projection); free agents; and an
-"Intuition" tab for manually shading a player's talent/health and seeing
-the ripple effect — plus a player drawer with the full arithmetic, an
-inflation-adjusted toggle, a projection-basis selector, and a C/SS
-positional-adjustment toggle. It opens on a phone, which is where a keeper
-decision actually
+"Contention" (Monte Carlo odds of actually finishing in the money — this
+league pays 50%/25%/15%/breakeven for 1st-4th, not a flat cutoff — with a
+toggle between the live 2026 race and 2027 keeper-core strength alone;
+`out/FINDINGS.md` #55); trade evaluator (now reporting Δ P(money), not
+just Δ points, for a proposed trade); standings (live + historical + a
+2027 keeper-core projection); free agents; and an "Intuition" tab for
+manually shading a player's talent/health and seeing the ripple effect —
+plus a player drawer with the full arithmetic, an inflation-adjusted
+toggle, a projection-basis selector, and a C/SS positional-adjustment
+toggle. It opens on a phone, which is where a keeper decision actually
 gets made.
 
 One thing is re-implemented in JavaScript: the rest-of-season standings

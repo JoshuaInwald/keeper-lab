@@ -207,7 +207,7 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 const S = {tab:"model", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
            desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
            rosBasis: D.ros_basis_default || "ros", standSeason: "live", positional: false,
-           shades: {}, intuitionQ: "", intuitionCalculated: false};
+           shades: {}, intuitionQ: "", intuitionCalculated: false, contentionSeason: "2026"};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
 
@@ -891,38 +891,64 @@ function contentionLabel(p){
   return {text:"Rebuild", cls:"neg"};
 }
 const PAYOUT_SPOTS = D.finish_sim.payout_spots;
-const CONTENTION_HELP = `Monte Carlo odds of finishing in the top ${PAYOUT_SPOTS}, the only `
-  + `places this league pays out (1st 50% of the pot, 2nd 25%, 3rd 15%, 4th gets the buy-in `
-  + `back -- 4th is a break-even outcome, not a scaled-down version of winning, which this `
-  + `single "in the money" figure doesn't distinguish) -- `
-  + `${D.finish_sim.draws} simulated rest-of-2026 seasons, jittering real player-outcome `
-  + "uncertainty (a hot/cold stretch, not a denominator-fit question -- different uncertainty "
-  + "source than the ± bands elsewhere in the app). Contender: 50%+ chance of the money. "
-  + "Bubble: 5-50%. Rebuild: under 5%. Judgment-call thresholds, not a hard line.";
+function contentionHelp(is2027){
+  const base = `Monte Carlo odds of finishing in the top ${PAYOUT_SPOTS}, the only places `
+    + `this league pays out (1st 50% of the pot, 2nd 25%, 3rd 15%, 4th gets the buy-in back -- `
+    + `4th is a break-even outcome, not a scaled-down version of winning, which this single `
+    + `"in the money" figure doesn't distinguish). `;
+  const scope = is2027
+    ? `${D.keeper_finish_sim.draws} simulated 2027 seasons built from each team's CURRENT `
+      + `keeper set alone plus replacement-level fill for every open roster slot -- keeper-core `
+      + `strength, not a real-auction forecast (every team will also spend a full 2027 budget). `
+    : `${D.finish_sim.draws} simulated rest-of-2026 seasons, jittering real player-outcome `
+      + `uncertainty (a hot/cold stretch, not a denominator-fit question -- different `
+      + `uncertainty source than the ± bands elsewhere in the app). `;
+  return base + scope + "Contender: 50%+ chance of the money. Bubble: 5-50%. Rebuild: under "
+    + "5%. Judgment-call thresholds, not a hard line.";
+}
 function contentionView(){
-  const basisData = D.finish_odds[S.rosBasis] || D.finish_odds.ros;
-  const rows = TEAMS.map(t=>basisData[t]
-    ? {team:t, ...basisData[t]}
-    : {team:t, current_points:0, p_money:0,
-      ...Object.fromEntries(Array.from({length:PAYOUT_SPOTS}, (_,i)=>[`p_finish_${i+1}`,0]))});
+  const is2027 = S.contentionSeason === "2027";
+  const zeroFinish = Object.fromEntries(Array.from({length:PAYOUT_SPOTS}, (_,i)=>[`p_finish_${i+1}`,0]));
+  const basisData = is2027
+    ? (D.basis_variants[S.basis].keeper_finish_odds || {})
+    : (D.finish_odds[S.rosBasis] || D.finish_odds.ros);
+  const nKeepByTeam = is2027
+    ? Object.fromEntries((D.basis_variants[S.basis].keeper_standings_2027 || []).map(r=>[r.team, r.n_keep]))
+    : {};
+  const rows = TEAMS.map(t=>{
+    const o = basisData[t] || {p_money:0, ...zeroFinish};
+    const context = is2027 ? (nKeepByTeam[t] ?? 0) : (o.current_points ?? 0);
+    return {team:t, context, ...o};
+  });
   const placeCols = Array.from({length:PAYOUT_SPOTS}, (_,i)=>{
     const place = i+1, ord = place===1?"1st":place===2?"2nd":place===3?"3rd":`${place}th`;
     return [`p_finish_${place}`, `P(${ord})`, "", x=>`${nf(x[`p_finish_${place}`]*100,0)}%`,
       `Simulated odds of finishing exactly ${ord}.`];
   });
+  const help = contentionHelp(is2027);
+  const contextCol = is2027
+    ? ["context","Keepers","",x=>x.context,"How many players are in this team's current 2027 keeper set."]
+    : ["context","Points now","",x=>nf(x.context,1),"Roto points in the live 2026 standings."];
   const cols = [
     ["team","Team","l",x=>`<span class="name" onclick="S.tab='board';S.team=${JSON.stringify(esc(x.team))};render()">${esc(x.team)}</span>`,
       "Click to see this team's players."],
-    ["current_points","Points now","",x=>nf(x.current_points,1),"Roto points in the live 2026 standings."],
+    contextCol,
     ["p_money","P(money)","",x=>{
         const lab = contentionLabel(x.p_money);
         return `${nf(x.p_money*100,0)}% <span class="${lab.cls}" style="font-size:11px;margin-left:4px">${lab.text}</span>`;
-      }, CONTENTION_HELP],
+      }, help],
     ...placeCols,
   ];
-  return `<div class="bar">${rosBasisPicker()}</div>`
-    + sortableTable(rows, cols, "sortContention", CONTENTION_HELP
-      + " Change the \"rest-of-2026 basis\" dropdown above to see how the signal driving this changes the picture.");
+  const seasonPicker = `<select onchange="S.contentionSeason=this.value;render()">
+    <option value="2026" ${!is2027?"selected":""}>2026 — rest of season</option>
+    <option value="2027" ${is2027?"selected":""}>2027 — keeper core</option>
+  </select>`;
+  return `<div class="bar">${seasonPicker}${is2027?"":rosBasisPicker()}</div>`
+    + sortableTable(rows, cols, "sortContention"+S.contentionSeason, help
+      + (is2027 ? " Change the \"projection basis\" dropdown in the header to see how the "
+                 + "projection source moves this."
+                : " Change the \"rest-of-2026 basis\" dropdown above to see how the signal "
+                 + "driving this changes the picture."));
 }
 
 // ---------- standings ----------
