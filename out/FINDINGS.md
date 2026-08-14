@@ -54,6 +54,7 @@ in `LAB_NOTEBOOK.md`.
 46. [A rest-of-2026 basis toggle in the app — Standings and Trade only, never a dollar value](#46-a-rest-of-2026-basis-toggle-in-the-app--standings-and-trade-only-never-a-dollar-value)
 47. [ROS value on the Keeper Board / Free Agents tables — a second toggle stacked on the first](#47-ros-value-on-the-keeper-board--free-agents-tables--a-second-toggle-stacked-on-the-first)
 48. [Historical standings, 2022-2025, normalised to current franchise names](#48-historical-standings-2022-2025-normalised-to-current-franchise-names)
+49. [2027 standings from keeper sets alone — and a bad replacement-line pick caught before shipping](#49-2027-standings-from-keeper-sets-alone--and-a-bad-replacement-line-pick-caught-before-shipping)
 
 </details>
 
@@ -2413,3 +2414,32 @@ literally accurate but useless for the actual question a history view
 answers — "how has this team done over time" — since a viewer would have
 to already know the rename chain to follow their own team's arc. Every
 row is grouped by `franchise_id`, not by name.
+
+## 49. 2027 standings from keeper sets alone — and a bad replacement-line pick caught before shipping
+
+Requested directly, alongside #48. New calculation, not just a display of
+existing numbers: `scripts/build_app.py`'s `_keeper_standings_2027()` sums
+each team's KEPT players' 2027 stat lines, fills every roster slot not yet
+occupied by a keeper with a replacement-level line, and runs the same
+`standings_points()` ranking the rest of the app uses. Deliberately framed
+as **keeper-core strength, not a forecast of who wins the real 2027
+auction** — every team will also spend real money in that auction, and
+this model doesn't attempt to predict what any specific team will do with
+it (nothing else in the app does either). Basis-dependent (a team's kept
+players' 2027 production moves with `PROJECTION_BASIS`), so it's nested
+inside `_variant_payload()` like #43/#47, not computed once.
+
+**Real bug in the first version, caught by eyeballing the output before
+shipping, not by a test.** The replacement-level stat line (needed to fill
+empty roster slots with something) was originally the SINGLE player
+closest to `replacement_rp` by `roto_points`. That player turned out to be
+a mediocre closer — saves are valuable enough that a so-so closer clears
+replacement level on total roto_points even though a real generic
+replacement-level pitcher is almost never a closer. Every team's empty
+pitcher slots were getting **~25 saves each** injected into their
+projected total, which would have wildly inflated SV across the board and
+distorted every category's ranking that trades off against it. Fixed by
+averaging a 15-player band around `replacement_rp` instead of taking the
+single nearest match, separately for hitters and pitchers — smooths out
+one player's idiosyncratic category profile. Sanity-checked the fixed
+band average directly: SV dropped from 25.3 to a realistic 5.3.

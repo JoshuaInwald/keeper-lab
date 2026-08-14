@@ -153,6 +153,11 @@ let AUCTION_EST = D.auction_estimates || {};
 // setBasis() same as AUCTION_EST, and read live by rosVal() per S.rosBasis
 // rather than mutated into row arrays like the raw ros_* stat fields.
 let ROS_VALUES = D.ros_values || {};
+// 2027 standings projected from each team's keeper set alone, empty roster
+// slots filled at replacement level (out/FINDINGS.md #49). Varies with
+// PROJECTION_BASIS (the keeper set and its 2027 production both do), not
+// with the rest-of-2026 toggle -- reassigned by setBasis() only.
+let KEEPER_STANDINGS_2027 = D.keeper_standings_2027 || [];
 const TRADE_SUGGESTIONS = D.trade_suggestions || [];
 // Alternate 2026 rest-of-season signals (out/FINDINGS.md #45/#46): "ros"
 // (ZiPS alone, default), "prorated" (season-to-date pace), "blend" (50/50).
@@ -209,6 +214,7 @@ function setBasis(b){
   INFL = D.constants.inflation || 1;
   AUCTION_EST = v.auction_estimates || {};
   ROS_VALUES = v.ros_values || {};
+  KEEPER_STANDINGS_2027 = v.keeper_standings_2027 || [];
   renderHeader();
   // New board/fa rows always carry the default ("ros") rest-of-season
   // signal -- reapply whichever ros-basis toggle was active, or a switch
@@ -687,9 +693,28 @@ const HISTORY_YEARS = Object.keys(HISTORY).map(Number).sort((a,b)=>b-a);
 function seasonPicker(){
   return `<select onchange="S.standSeason=this.value;render()">
     <option value="live" ${S.standSeason==="live"?"selected":""}>2026 — live + projected</option>
+    <option value="keepers2027" ${S.standSeason==="keepers2027"?"selected":""}>2027 — keeper sets only</option>
     ${HISTORY_YEARS.map(y=>
       `<option value="${y}" ${String(S.standSeason)===String(y)?"selected":""}>${y} — final standings</option>`).join("")}
   </select>`;
+}
+function keeperStandings2027View(){
+  const cols = [
+    ["team","Team","l",r=>esc(r.team),"Fantasy team."],
+    ["points","Projected points","",r=>nf(r.points,1),
+      "10 for first place down to 1 for last, using ONLY each team's current keeper set plus "
+      +"replacement-level filler for every roster slot not yet occupied by a keeper -- not a "
+      +"forecast of who wins the real 2027 auction, which every team will also spend money in."],
+    ["n_keep","Keepers","",r=>r.n_keep,"How many players are in the current keeper set."],
+    ["empty_slots_filled","Replacement slots","",r=>`<span class="dim">${r.empty_slots_filled}</span>`,
+      "Roster spots (of 23 active) filled with a replacement-level stand-in because they aren't a keeper yet."],
+    ...CATS.map(c=>[c,c,"",r=>`<span class="dim">${nf(r[c],CAT_DP(c))}</span>`,
+      `Projected 2027 ${c} total (${C_UNIT(c)}), keeper core + replacement-level fill.`])
+  ];
+  return `<div class="bar">${seasonPicker()}</div>`
+    + sortableTable(KEEPER_STANDINGS_2027, cols, "sortStandKeepers2027",
+        "Isolates keeper-core strength from what an average auction might add. Change the "
+        +"\"projection basis\" dropdown in the header to see how the projection source moves this.");
 }
 function historyStandingsView(yr){
   const rows = HISTORY[yr] || [];
@@ -707,6 +732,7 @@ function historyStandingsView(yr){
 }
 
 function standingsView(){
+  if(S.standSeason === "keepers2027") return keeperStandings2027View();
   if(S.standSeason !== "live") return historyStandingsView(S.standSeason);
 
   const now={}; D.standings.forEach(s=>now[s.team]=s);

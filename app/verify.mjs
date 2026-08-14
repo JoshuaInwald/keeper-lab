@@ -219,6 +219,24 @@ const historyBad = !historyResult.skipped
   && (historyResult.rowsShown !== historyResult.expected || !historyResult.backToLive);
 if (historyBad) console.log('  HISTORICAL STANDINGS MISMATCH:', JSON.stringify(historyResult));
 
+// 2027 keeper-only standings (out/FINDINGS.md #49): must render all 10
+// teams and must vary with PROJECTION_BASIS, since the keeper set's 2027
+// production is basis-dependent -- unlike history (#48), which isn't.
+const keeper2027Result = await page.evaluate(() => {
+  go('standings');
+  S.standSeason = 'keepers2027';
+  render();
+  const rowsShown = document.querySelectorAll('#view tbody tr').length;
+  const before = KEEPER_STANDINGS_2027.find(r => r.team === 'NPB No Stars')?.points;
+  setBasis('actuals');
+  const after = KEEPER_STANDINGS_2027.find(r => r.team === 'NPB No Stars')?.points;
+  setBasis('blend');
+  S.standSeason = 'live'; render();
+  return { rowsShown, before, after, basisAware: before !== after };
+});
+const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
+if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -248,5 +266,8 @@ console.log(boardRosBad ? 'FAIL  board ROS-value column does not sort correctly 
                         : 'PASS  board ROS-value column sorts correctly and tracks the rest-of-2026 toggle');
 console.log(historyBad ? 'FAIL  historical standings did not render or did not return to the live view'
                        : 'PASS  historical standings render and return to the live view cleanly');
+console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignores projection basis'
+                          : 'PASS  2027 keeper standings render all 10 teams and track projection basis');
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad || boardRosBad || historyBad ? 1 : 0);
+process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad
+            || boardRosBad || historyBad || keeper2027Bad ? 1 : 0);

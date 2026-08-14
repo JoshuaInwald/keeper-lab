@@ -80,6 +80,74 @@ def _rows(df: pd.DataFrame, cols: list[str]) -> list[list]:
 ROS_BASES = ["ros", "prorated", "blend"]
 
 
+def _keeper_standings_2027(board: pd.DataFrame, fa: pd.DataFrame,
+                           replacement_rp: float) -> list[dict]:
+    """2027 standings projected from each team's CURRENT keeper set alone,
+    with every roster slot NOT yet occupied by a keeper filled at
+    replacement level. Answers "how strong is my keeper core on its own,"
+    not "who will actually win the 2027 auction" -- this deliberately does
+    not attempt to forecast what any team will do with its remaining
+    budget, which differs team to team and isn't something this model
+    predicts anywhere else either.
+
+    Replacement line is a 15-player band average around `replacement_rp`
+    (roto points), not the single nearest player: the first version used
+    the single closest match and it happened to land on a closer, whose
+    ~25 saves then got added to EVERY team's empty pitcher slots -- saves
+    are valuable enough that a mediocre closer clears replacement level
+    easily on overall roto_points even though he's a poor stand-in for a
+    generic replacement-level pitcher. Averaging a band smooths that out.
+    """
+    from klab.trade import standings_points
+    hit_cols = ["AB", "H", "HR", "R", "RBI", "SB"]
+    # "H" for a pitcher IS hits allowed on the full-season board's own
+    # native columns (unlike ros_lines()'s merged schema, which renames to
+    # H_allowed to dodge a join collision -- no such collision here).
+    pit_cols = ["IP", "W", "SV", "K", "ER", "BB", "H"]
+
+    pool = pd.concat([board, fa], ignore_index=True)
+
+    def repl_line(p, cols, n=15):
+        d = (p["roto_points"] - replacement_rp).abs()
+        return p.loc[d.nsmallest(n).index, cols].mean()
+
+    repl_hit = repl_line(pool[pool["role"] != "PIT"], hit_cols)
+    repl_pit = repl_line(pool[pool["role"] == "PIT"], pit_cols)
+
+    kept = board[board["keep_2027"]]
+    rows = []
+    for team, grp in kept.groupby("team"):
+        is_pit = grp["role"] == "PIT"
+        empty_hit = max(C.N_HIT_SLOTS - int((~is_pit).sum()), 0)
+        empty_pit = max(C.N_PIT_SLOTS - int(is_pit.sum()), 0)
+
+        h = {c: float(grp.loc[~is_pit, c].sum()) + empty_hit * float(repl_hit[c])
+             for c in hit_cols}
+        p = {c: float(grp.loc[is_pit, c].sum()) + empty_pit * float(repl_pit[c])
+             for c in pit_cols}
+
+        rows.append({
+            "team": team, "n_keep": int(len(grp)),
+            "empty_slots_filled": int(empty_hit + empty_pit),
+            "R": h["R"], "HR": h["HR"], "RBI": h["RBI"], "SB": h["SB"],
+            "AVG": h["H"] / h["AB"] if h["AB"] else 0.0,
+            "W": p["W"], "SV": p["SV"], "K": p["K"],
+            "ERA": p["ER"] * 9.0 / p["IP"] if p["IP"] else 0.0,
+            "WHIP": (p["BB"] + p["H"]) / p["IP"] if p["IP"] else 0.0,
+        })
+
+    wide = pd.DataFrame(rows).set_index("team")
+    pts = standings_points(wide[C.CATS])
+    out = []
+    for team in wide.index:
+        row = {"team": team, "points": _round(pts.loc[team, "TOTAL"]),
+              "n_keep": _round(wide.loc[team, "n_keep"]),
+              "empty_slots_filled": _round(wide.loc[team, "empty_slots_filled"])}
+        row.update({c: _round(wide.loc[team, c]) for c in C.CATS})
+        out.append(row)
+    return sorted(out, key=lambda r: -r["points"])
+
+
 def _historical_standings() -> dict:
     """Final standings for every completed season on record (2022-2025;
     2026 is still live and already has its own payload section), keyed by
@@ -278,6 +346,7 @@ def _variant_payload() -> dict:
         "auction_estimates": _auction_estimates(board, fa),
         "ros_values": _ros_values(board, fa, _meta["denominators"], _meta["baseline"],
                                   _meta["replacement_rp"]),
+        "keeper_standings_2027": _keeper_standings_2027(board, fa, _meta["replacement_rp"]),
     }
 
 
@@ -338,7 +407,8 @@ def build_payload() -> dict:
         "basis_variants": {b: {"cols": v["cols"], "board": v["board"], "fa": v["fa"],
                                "teams": v["teams_raw"], "constants": v["constants"],
                                "auction_estimates": v["auction_estimates"],
-                               "ros_values": v["ros_values"]}
+                               "ros_values": v["ros_values"],
+                               "keeper_standings_2027": v["keeper_standings_2027"]}
                            for b, v in variants.items()},
         "trade_suggestions": trade_suggestions,
         "ros_variants": ros_variants,
@@ -354,6 +424,7 @@ def build_payload() -> dict:
         "teams": variants[default]["teams_raw"],             # (default basis)
         "auction_estimates": variants[default]["auction_estimates"],  # (default basis)
         "ros_values": variants[default]["ros_values"],      # (default proj basis; keyed by [rosBasis][fg_id])
+        "keeper_standings_2027": variants[default]["keeper_standings_2027"],  # (default basis)
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "history_standings": _historical_standings(),
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
