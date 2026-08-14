@@ -195,7 +195,8 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 // ---------- shared state ----------
 const S = {tab:"board", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
            desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
-           rosBasis: D.ros_basis_default || "ros", standSeason: "live"};
+           rosBasis: D.ros_basis_default || "ros", standSeason: "live",
+           shades: {}, intuitionQ: "", intuitionCalculated: false};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
 
@@ -251,13 +252,22 @@ function setRosBasis(basis){
 }
 
 // ---------- roto engine (mirrors trade.win_now_delta) ----------
-function rosterAgg(swap){
+// shadeCols (optional, Intuition tab only -- see out/FINDINGS.md #50):
+// {fg_id: {colName: multiplier, ...}}, unlisted columns default to 1. A
+// per-column map, not one scalar per player, because "he's better" and
+// "he's healthier" are different axes that shouldn't move the same stats
+// the same way -- see buildShadeCols().
+function rosterAgg(swap, shadeCols){
   const agg={}; TEAMS.forEach(t=>{agg[t]={};ROS.forEach(c=>agg[t][c]=0)});
   for(const r of BOARD){
     const id=g(r,"fg_id");
     const t = (swap && swap[id]) || g(r,"team");
     if(!agg[t]) continue;
-    for(const c of ROS) agg[t][c]+= g(r,"ros_"+c)||0;
+    const cmap = shadeCols && shadeCols[id];
+    for(const c of ROS){
+      const mult = cmap && cmap[c]!=null ? cmap[c] : 1;
+      agg[t][c]+= (g(r,"ros_"+c)||0) * mult;
+    }
   }
   return agg;
 }
@@ -301,7 +311,7 @@ function recomputeProjections(){   // re-run after setRosBasis() changes ros_* f
 
 // ---------- nav ----------
 const TABS=[["board","Keeper board"],["teams","League"],["trade","Trade"],
-            ["standings","Standings"],["fa","Free agents"],["model","Model"]];
+            ["standings","Standings"],["fa","Free agents"],["intuition","Intuition"],["model","Model"]];
 $("nav").innerHTML = TABS.map(([k,l])=>
   `<button data-t="${k}" onclick="go('${k}')">${l}</button>`).join("");
 function go(t){S.tab=t;render();}
@@ -956,6 +966,189 @@ const SETTING_HELP = {
   "max pt scale": "The most a player's projected playing time can be scaled up for the “if he plays a full season” upside figure on his player card. Beyond this, a bigger role isn't a reasonable extrapolation of this player — it'd effectively be projecting a different player.",
 };
 
+// ---------- intuition (manual player shading) ----------
+// A personal "what if I think the model's wrong about this guy" layer,
+// deliberately sandboxed: it never touches BOARD or any other tab's
+// numbers (out/FINDINGS.md #50). Two axes, on purpose, not one:
+// "talent" (is he actually better/worse than projected) moves his
+// PRODUCTION RATE; "health" (assume no missed time) moves his PLAYING
+// TIME. Conflating them would make "shade him up" ambiguous between "he'll
+// play more" and "he'll play better."
+const TALENT_SHADE_STEP = 0.05;
+const TALENT_SHADE_MAX = 0.30;
+// Flat, clearly-approximate rest-of-2026 volume boost for "force health" --
+// not a real injury/return-date model (this league's data has none of
+// that), just a labeled what-if.
+const HEALTH_BOOST = 1.15;
+
+function buildShadeCols(){
+  const out = {};
+  for(const [id, s] of Object.entries(S.shades)){
+    const r = byId[id]; if(!r) continue;
+    const isPit = g(r,"role")==="PIT";
+    const healthMult = s.health ? HEALTH_BOOST : 1;
+    const up = 1 + (s.talent||0);
+    const down = 1/up;
+    out[id] = isPit
+      ? {IP:healthMult, W:healthMult*up, SV:healthMult*up, K:healthMult*up,
+         ER:healthMult*down, BB:healthMult*down, H_allowed:healthMult*down}
+      : {PA:healthMult, AB:healthMult, H:healthMult*up, HR:healthMult*up,
+         R:healthMult*up, RBI:healthMult*up, SB:healthMult*up};
+  }
+  return out;
+}
+// Transparent LINEAR SCALING of the already-computed 2027 dollar value --
+// explicitly NOT a re-run of the model. A true re-derivation needs the
+// denominators, the roto scorer, and the auction exchange rate, all of
+// which stay server-side on purpose (out/ARCHITECTURE.md §4.2) so this
+// app never maintains two implementations of the valuation pipeline that
+// can drift apart -- a real bug class this project has hit before.
+// "Force health" reuses the ALREADY-COMPUTED full-time projection
+// (redraft_value_ft) rather than inventing a second scale-up.
+function shaded2027(r, s){
+  const base = s.health ? (g(r,"redraft_value_ft")||g(r,"redraft_value")) : g(r,"redraft_value");
+  const shadedVal = base * (1 + (s.talent||0));
+  const deltaVal = shadedVal - g(r,"redraft_value");
+  const shadedSurplus = g(r,"surplus_multiyear") + deltaVal;
+  return {shadedVal, deltaVal, shadedSurplus};
+}
+// Per-player hover context requested for this tab (and, per Josh, as a
+// general design rule: sortable/scannable numbers are columns, everything
+// else is a tooltip so it doesn't clutter the table -- out/FINDINGS.md #50).
+// No age anywhere: no file in data/ has one, same gap already stated for
+// the auction estimator.
+function playerTooltip(r){
+  const isPit = g(r,"role")==="PIT";
+  const cats = isPit ? D.pit_cats : D.hit_cats;
+  const catLine = cats.map(c=>`${c} ${nf(g(r,"rp_"+c),2)}`).join(" · ");
+  const rosLine = isPit
+    ? `ROS: ${nf(g(r,"ros_IP"),0)} IP, ${nf(g(r,"ros_W"),0)}W/${nf(g(r,"ros_SV"),0)}SV/${nf(g(r,"ros_K"),0)}K`
+    : `ROS: ${nf(g(r,"ros_AB"),0)} AB, ${nf(g(r,"ros_R"),0)}R/${nf(g(r,"ros_HR"),0)}HR/`
+      +`${nf(g(r,"ros_RBI"),0)}RBI/${nf(g(r,"ros_SB"),0)}SB`;
+  const lockNote = g(r,"keepable")===false ? " -- confirmed free agent, not extendable" : "";
+  return `${g(r,"name")} · ${g(r,"team")} · ${g(r,"position")||"?"}\n`
+    +`Contract: ${g(r,"contract")}${lockNote}\n`
+    +`2027 roto pts: ${nf(g(r,"roto_points"),2)} (${catLine})\n`
+    +rosLine+`\n`
+    +`Worth '27: ${money(g(r,"redraft_value"))} · Gain, all yrs: ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}`;
+}
+
+function addShadedPlayer(id){
+  if(!S.shades[id]) S.shades[id] = {talent:0, health:false};
+  S.intuitionCalculated = false;
+  S.intuitionQ = "";
+  render();
+}
+function removeShadedPlayer(id){
+  delete S.shades[id];
+  S.intuitionCalculated = false;
+  render();
+}
+function bumpTalent(id, dir){
+  const s = S.shades[id]; if(!s) return;
+  s.talent = Math.max(-TALENT_SHADE_MAX, Math.min(TALENT_SHADE_MAX,
+    Math.round((s.talent + dir*TALENT_SHADE_STEP)*100)/100));
+  S.intuitionCalculated = false;
+  render();
+}
+function toggleHealthShade(id){
+  const s = S.shades[id]; if(!s) return;
+  s.health = !s.health;
+  S.intuitionCalculated = false;
+  render();
+}
+function recalcIntuition(){ S.intuitionCalculated = true; render(); }
+
+function intuitionView(){
+  const q = S.intuitionQ.toLowerCase();
+  const shadedIds = Object.keys(S.shades);
+  const candidates = q.length>1
+    ? BOARD.filter(r=>String(g(r,"name")).toLowerCase().includes(q) && !S.shades[g(r,"fg_id")]).slice(0,8)
+    : [];
+  const rows = shadedIds.map(id=>({r: byId[id], s: S.shades[id]})).filter(x=>x.r);
+
+  const shadeTable = rows.length ? `<table><thead><tr>
+      <th class="l">Player</th>
+      <th class="l">Team</th>
+      <th title="How much better (+) or worse (−) you think he'll actually perform, vs the model's own projection. Moves his production RATE (hits, HR, K, walks allowed, etc) -- not his playing time, which is the separate health control.">Talent shade</th>
+      <th title="Assumes no missed time: swaps in the model's own \"full-time\" 2027 projection where available, and applies a flat +15% rest-of-2026 playing-time boost. Not a real injury/return-date model -- this league's data has none -- just a labeled what-if.">Force health</th>
+      <th></th>
+    </tr></thead><tbody>${rows.map(({r,s})=>`<tr>
+      <td class="l"><span class="name" title="${esc(playerTooltip(r))}" onclick="showPlayer(${g(r,'fg_id')})">${esc(g(r,'name'))}</span></td>
+      <td class="l dim">${esc(g(r,'team'))}</td>
+      <td><button class="act" onclick="bumpTalent(${g(r,'fg_id')},-1)">−</button>
+        <span style="display:inline-block;width:46px;text-align:center;font-family:var(--mono)">${s.talent>0?"+":""}${(s.talent*100).toFixed(0)}%</span>
+        <button class="act" onclick="bumpTalent(${g(r,'fg_id')},1)">+</button></td>
+      <td><label class="chk"><input type="checkbox" ${s.health?"checked":""}
+        onchange="toggleHealthShade(${g(r,'fg_id')})"></label></td>
+      <td><span class="chip" onclick="removeShadedPlayer(${g(r,'fg_id')})">remove</span></td>
+    </tr>`).join("")}</tbody></table>`
+    : `<div class="dim" style="padding:6px 0 10px">Search a player below to start shading. Nothing
+        recalculates until you press "recalculate."</div>`;
+
+  let results = "";
+  if(rows.length && S.intuitionCalculated){
+    const shadeCols = buildShadeCols();
+    const after = rotoPoints(catTotals(rosterAgg(null, shadeCols)));
+    const teamsTouched = [...new Set(rows.map(({r})=>g(r,"team")))];
+    const standRows = teamsTouched.map(t=>({
+      team:t, before:PROJ_PTS[t].TOTAL, after:after[t].TOTAL,
+      delta:after[t].TOTAL-PROJ_PTS[t].TOTAL,
+    })).sort((a,b)=>b.delta-a.delta);
+    const dollarRows = rows.map(({r,s})=>({r, ...shaded2027(r,s)}));
+
+    results = `
+      <div class="panel"><h3>2026 rest-of-season standings impact</h3>
+        <div class="note">Full re-run of the same win-now engine the Trade tab uses, with your
+          shaded inputs swapped in -- this half is exact, not approximated. A small shade
+          reading "0.0 change" isn't broken -- roto standings are RANKED, not continuous, so a
+          modest boost only moves a team's points if it's enough to cross another team's total
+          in that category. Try a bigger shade if you expect more movement and don't see it.</div>
+        <table style="margin-top:8px"><thead><tr>
+          <th class="l">Team</th><th>Before</th><th>After</th><th>Change</th>
+        </tr></thead><tbody>${standRows.map(x=>`<tr>
+          <td class="l">${esc(x.team)}</td><td>${nf(x.before,1)}</td><td>${nf(x.after,1)}</td>
+          <td>${sgn(x.delta,1)}</td></tr>`).join("")}</tbody></table>
+      </div>
+      <div class="panel"><h3>2027 keeper-value impact — approximate</h3>
+        <div class="note">Linear scaling of the already-computed dollar value, NOT a re-run of the
+          model. Treat this as a rough feel for direction and magnitude, not a new official number.</div>
+        <table style="margin-top:8px"><thead><tr>
+          <th class="l">Player</th><th>Worth '27 before</th><th>Worth '27 after</th>
+          <th>Gain, all yrs before</th><th>Gain, all yrs after</th>
+        </tr></thead><tbody>${dollarRows.map(x=>`<tr>
+          <td class="l">${esc(g(x.r,'name'))}</td><td>${money(g(x.r,'redraft_value'))}</td>
+          <td>${money(x.shadedVal)}</td>
+          <td>${sgn(adj(g(x.r,'surplus_multiyear')),0,"$")}</td>
+          <td>${sgn(adj(x.shadedSurplus),0,"$")}</td></tr>`).join("")}
+        </tbody></table>
+      </div>`;
+  } else if(rows.length){
+    results = `<div class="panel"><div class="dim">Shades set. Press "recalculate" to see the impact.</div></div>`;
+  }
+
+  return `
+    <div class="panel">
+      <h3>Shaded players</h3>
+      ${shadeTable}
+      <div class="bar" style="margin-top:10px">
+        <input type="search" placeholder="add a player" value="${esc(S.intuitionQ)}"
+          oninput="S.intuitionQ=this.value;render()">
+        <button class="act" onclick="recalcIntuition()" ${rows.length?"":"disabled"}>recalculate</button>
+      </div>
+      ${candidates.length ? `<div class="picker" style="margin-top:6px">${candidates.map(r=>
+        `<div title="${esc(playerTooltip(r))}" onclick="addShadedPlayer(${g(r,'fg_id')})">
+          <span>${esc(g(r,'name'))} <span class="dim">${esc(g(r,'team'))}</span></span>
+          <span class="dim">${g(r,'role')==="PIT"?"P":"H"}</span></div>`).join("")}</div>` : ""}
+      <div class="note">Your own read on a player, layered on top of the model's -- not a
+        replacement for it. Talent shade moves his production rate; force-health assumes no
+        missed time. Neither changes anything on the Board, Trade, or Standings tabs -- this
+        stays sandboxed to this tab.</div>
+    </div>
+    ${results}
+  `;
+}
+
 function modelView(){
   const c=D.constants, den=c.denominators;
   // Was a two-way test that labelled anything not in NEG_CATS a counting stat,
@@ -1031,6 +1224,7 @@ function render(){
   else if(S.tab==="teams") v.innerHTML=teamsView();
   else if(S.tab==="trade") v.innerHTML=tradeView();
   else if(S.tab==="standings") v.innerHTML=standingsView();
+  else if(S.tab==="intuition") v.innerHTML=intuitionView();
   else if(S.tab==="model") v.innerHTML=modelView();
 }
 render();

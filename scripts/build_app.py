@@ -41,7 +41,7 @@ BASES = ["blend", "projection", "actuals"]
 # Columns carried into the payload, in order. Kept explicit rather than
 # "everything" so the file stays small and the schema is reviewable.
 PLAYER_COLS = [
-    "fg_id", "name", "team", "role", "il",
+    "fg_id", "name", "team", "role", "il", "position",
     "salary", "contract", "keeper_status", "keeper_cost", "years_controlled",
     "keepable", "extension_used", "extension_option", "extension_years", "keep_2027",
     "roto_points", "rp_above_repl", "redraft_value", "keep_value",
@@ -311,8 +311,17 @@ def _variant_payload() -> dict:
     ros_cols = [f"ros_{c}" for c in ROS_COLS]
     assert not (set(ros.columns) - {"fg_id"}) & set(PLAYER_COLS), "column collision"
 
+    # Defensive position, for the Intuition tab's player tooltips (out/
+    # FINDINGS.md #50) -- not used anywhere in the valuation itself
+    # (POSITIONAL_ADJUSTMENT is off, see klab/keeper.py's own reasoning).
+    # Sourced from auction-history matches, so it's missing for anyone with
+    # no draft record on file; "?" rather than a crash for those.
+    from klab.keeper import position_map
+    pos_map = position_map()
+
     board = s.board.merge(ros, on="fg_id", how="left")
     board[ros_cols] = board[ros_cols].fillna(0.0)
+    board["position"] = board["fg_id"].map(pos_map).fillna("?")
     # Bands come from resampling the team-seasons the denominators are fit on,
     # so every dollar figure can be shown as a range instead of a point.
     from klab.uncertainty import bootstrap_bands
@@ -329,6 +338,7 @@ def _variant_payload() -> dict:
     fa = fa[fa["roto_points"] > 0].nlargest(400, "roto_points")
     fa = fa.merge(ros, on="fg_id", how="left")
     fa[ros_cols] = fa[ros_cols].fillna(0.0)
+    fa["position"] = fa["fg_id"].map(pos_map).fillna("?")
 
     cols = PLAYER_COLS + ros_cols
     return {

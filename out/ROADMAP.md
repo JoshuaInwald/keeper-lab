@@ -140,6 +140,22 @@ in each layer (a starting pitcher's innings could get projected 5-6x too
 high; the two toggles could silently fight each other on state).
 No "pre-season 2026" option: no file in `data/` has one.
 
+**2.6 Historical standings + 2027 keeper-only standings — done, 2026-08-13.**
+Standings tab season picker: final standings for every completed season
+2022-2025 (normalised to current franchise names across five renames), plus
+a "2027 — keeper sets only" view (each team's current keepers' 2027
+production + replacement-level fill for every open roster slot — keeper-core
+strength, not a real-auction forecast). See `out/FINDINGS.md` #48-49.
+
+**2.7 The Intuition tab (manual player shading) — done, 2026-08-13.** Shade
+any player's talent up/down and/or force a "full health" assumption;
+recalculates 2026 standings impact exactly (same client-side engine as the
+Trade tab) and shows 2027 dollar impact as a transparently-labeled linear
+scaling, not a full model re-run — the 2027 valuation pipeline stays
+server-side only, on purpose, to avoid a second implementation that can
+drift from the first. Fully sandboxed: never touches any other tab's
+numbers. See `out/FINDINGS.md` #50.
+
 **2.4 Auto-refresh — build pipeline is cron-safe, data ingestion is not
 (checked 2026-08-13, not scheduled on purpose, still manual by choice).**
 Two separate questions, worth not conflating:

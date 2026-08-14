@@ -55,6 +55,7 @@ in `LAB_NOTEBOOK.md`.
 47. [ROS value on the Keeper Board / Free Agents tables — a second toggle stacked on the first](#47-ros-value-on-the-keeper-board--free-agents-tables--a-second-toggle-stacked-on-the-first)
 48. [Historical standings, 2022-2025, normalised to current franchise names](#48-historical-standings-2022-2025-normalised-to-current-franchise-names)
 49. [2027 standings from keeper sets alone — and a bad replacement-line pick caught before shipping](#49-2027-standings-from-keeper-sets-alone--and-a-bad-replacement-line-pick-caught-before-shipping)
+50. [The Intuition tab — manual player shading, sandboxed, split into an exact half and an approximate half](#50-the-intuition-tab--manual-player-shading-sandboxed-split-into-an-exact-half-and-an-approximate-half)
 
 </details>
 
@@ -2443,3 +2444,59 @@ averaging a 15-player band around `replacement_rp` instead of taking the
 single nearest match, separately for hitters and pitchers — smooths out
 one player's idiosyncratic category profile. Sanity-checked the fixed
 band average directly: SV dropped from 25.3 to a realistic 5.3.
+
+## 50. The Intuition tab — manual player shading, sandboxed, split into an exact half and an approximate half
+
+Requested directly: let a user layer their own read on a player ("the
+model's wrong about him, up or down") on top of the model's numbers, and
+see the impact — a "plus/minus on talent" control, plus a "force full
+health" toggle, two-stage (set shades, then recalculate).
+
+**The central design question, asked directly and answered before
+building anything**: can a static HTML file with no server do this? Split
+the answer in two, because the app's architecture forces the split:
+
+- **2026 rest-of-season / standings impact: yes, exactly.** The win-now
+  standings engine (`rosterAgg`/`catTotals`/`rotoPoints`) already runs
+  entirely client-side — the one thing this app deliberately reimplements
+  in JS. `rosterAgg()` gained an optional per-column multiplier map
+  (`{fg_id: {colName: mult}}`, not one scalar per player) so a shade can
+  be applied without touching `BOARD` at all: talent moves a player's
+  PRODUCTION RATE (H, HR, K, etc.), health moves his PLAYING TIME (PA,
+  IP), and the two are separate axes on purpose — conflating them would
+  make "shade him up" ambiguously mean either "he'll play more" or "he'll
+  play better."
+- **2027 dollar impact: no, not a real re-run — and said so in the UI,
+  not just in a comment.** A true re-derivation needs the denominators,
+  the roto scorer, the auction exchange-rate regression, and multi-year
+  surplus logic, all of which live only in Python. Porting that to JS so
+  a shaded player's dollar value re-derives correctly would mean
+  maintaining two implementations of the whole valuation model — the
+  exact failure mode this project already got burned by once this
+  session (the PA_x/PA_y JS/Python drift bug) and has deliberately kept
+  server-side-only ever since (`out/ARCHITECTURE.md` §4.2). Instead, the
+  2027 panel applies **transparent linear scaling**: the already-computed
+  `redraft_value` times `(1 + talent_shade)`, with the *already-computed*
+  `redraft_value_ft` (full-time projection) substituted in first if health
+  is forced, rather than inventing a second scale-up. Labeled plainly in
+  the UI as an approximation, not a new official number.
+
+**Sandboxing.** Shading never touches `BOARD`, `PROJ_PTS`, or any other
+tab — every other screen's numbers are unaffected by what's set here.
+Verified in `app/verify.mjs`, not just assumed: the new check confirms a
+shaded player's `ros_R` on `BOARD` and the league-wide `PROJ_PTS` total
+are bit-identical before and after shading and recalculating.
+
+**A real result worth knowing, not a bug**: shading one pitcher by a
+realistic ±10-15% often shows "0.0 change" in team standings. This is
+correct, not broken — roto standings are RANK-based, not continuous, so a
+modest boost only moves a team's points if it's large enough to cross
+another team's total in that specific category. Confirmed directly:
+shading Tarik Skubal to the maximum (+30% talent, health forced) DOES
+move NPB No Stars from 26 to 28 points (via K and WHIP crossing a
+rank threshold), while a realistic +10%/health-forced shade shows no
+movement at all for the same player. Added a note in the UI so a user
+doesn't mistake "the standings math is genuinely insensitive to a small
+shade" for "the feature doesn't work."
+
+**Two small, real additions along the way**: defensive position (`board.position`, from `klab.keeper.position_map()` — an auction-history match, so it's `"?"` for anyone with no draft record on file, an honest gap rather than a guess) and a `playerTooltip()` helper showing 2027 roto points by category, ROS line, contract status, and position on hover — requested as a general design rule, not just for this tab: **sortable/scannable numbers belong in columns; everything else belongs in a tooltip**, so a table doesn't get cluttered with context nobody's comparing across rows. No age anywhere — no file in `data/` has one, same gap already stated for the auction estimator (#35).

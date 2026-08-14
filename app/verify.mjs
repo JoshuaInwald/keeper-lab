@@ -65,7 +65,7 @@ const got = await page.evaluate(ref => {
 
 // Every tab, the drawer, the filters, a re-sort -- anything that throws shows
 // up in `errs`.
-for (const t of ['board', 'teams', 'trade', 'standings', 'fa', 'model']) {
+for (const t of ['board', 'teams', 'trade', 'standings', 'fa', 'intuition', 'model']) {
   await page.evaluate(t => go(t), t);
   await page.waitForTimeout(50);
 }
@@ -237,6 +237,40 @@ const keeper2027Result = await page.evaluate(() => {
 const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
+// Intuition tab (out/FINDINGS.md #50): shading a player must (a) stay
+// sandboxed -- never mutate BOARD or PROJ_PTS -- and (b) actually move
+// both the 2026 standings recompute and the 2027 linear-scaled dollar
+// figure once "recalculate" runs.
+const intuitionResult = await page.evaluate(() => {
+  go('intuition');
+  const r = BOARD.find(r => g(r, 'role') !== 'PIT' && g(r, 'roto_points') > 0);
+  const id = g(r, 'fg_id');
+  const boardRosBefore = g(r, 'ros_R');
+  const projTotalBefore = TEAMS.reduce((s, t) => s + PROJ_PTS[t].TOTAL, 0);
+
+  addShadedPlayer(id);
+  bumpTalent(id, 1); bumpTalent(id, 1); bumpTalent(id, 1);  // +15%
+  toggleHealthShade(id);
+  recalcIntuition();
+
+  const shadeCols = buildShadeCols();
+  const after = rotoPoints(catTotals(rosterAgg(null, shadeCols)));
+  const team = g(r, 'team');
+  const standingsChanged = after[team].TOTAL !== PROJ_PTS[team].TOTAL;
+
+  const shaded = shaded2027(r, S.shades[id]);
+  const dollarChanged = shaded.shadedVal !== g(r, 'redraft_value');
+
+  const boardUntouched = g(r, 'ros_R') === boardRosBefore;
+  const projUntouched = TEAMS.reduce((s, t) => s + PROJ_PTS[t].TOTAL, 0) === projTotalBefore;
+
+  removeShadedPlayer(id);  // reset for any later checks in this file
+  return { standingsChanged, dollarChanged, boardUntouched, projUntouched };
+});
+const intuitionBad = !intuitionResult.standingsChanged || !intuitionResult.dollarChanged
+  || !intuitionResult.boardUntouched || !intuitionResult.projUntouched;
+if (intuitionBad) console.log('  INTUITION TAB MISMATCH:', JSON.stringify(intuitionResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -268,6 +302,8 @@ console.log(historyBad ? 'FAIL  historical standings did not render or did not r
                        : 'PASS  historical standings render and return to the live view cleanly');
 console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignores projection basis'
                           : 'PASS  2027 keeper standings render all 10 teams and track projection basis');
+console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'
+                         : 'PASS  Intuition tab shading moves both halves and stays sandboxed');
 await browser.close();
 process.exit(bad || errs.length || suggBad.length || basisBad || auctionBad || rosBasisBad
-            || boardRosBad || historyBad || keeper2027Bad ? 1 : 0);
+            || boardRosBad || historyBad || keeper2027Bad || intuitionBad ? 1 : 0);
