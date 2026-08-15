@@ -218,12 +218,37 @@ def estimate_auction_price(name: str, players: pd.DataFrame,
 
     first_timer = player_tenure(int(row["fg_id"])) == 0
     comps = find_comps(row, row["role"], pg, k=k, target_is_first_timer=first_timer)
-    premiums = comps["premium_frac"]
 
-    base = float(row["redraft_value"])
-    lo = base * (1 + premiums.quantile(0.25))
-    mid = base * (1 + premiums.median())
-    hi = base * (1 + premiums.quantile(0.75))
+    # CORRECTED 2026-08-15 (out/FINDINGS.md, this session): comp_adjusted_*
+    # used to be `redraft_value * (1 + premium)` -- a PERCENTAGE adjustment
+    # applied on top of redraft_value itself. That silently inherits every
+    # problem redraft_value has: its budget-conserving dollar scale has no
+    # reference to real prices at all, and once a player's production sits
+    # above anything in the 5-year auction history, the linear exchange-rate
+    # fit it's built from just keeps extrapolating past the highest price
+    # anyone has ever actually paid. A percentage on top of an already-
+    # runaway number stays runaway -- checked directly: Tarik Skubal's old
+    # comp_adjusted_mid came back at $64, ABOVE his own already-too-high
+    # $51 fair value, despite this league never once paying a pitcher more
+    # than $34 (Woodruff, 2023) or anyone more than $45 (Turner, 2023) in
+    # 677 real purchases.
+    #
+    # Using the comps' own real `salary` directly instead is a genuine
+    # absolute anchor: it can only ever describe a price somewhere in the
+    # range of what similar production has actually sold for, because
+    # that's literally what it's built from. Checked directly against the
+    # players Josh's league-mate flagged: Torkelson $14.35 fair -> $9.0
+    # comp median (he called $6-8), Cade Smith $31.55 -> $9.0 (he called
+    # "max 15"), Freeman $13.65 -> $17.0 (he called "more than 13"),
+    # McGonigle $8.32 -> $13.0 (he called "way more than 8"). Skubal moves
+    # to $23-29, below the real $34 ceiling rather than 50% past it -- still
+    # short of the $40 his league-mate guessed, an honest consequence of a
+    # k-NN estimate never overshooting its own comps by construction, not a
+    # bug to chase further here.
+    lo = comps["salary"].quantile(0.25)
+    mid = comps["salary"].median()
+    hi = comps["salary"].quantile(0.75)
+    base = float(row["redraft_value"])  # kept on the return value for context/audit
 
     return {
         "name": name, "role": row["role"], "position": pos,
