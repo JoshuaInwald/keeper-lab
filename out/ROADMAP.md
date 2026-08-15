@@ -30,89 +30,152 @@ session or two old.
 
 ---
 
-## Priorities as of 2026-08-15 — top 8, ranked
+## Priorities as of 2026-08-15 — top 10, ranked
 
 Grew out of a real review: Josh's league-mate (10 years in this league,
 trusted on real auction prices) went through the app and flagged several
 players where `redraft_value` ("Worth '27") looked wrong. Triangulating his
 calls against this league's own 677-purchase auction history (`out/
 auction_sample.csv`) turned up a real, general problem, not just a few bad
-player-level numbers — see below. Supersedes older Phase 1-6 items below
-where they conflict; this list is the current read.
+player-level numbers. Also pulls up two items that were already sitting in
+Phase 3 below, unbuilt, one of them already flagged elsewhere in this repo
+(`out/RESEARCH.md`) as the single highest-value gap left — worth surfacing
+into the active list instead of staying buried under older phase numbering.
+**Supersedes Phase 1-6 below where they conflict; this list is the current
+read.** (Phase 1's two items, sensitivity harness and uncertainty bands, are
+both actually done too — stale "not done" markers, not real gaps; verified
+directly, `out/sensitivity_keep_flags.csv` and `klab/uncertainty.py` both
+exist and are wired in.)
+
+**Shipped today, 2026-08-15** (not counted in the 10 — see commit history
+for detail): Ohtani split into two 2027 auction assets; track-record signal
+(`appearances_to_date`/`player_tenure()`) in the comp system; comp panel
+re-anchored to comps' own real historical `salary` instead of a percentage
+on top of `redraft_value`; board UI groups playing-time/roto columns before
+dollar columns and shows each player's PA/IP + health-vs-role scaling tag.
 
 1. **Blend the comp-based estimate into headline `redraft_value` (1
-   session).** Just-shipped: `klab/auction_estimator.py`'s comp panel now
-   anchors to comps' own real historical `salary` (a genuine absolute
-   anchor) instead of a percentage on top of `redraft_value` itself — the
-   old version let Tarik Skubal's comp-adjusted estimate land at $64, above
-   his own already-too-high $51 fair value, despite this league never once
-   paying a pitcher more than $34 (Woodruff, 2023) or anyone more than $45
-   (Turner, 2023) across 677 real purchases. That fixed the secondary panel;
-   `redraft_value` itself is still untouched and can still price a player
-   above anything anyone has ever actually paid. Remaining work: a
-   confidence-weighted blend of the corrected comp estimate into
-   `redraft_value`, then a proportional rescale of the top 230 back to
-   exactly $2,600 — same pattern `positional=True` already uses when IT
-   breaks this identity (#52, ~1% approximation, accepted). Confidence
-   weight candidate: `min(1.0, n_same_position_available / k)`. Consider an
-   explicit smooth compression near the top of the scale too (Josh's ask)
-   as a belt-and-suspenders on top of the comp anchor itself.
+   session).** The comp panel is already fixed (see "shipped today" above)
+   — it can no longer price a player above what similar production has
+   actually sold for. `redraft_value` itself still can: it's a pure
+   budget-conserving points-above-replacement scale with no reference to
+   real prices, so it can still exceed this league's actual all-time
+   ceiling ($45 for any player, $34 for a pitcher — Skubal currently prices
+   at $51). Needs a confidence-weighted blend of the corrected comp
+   estimate into `redraft_value`, then a proportional rescale of the top
+   230 back to exactly $2,600 — same pattern `positional=True` already
+   uses when IT breaks this identity (#52, ~1% approximation, accepted).
+   Confidence weight candidate: `min(1.0, n_same_position_available / k)`.
+   Consider an explicit smooth compression near the top of the scale too
+   (Josh's ask) as a belt-and-suspenders on top of the comp anchor itself.
 
-2. **Track-record signal in the comp system — done, 2026-08-15.**
-   `appearances_to_date` / `player_tenure()`, so a rookie or breakout debut
-   (Cade Smith, a first-year closer) doesn't get comped against established
-   veterans with a coincidentally similar line. Real effect: Kurtz's comp
-   median moved from $5.18 to $14.95. Known gap, not silently swept under
-   the rug: Cade Smith's own historical position is unresolved
-   ("UNKNOWN" — a `position_map()` coverage gap, not a `player_tenure` bug)
-   and Skubal was sold once before in a much weaker year, so a strict
-   "never sold" definition misses his 2026 breakout. Revisit with a less
-   binary tenure signal if those two matter enough on their own.
+2. **Team-specific category value (was: §3.9, 0.5-1 session to scope, more
+   to build).** `out/RESEARCH.md` §6.2/§8 already ranks this the single
+   highest-value gap in the whole project, ahead of everything else on the
+   old list. Roto points add up linearly today, so the model is indifferent
+   between 20 more HR and 20 more K — but the real value of a category unit
+   depends on where a SPECIFIC team sits in it (a team third in saves gains
+   a lot from five more; a team tenth by 40 gains nothing). Proper fix turns
+   one dollar value per player into ten (one per team). The trade
+   evaluator's win-now lens already works around this by re-ranking
+   standings rather than adding roto points, so a workaround exists even
+   though the general fix doesn't.
 
-3. **Ohtani priced as two 2027 auction assets — done, 2026-08-15.** Hitter
-   and pitcher now split (`config.TWO_WAY_SPLIT_NAMES`), matching the real
-   2027 rule change Josh confirmed. Historical seasons (2022-2026) still
-   combine his two lines in `auction.py`'s `score_season()`, correctly —
-   he really was one asset then.
+3. **Prospect / upside distribution (was: §3.2, 1 session).** Every player
+   is currently a single point estimate; breakouts are systematically
+   undervalued as a direct result. ZiPS's own export already has P10-P90
+   percentile columns, unused. Minimum viable: value the option (the
+   distribution), not the mean. Directly explains a chunk of this session's
+   whole review — McGonigle/Wetherholt/Dingler/Kurtz undervaluation isn't
+   just a tenure/comp problem (#5 below), it's partly that the model has no
+   way to price upside variance at all.
 
-4. **"Name-brand / good-team" market premium (research question, scope
-   TBD).** Josh's observation, 2026-08-15: real bidders pay more for a
-   famous player on a good team than stats projections alone predict —
-   distinct from the track-record gap #2 already covers. Needs its own
-   investigation (does `premium_frac` in `comp_pool()` correlate with prior-
-   season team win total or a name-recognition proxy, controlling for
-   production?) before deciding whether/how to fold it in. Flagged as real
-   but separate — don't conflate with #1's comp-anchor work.
+4. **Waiver-wire value, quantified (was: §3.3, 1 session).** Free agents
+   supply **40% of this league's roto production** at $10-20 each — the
+   single largest acquisition channel, and the model currently treats it as
+   invisible. Quantifying it properly sharpens replacement level, which is
+   the anchor `redraft_value` is measured against for literally every
+   player in the board.
 
-5. **Reopen young/new-to-league-player projection modeling (was: ROADMAP
-   §3.7, parked 2026-08-13 on "ZiPS judged good enough").** Josh's
-   league-mate's pushback (McGonigle, Wetherholt, Dingler, Kurtz all called
-   undervalued) plus Josh's own broadening of the case beyond literal
-   rookies (Mike/Munetaka Murakami-type players — NPB veterans with real
-   pedigree but no MLB/this-league track record, currently beating
-   preseason projections) may be reason to un-park this. No age/debut-year
-   data exists anywhere in `data/`, so this is really about *tenure in this
-   league's own auction history* (which #2 above already captures for
-   *pricing*) vs. the underlying ZiPS-blend *projection* itself, which #2
-   doesn't touch at all. Scope needed before building.
+5. **Reopen young/new-to-league-player projection modeling (was: §3.7,
+   parked 2026-08-13 on "ZiPS judged good enough").** Josh's league-mate's
+   pushback (McGonigle, Wetherholt, Dingler, Kurtz all called undervalued)
+   plus Josh's own broadening of the case beyond literal rookies (a
+   Munetaka Murakami-type player — real NPB pedigree, no MLB/this-league
+   track record, currently beating preseason projections) may be reason to
+   un-park this. No age/debut-year data exists anywhere in `data/`, so this
+   is really about *tenure in this league's own auction history* (which the
+   comp system's `player_tenure()` already captures for *pricing*, shipped
+   today) vs. the underlying ZiPS-blend *projection* itself, which that
+   fix doesn't touch at all. Scope needed before building.
 
-6. **UI: separate roto-value display from dollar-value display (scope
-   TBD).** Josh trusts the roto-point calculations more than the dollar
-   conversions right now and wants that legible in the app: stat columns
-   grouped together, roto-value columns grouped together, dollar columns
-   grouped together (not interleaved as today), and a stats/roto toggle per
-   view considered for tabs beyond Standings.
+6. **Intuition tab v2 — full redesign (scope TBD, Josh's ask 2026-08-15).**
+   Currently the tab lets you shock every player's category rates by a
+   single global amount via +/- buttons and see the standings-odds effect,
+   sandboxed from the rest of the app (`app/verify.mjs`'s own check name:
+   "Intuition tab shading moves both halves and stays sandboxed"). Josh
+   wants substantially more:
+   - **Start by displaying** each player's playing-time assumption (PA/IP
+     — now shown on the board too, shipped today) AND his rate-stat /
+     accumulation assumptions for every roto category (the underlying
+     per-category rates the projection is built from, not just the
+     resulting roto points).
+   - **Three ways to adjust**, not just one: keep the existing +/- buttons,
+     ADD direct numeric entry (type a specific PA/IP or rate directly), AND
+     ADD preset buttons for common moves ("full-time" being the obvious
+     one — snapping straight to `KEEPER_PA_FLOOR`/`KEEPER_IP_FLOOR` from
+     `klab/config.py` — plus whatever other presets turn out to be common
+     once this is in use).
+   - **Show all 230 active rostered players at once, grouped by team**, in
+     a layout closer to a FanGraphs roster depth-chart page than the
+     current searchable/filterable table — alongside key contract fields
+     (salary, contract code, keeper cost) so a full-roster what-if session
+     doesn't require flipping to the Board tab to check costs.
+   - **Open architecture question, needs a real decision before building**:
+     should adjustments made here be a true override that propagates into
+     what the Board/Trade/Standings tabs show — i.e. change the actual
+     values used everywhere else in the app — or stay a sandboxed
+     simulation local to this tab, as today? This is not a small
+     implementation detail: a propagating override needs to flow through
+     `project_hitters`/`project_pitchers` → scoring → dollar values and
+     then be reflected in the SAME payload every other tab reads, which is
+     a materially bigger and more invasive change than a local
+     what-if view. Worth an explicit Josh decision, not an assumed default,
+     before scoping further. (This absorbs the earlier, narrower "manual
+     PA/IP override" item — same underlying need, now folded into one
+     redesign instead of two overlapping efforts.)
 
-7. **UI: uncertainty (Intuition tab) available via tooltip everywhere
-   (scope TBD).** Currently its own tab; Josh wants that kind of
-   uncertainty context reachable from any view, not just its own page.
+7. **UI: uncertainty (Intuition-tab-style ranges) available via tooltip on
+   OTHER tabs too (scope TBD).** Distinct from #6 above — this is about
+   Board/Trade/Standings gaining a lightweight uncertainty affordance
+   in-place, not about the Intuition tab itself. Needs a design pass on
+   what a compact per-cell/per-row tooltip looks like reused across tabs.
 
-8. **UI: manual PA/IP override + playing-time assumptions shown alongside
-   projections (scope TBD).** Every player's `pt_scale`/`pt_scale_kind`
-   (`klab/keeper.py::to_full_time`) is already computed but not shown next
-   to his projection. Josh wants it visible, plus a manual override path so
-   a new breakout starter's workload can be hand-adjusted without waiting
-   on a model refit.
+8. **"Name-brand / good-team" market premium — blocked on data, needs
+   scoping.** Josh's observation, 2026-08-15: real bidders pay more for a
+   famous player on a good team than stats projections predict, distinct
+   from the track-record gap #5 covers. Checked directly, 2026-08-15: no
+   real MLB standings/win-total data exists anywhere in `data/` — only
+   fantasy-team names and player stats — so the "good team" half of this
+   can't be tested at all without adding a new data source first. Don't
+   force a weak proxy; scope the data need before attempting this.
+
+9. **`position_map()` coverage gap (small, contained).** Some players'
+   historical draft position resolves to `"UNKNOWN"` (Cade Smith is the
+   concrete case found this session), thinning their comp pool and
+   sometimes preventing the position-specific comp filter — and now also
+   the tenure filter (#5's `player_tenure` work) — from ever having enough
+   comps to engage. Worth a data-quality pass on `klab/keeper.py::position_map()`'s
+   coverage.
+
+10. **Established-vet down-year overweighting in the projection blend
+    (small-to-medium, needs its own look).** Zack Wheeler currently prices
+    at $5.53 — barely above replacement — for what reads like one
+    injury/down year dominating the 2026-actuals leg of the projection
+    blend. `klab/project.py`'s `RELIABILITY` weighting already discounts
+    noisy stats, but doesn't distinguish "this vet is declining" from "this
+    vet had one bad/hurt year," which is a real, different question from
+    both #3 (upside distribution) and #5 (rookie tenure) above.
 
 ---
 
