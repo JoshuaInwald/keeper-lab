@@ -301,13 +301,24 @@ def _keeper_finish_odds(board: pd.DataFrame, fa: pd.DataFrame,
 
 def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
     """Comp-based next-auction price estimate for every player with a
-    projection, keyed by fg_id (as a string -- JSON object keys are always
-    strings). Computed per-basis, not once and reused: `regression_fair_value`
-    inside `estimate_auction_price()` is the player's own `redraft_value`,
-    which is exactly the number the basis selector changes -- pinning this
-    panel to one basis while the rest of the page follows the selector
-    would reproduce the same inconsistency out/FINDINGS.md #42 already
-    found and fixed for team/constant aggregates.
+    projection, keyed by "{fg_id}_{role}" (fg_id as an int -- JSON object
+    keys are always strings). Computed per-basis, not once and reused:
+    `regression_fair_value` inside `estimate_auction_price()` is the
+    player's own `redraft_value`, which is exactly the number the basis
+    selector changes -- pinning this panel to one basis while the rest of
+    the page follows the selector would reproduce the same inconsistency
+    out/FINDINGS.md #42 already found and fixed for team/constant
+    aggregates.
+
+    Keyed on role as well as fg_id (not fg_id alone) because a true
+    two-way player (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one
+    fg_id from 2027 on -- a fg_id-only key would let his second row
+    silently overwrite the first with an identical (wrong-role) estimate,
+    since `estimate_auction_price()` used to always resolve a name to its
+    first matching row. Passing `role` through fixes that at the source;
+    the key change here keeps both estimates addressable in the payload.
+    Everyone else still has exactly one role per fg_id, so this is a
+    no-op widening for them.
 
     Deliberately still a separate, non-integrated tool per
     klab/auction_estimator.py's own docstring -- this only *displays* its
@@ -317,13 +328,13 @@ def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
     players = pd.concat([board, fa], ignore_index=True)
     players = players[players["roto_points"] > 0]
     out = {}
-    for name, fg_id in zip(players["name"], players["fg_id"]):
+    for name, fg_id, role in zip(players["name"], players["fg_id"], players["role"]):
         try:
-            est = estimate_auction_price(name, players, k=15)
+            est = estimate_auction_price(name, players, k=15, role=role)
         except Exception:
             continue   # ambiguous/unresolved name -- skip rather than fail the whole build
         comps = est["comps"].head(8).to_dict("records")
-        out[str(int(fg_id))] = {
+        out[f"{int(fg_id)}_{role}"] = {
             "fair": _round(est["regression_fair_value"]),
             "lo": _round(est["comp_adjusted_low"]),
             "mid": _round(est["comp_adjusted_mid"]),
@@ -366,7 +377,7 @@ def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: lis
     # wouldn't move much anyway.
     from klab.uncertainty import bootstrap_bands
     board = board.merge(bootstrap_bands(B=BOOTSTRAP_DRAWS).reset_index(),
-                        on="fg_id", how="left")
+                        on=["fg_id", "role"], how="left")
 
     fa = s.free_agents.copy()
     fa["team"] = "(free agent)"

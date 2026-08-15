@@ -144,16 +144,25 @@ def find_comps(target: pd.Series, role: str, pos_group: str,
 
 
 def estimate_auction_price(name: str, players: pd.DataFrame,
-                           k: int = 15) -> dict:
+                           k: int = 15, role: str | None = None) -> dict:
     """Comp-adjusted next-auction price estimate for one player.
 
     `players` must have the columns in PROFILE_COLS plus roto_points,
     redraft_value, role, and fg_id -- i.e. `out/player_values_2027.csv`,
     or the keeper board.
+
+    `role` disambiguates a name that resolves to more than one row -- a
+    true two-way player (config.TWO_WAY_SPLIT_NAMES) has separate HIT and
+    PIT rows sharing one name from 2027 on (see
+    klab.board.project_all_players). Omitting it keeps the old
+    first-match behavior for every other name, which still only ever
+    resolves to one row.
     """
     from .keeper import position_map
 
     row = players[players["name"] == name]
+    if role is not None:
+        row = row[row["role"] == role]
     if not len(row):
         raise ValueError(f"'{name}' not found")
     row = row.iloc[0]

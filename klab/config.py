@@ -102,6 +102,15 @@ EXTENSION_ALREADY_USED_IF_SALARY_ABOVE_DRAFT = True
 # override rather than as a silent special case somewhere downstream.
 NON_EXTENDABLE_NAMES = {"Shohei Ohtani"}
 
+# The league auctions a true two-way player as two separate assets (hitter
+# and pitcher) starting with the 2027 auction -- Josh's confirmation,
+# 2026-08-15. Before 2027 he was one combined roster/keeper commitment, so
+# this only affects the forward-looking valuation path
+# (klab.board.project_all_players / value_2028), not klab.auction.py's
+# score_season(), which scores realized past auctions under the old rule and
+# is deliberately left summing his two lines into one purchase.
+TWO_WAY_SPLIT_NAMES = {"Shohei Ohtani"}
+
 # Contracts the CBS export left unreadable, resolved by the commissioner.
 # name -> (contract_code, salary). These are the only hand-entered contracts in
 # the project; everything else is read from the export.

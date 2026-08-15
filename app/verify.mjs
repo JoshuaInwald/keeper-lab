@@ -231,17 +231,17 @@ if (finishBad) console.log('  FINISH-ODDS SIMULATOR MISMATCH:', JSON.stringify(f
 // for teams/constants: it's derived from the board's own redraft_value.
 const auctionResult = await page.evaluate(() => {
   go('board');
-  const withEst = BOARD.find(r => AUCTION_EST[g(r, 'fg_id')]);
-  const withoutEst = BOARD.find(r => !AUCTION_EST[g(r, 'fg_id')]);
+  const withEst = BOARD.find(r => AUCTION_EST[g(r, 'fg_id') + '_' + g(r, 'role')]);
+  const withoutEst = BOARD.find(r => !AUCTION_EST[g(r, 'fg_id') + '_' + g(r, 'role')]);
   showPlayer(g(withEst, 'fg_id'));
   const panelHtml = $('dbody').innerHTML;
   const hasPanel = panelHtml.includes('Next-auction estimate');
   const nCompRows = document.querySelectorAll('#dbody table tbody tr').length;
-  const fairBlend = AUCTION_EST[g(withEst, 'fg_id')].fair;
+  const fairBlend = AUCTION_EST[g(withEst, 'fg_id') + '_' + g(withEst, 'role')].fair;
   showPlayer(g(withoutEst, 'fg_id'));
   const noPanelForMissing = !$('dbody').innerHTML.includes('Next-auction estimate');
   setBasis('actuals');
-  const fairActuals = AUCTION_EST[g(withEst, 'fg_id')].fair;
+  const fairActuals = AUCTION_EST[g(withEst, 'fg_id') + '_' + g(withEst, 'role')].fair;
   setBasis('blend');
   return { hasPanel, nCompRows, noPanelForMissing, fairBlend, fairActuals,
           basisAware: fairBlend !== fairActuals };

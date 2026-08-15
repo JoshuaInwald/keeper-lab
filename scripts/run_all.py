@@ -31,7 +31,7 @@ def main():
     # way to tell "the model is confident" from "the model is guessing"
     # apart. Merged here so it's in the board everywhere from this point on.
     from klab.uncertainty import bootstrap_bands
-    board = board.merge(bootstrap_bands().reset_index(), on="fg_id", how="left")
+    board = board.merge(bootstrap_bands().reset_index(), on=["fg_id", "role"], how="left")
 
     board.to_csv(OUT / "keeper_board_2027.csv", index=False)
     board[board["keep_2027"]].to_csv(OUT / "optimal_keepers_2027.csv", index=False)

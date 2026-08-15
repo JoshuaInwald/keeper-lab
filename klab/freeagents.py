@@ -77,7 +77,15 @@ def free_agent_board(positional: bool = False) -> pd.DataFrame:
     # board -- a free agent is by definition absent from it, so merging there
     # silently zeroed every out-year value and understated multi-year surplus.
     from .board import value_2028
-    sv27 = players.set_index("fg_id")["SV"] if "SV" in players else None
+    # .groupby(...).max(), not .set_index(...) -- a true two-way player
+    # (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id in
+    # `players` (see klab.board.project_all_players), and a duplicate-keyed
+    # Series breaks the .map() lookup inside project_saves(). max() recovers
+    # his real (pitcher-row) save total; every other fg_id is unique, so
+    # this is a no-op for everyone else. `fa` itself never contains him --
+    # he's rostered -- so the v28 merge below stays a safe fg_id-only merge,
+    # unlike the rostered-board merges in klab.board.build_board().
+    sv27 = players.groupby("fg_id")["SV"].max() if "SV" in players else None
     v28 = value_2028(exch, meta, sv27, positional=positional)[["fg_id", "redraft_value_2028"]]
     fa = fa.merge(v28, on="fg_id", how="left")
     fa["redraft_value_2028"] = fa["redraft_value_2028"].fillna(0.0)

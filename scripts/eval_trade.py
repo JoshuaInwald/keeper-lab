@@ -23,7 +23,7 @@ def main():
     b_send = [x.strip() for x in sys.argv[4].split(",") if x.strip()]
 
     board, exch, meta = build_board()
-    board = board.merge(bootstrap_bands().reset_index(), on="fg_id", how="left")
+    board = board.merge(bootstrap_bands().reset_index(), on=["fg_id", "role"], how="left")
     _, D, base, _ = build_2027_scorer()
     ros = ros_lines()
 

@@ -148,8 +148,18 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
         if c not in out:
             out[c] = np.nan
 
-    # Ohtani shares one FanGraphs id across the hitter and pitcher files.
-    # Sum his roto points; keep both stat lines by summing counting stats.
+    # A player can share one FanGraphs id across the hitter and pitcher
+    # files two ways: an incidental one (a position player who mop-up
+    # pitched a few innings, or a pitcher with a token PA -- not a real
+    # two-way roster asset, and still combined into one row below) and a
+    # true two-way player (Ohtani), who from 2027 on is auctioned/rostered
+    # as two separate assets (config.TWO_WAY_SPLIT_NAMES) and must NOT be
+    # combined. Pull his rows out before the incidental-combine groupby so
+    # they pass through untouched.
+    split_names = out["name"].isin(C.TWO_WAY_SPLIT_NAMES)
+    split_rows = out[split_names].copy()
+    out = out[~split_names]
+
     num = [c for c in out.columns if c.startswith("rp_")] + ["roto_points"] + \
           [c for c in stat_cols if c not in ("AVG", "ERA", "WHIP")]
     out["_hit"] = (out["role"] == "HIT").astype(int)
@@ -163,7 +173,8 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
     # numeric flags instead of a per-group lambda; same answer, far cheaper
     out["role"] = np.where(out["_hit"] & out["_pit"], "TWO",
                            np.where(out["_hit"] > 0, "HIT", "PIT"))
-    return out.drop(columns=["_hit", "_pit"]), D, base, D_se
+    out = out.drop(columns=["_hit", "_pit"])
+    return pd.concat([out, split_rows], ignore_index=True), D, base, D_se
 
 
 @cached
@@ -280,9 +291,18 @@ def value_players(exch: dict | None = None, positional: bool = False
     players["keep_value"] = (
         (players["roto_points"] - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
 
-    ft = ft_players.set_index("fg_id")
-    players["roto_points_ft"] = players["fg_id"].map(ft["roto_points"])
-    players["pt_scale"] = players["fg_id"].map(ft["pt_scale"]).fillna(1.0)
+    # Merge on (fg_id, role), not a fg_id-keyed .map() -- a true two-way
+    # player (config.TWO_WAY_SPLIT_NAMES) now has two rows sharing one
+    # fg_id in both `players` and `ft_players` (see
+    # project_all_players()), and a duplicate-keyed index breaks .map()'s
+    # lookup. role disambiguates; everyone else still has exactly one row
+    # per fg_id, so this is a plain 1:1 merge for them, same as before.
+    ft = ft_players[["fg_id", "role", "roto_points", "pt_scale", "pt_scale_kind"]].rename(
+        columns={"roto_points": "roto_points_ft", "pt_scale": "pt_scale_full",
+                "pt_scale_kind": "pt_scale_kind_full"})
+    players = players.merge(ft, on=["fg_id", "role"], how="left")
+    players["pt_scale"] = players["pt_scale_full"].fillna(1.0)
+    players = players.drop(columns=["pt_scale_full"])
     players["redraft_value_ft"] = dollars(players["roto_points_ft"].fillna(
         players["roto_points"]), repl_series)
     players["upside_ft"] = players["redraft_value_ft"] - players["redraft_value"]
@@ -294,7 +314,8 @@ def value_players(exch: dict | None = None, positional: bool = False
     # a bullpen-decision bet, not a health one. Conflating the two under one
     # number made Griffin Jax and Grant Taylor's huge upside_ft look like
     # hidden health value when it was really "if he becomes the closer."
-    players["upside_kind"] = players["fg_id"].map(ft["pt_scale_kind"]).fillna("health")
+    players["upside_kind"] = players["pt_scale_kind_full"].fillna("health")
+    players = players.drop(columns=["pt_scale_kind_full"])
 
     meta = {"replacement_rp": repl_rp, "n_rostered": n_rostered,
             "pool_rp_above_repl": pool_rp,
@@ -343,9 +364,22 @@ def value_2028(exch: dict, meta: dict, saves_2027: pd.Series,
     # playing time, so the out year has to be too, or multi-year surplus
     # silently mixes an expected-PT 2027 with a full-time 2028.
     H, P = project_2028(saves_2027)
-    Hs = H[["fg_id"]].join(scorer.hitters(H)[["roto_points"]])
-    Ps = P[["fg_id"]].join(scorer.pitchers(P)[["roto_points"]])
-    out = pd.concat([Hs, Ps]).groupby("fg_id", as_index=False)["roto_points"].sum()
+    Hs = H[["fg_id", "name"]].join(scorer.hitters(H)[["roto_points"]])
+    Ps = P[["fg_id", "name"]].join(scorer.pitchers(P)[["roto_points"]])
+    Hs["role"], Ps["role"] = "HIT", "PIT"
+    both = pd.concat([Hs, Ps], ignore_index=True)
+
+    # Mirror project_all_players()'s 2027 split: a true two-way player
+    # (config.TWO_WAY_SPLIT_NAMES) keeps separate 2028 hit/pitch lines too --
+    # summing them here would hand the SAME combined number to both of his
+    # split 2027 rows below via the fg_id merge in build_board(). `role` is
+    # only kept (non-null) for these rows; everyone else merges on fg_id
+    # alone, unchanged from before.
+    split_names = both["name"].isin(C.TWO_WAY_SPLIT_NAMES)
+    split_rows = both[split_names][["fg_id", "role", "roto_points"]]
+    combined = (both[~split_names].groupby("fg_id", as_index=False)["roto_points"].sum()
+               .assign(role=None))
+    out = pd.concat([combined, split_rows], ignore_index=True)
     out = out.rename(columns={"roto_points": "roto_points_2028"})
     scale = meta["usd_per_rp_redraft"]
 
@@ -394,9 +428,25 @@ def build_board(exch: dict | None = None, positional: bool = False
     for c in ("roto_points_ft", "redraft_value_ft", "upside_ft"):
         b[c] = b[c].fillna(0.0)
 
-    sv27 = players.set_index("fg_id")["SV"] if "SV" in players else None
+    # .groupby(...).max() rather than .set_index(...) -- a true two-way
+    # player (config.TWO_WAY_SPLIT_NAMES) now has two rows sharing one
+    # fg_id in `players` (see project_all_players()), and a duplicate-keyed
+    # Series breaks the .map() lookup inside project_saves(). max() recovers
+    # his real (pitcher-row) save total; every other fg_id is unique, so
+    # this is a no-op for everyone else.
+    sv27 = players.groupby("fg_id")["SV"].max() if "SV" in players else None
     v28 = value_2028(exch, meta, sv27, positional=positional)
-    b = b.merge(v28, on="fg_id", how="left")
+    # v28 tags a two-way player's rows with a real `role` (HIT/PIT) and
+    # leaves it null for everyone else. A plain fg_id merge would
+    # cartesian-join his 2 `b` rows against his 2 `v28` rows into 4 -- match
+    # those on (fg_id, role) instead; everyone else merges on fg_id alone,
+    # unchanged.
+    v28_normal = v28[v28["role"].isna()].drop(columns=["role"])
+    v28_split = v28[v28["role"].notna()]
+    two_way_ids = set(v28_split["fg_id"])
+    b_normal = b[~b["fg_id"].isin(two_way_ids)].merge(v28_normal, on="fg_id", how="left")
+    b_split = b[b["fg_id"].isin(two_way_ids)].merge(v28_split, on=["fg_id", "role"], how="left")
+    b = pd.concat([b_normal, b_split], ignore_index=True)
     b["roto_points_2028"] = b["roto_points_2028"].fillna(0.0)
     b["redraft_value_2028"] = b["redraft_value_2028"].fillna(0.0)
 

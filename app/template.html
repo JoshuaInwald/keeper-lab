@@ -670,7 +670,12 @@ function extLabel(r){
 // a pure production regression predicts. No age/debut-year data exists in
 // this league's records, so it's a production+position comp only.
 function auctionEstPanel(r){
-  const est = AUCTION_EST[g(r,"fg_id")];
+  // Keyed "{fg_id}_{role}", not fg_id alone -- a true two-way player has
+  // two rows sharing one fg_id from 2027 on (klab.config.TWO_WAY_SPLIT_NAMES),
+  // and a fg_id-only key would silently show one row's estimate on both
+  // cards. Everyone else still has one role per fg_id, so this is a
+  // no-op for them.
+  const est = AUCTION_EST[g(r,"fg_id")+"_"+g(r,"role")];
   if(!est) return "";
   const rows = est.comps.map(c=>
     `<tr><td>${c.season}</td><td class="l">${esc(c.player)}</td><td class="l">${esc(c.team)}</td>
