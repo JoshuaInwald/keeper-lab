@@ -46,6 +46,22 @@ local `main` and `origin/main` have diverged. A session that edits
 next session (local or cloned from GitHub) looking at stale docs and doesn't
 know it.
 
+Then refresh the read-only local mirror at
+`~/Documents/Fantasy Baseball/keeper-lab/` (2026-08-15, Josh's request — he
+wants a browsable local copy of the tracked repo sitting next to the raw
+exports, not just on GitHub):
+
+```
+rsync -a --exclude='.git' --exclude='.venv311' --exclude='node_modules' \
+  --exclude='__pycache__' --exclude='.pytest_cache' --exclude='*.pyc' \
+  ~/PycharmProjects/keeper-lab/ "~/Documents/Fantasy Baseball/keeper-lab/"
+```
+
+One-way, repo -> Documents. Never edit anything under that mirror directly —
+it gets overwritten wholesale next refresh, and edits made there don't reach
+GitHub. It intentionally excludes `.git`, so it's a snapshot of tracked
+content, not a second clone.
+
 ## Conventions worth knowing before editing
 
 - `out/*.md` are committed on purpose — they're the portfolio artifact, not
