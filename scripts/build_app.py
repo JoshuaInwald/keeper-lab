@@ -348,9 +348,12 @@ def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
             # not caught unless it goes through the same NaN-safe helper
             # everything else does. json.dumps(allow_nan=False) surfaced it
             # immediately (673 players, several dozen with a NaN comp `pos`).
+            "first_timer": bool(est["target_is_first_timer"]),
+            "tenure_filtered": bool(est["tenure_filtered"]),
             "comps": [{"season": _round(c["season"]), "player": _round(c["player"]),
                        "team": _round(c["team"]), "salary": _round(c["salary"]),
-                       "pos": _round(c["pos"]), "premium_pct": _round(c["premium_frac"] * 100)}
+                       "pos": _round(c["pos"]), "premium_pct": _round(c["premium_frac"] * 100),
+                       "appearances": _round(c["appearances_to_date"])}
                       for c in comps],
         }
     return out

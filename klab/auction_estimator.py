@@ -106,6 +106,22 @@ def comp_pool() -> pd.DataFrame:
 
     d["predicted_salary"] = predicted
     d["premium_frac"] = resid
+
+    # Track record: how many times this player has already been bought in
+    # this league's real history, strictly before this row's own season --
+    # 0 means this sale was his first. Comps otherwise can't tell a
+    # rookie/breakout debut from a proven veteran with an identical stat
+    # line, which is exactly why a first-year closer (Cade Smith) or a
+    # pitcher's best-ever season (Skubal) get comped against established
+    # stars and overshoot even the already-high regression fair value.
+    # fg_id == -1 is auction.py's "name didn't resolve to a real player"
+    # placeholder for unmatched drafts -- not one player, so those rows
+    # can't have a real tenure count against each other; left at 0 (the
+    # conservative first-timer default) rather than counted together.
+    d = d.sort_values("season")
+    real = d["fg_id"] != -1
+    d["appearances_to_date"] = 0
+    d.loc[real, "appearances_to_date"] = d[real].groupby("fg_id").cumcount()
     return d
 
 
@@ -123,12 +139,33 @@ def _distance(pool: pd.DataFrame, target: pd.Series) -> pd.Series:
     return np.sqrt((diff ** 2).sum(axis=1))
 
 
+def player_tenure(fg_id: int) -> int:
+    """How many times this player has already been bought in this league's
+    real auction history (any season in the sample) -- 0 means his next
+    sale would be his first. Used to tell find_comps() whether a target is
+    a first-timer, so his comps aren't drawn from proven veterans with a
+    coincidentally similar debut-season line."""
+    pool = comp_pool()
+    return int((pool["fg_id"] == fg_id).sum())
+
+
 def find_comps(target: pd.Series, role: str, pos_group: str,
-               k: int = 15) -> pd.DataFrame:
+               k: int = 15, target_is_first_timer: bool = False) -> pd.DataFrame:
     """K nearest comps by production-profile distance. Prefers same
     position group; falls back to the full role if that group is too thin
     to say anything (this league is small -- 677 purchases over 5 seasons
-    -- so a tight position+profile filter can leave single digits)."""
+    -- so a tight position+profile filter can leave single digits).
+
+    `target_is_first_timer`: the target has never been bought in this
+    league before (`player_tenure()` == 0) -- a rookie or a breakout debut.
+    When true, comps are preferred among OTHER first-timers first (same
+    fallback pattern as position: use it if there are at least `k`, drop it
+    if not). A first-time sale happened in a market that hadn't yet decided
+    the player would repeat his line, which is a different market than the
+    one that priced an established arm/bat with an identical stat line --
+    without this, a rookie closer's debut season gets comped against
+    proven $30+ closers and overshoots even the regression fair value
+    (Cade Smith, Tarik Skubal)."""
     pool = comp_pool()
     pool = pool[pool["role"] == role].copy()
 
@@ -136,10 +173,18 @@ def find_comps(target: pd.Series, role: str, pos_group: str,
     used_pool = same_pos if len(same_pos) >= k else pool
     fallback = len(same_pos) < k
 
+    tenure_filtered = False
+    if target_is_first_timer:
+        first_timers = used_pool[used_pool["appearances_to_date"] == 0]
+        if len(first_timers) >= k:
+            used_pool = first_timers
+            tenure_filtered = True
+
     d = _distance(used_pool, target)
     comps = used_pool.assign(distance=d).nsmallest(k, "distance")
     comps.attrs["fallback_to_full_role"] = fallback
     comps.attrs["n_same_position"] = len(same_pos)
+    comps.attrs["tenure_filtered"] = tenure_filtered
     return comps
 
 
@@ -171,7 +216,8 @@ def estimate_auction_price(name: str, players: pd.DataFrame,
     pos = pmap.get(int(row["fg_id"]), "UNKNOWN")
     pg = position_group(pos)
 
-    comps = find_comps(row, row["role"], pg, k=k)
+    first_timer = player_tenure(int(row["fg_id"])) == 0
+    comps = find_comps(row, row["role"], pg, k=k, target_is_first_timer=first_timer)
     premiums = comps["premium_frac"]
 
     base = float(row["redraft_value"])
@@ -189,7 +235,9 @@ def estimate_auction_price(name: str, players: pd.DataFrame,
         "n_comps": len(comps),
         "fallback_to_full_role": bool(comps.attrs["fallback_to_full_role"]),
         "n_same_position_available": int(comps.attrs["n_same_position"]),
+        "target_is_first_timer": first_timer,
+        "tenure_filtered": bool(comps.attrs["tenure_filtered"]),
         "comps": comps[["season", "player", "team", "salary", "pos",
                         "roto_points", "predicted_salary", "premium_frac",
-                        "distance"]].reset_index(drop=True),
+                        "distance", "appearances_to_date"]].reset_index(drop=True),
     }

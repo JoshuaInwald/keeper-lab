@@ -109,10 +109,18 @@ def test_unknown_contract_is_charged_worst_case():
 # --- data integrity ---------------------------------------------------------
 
 def test_board_has_no_duplicate_players(board):
-    """Ohtani has two rows in the contracts file (batter and pitcher) sharing
-    one FanGraphs id; a careless join put him on the board twice."""
+    """A careless join could put a normal player on the board twice.
+
+    The one INTENDED exception: a true two-way player
+    (config.TWO_WAY_SPLIT_NAMES, e.g. Ohtani) legitimately has two rows
+    sharing one fg_id from 2027 on -- hitter and pitcher, priced as
+    separate auction assets (klab.board.project_all_players). Duplicated
+    (fg_id, role) pairs, or a duplicated fg_id for anyone NOT in that set,
+    are still the real bug this test exists to catch."""
     b, _, _ = board
-    assert b["fg_id"].duplicated().sum() == 0
+    assert b.duplicated(["fg_id", "role"]).sum() == 0
+    dup_fg_id = b[b["fg_id"].duplicated(keep=False)]
+    assert set(dup_fg_id["name"].unique()) <= C.TWO_WAY_SPLIT_NAMES
 
 
 def test_only_real_two_way_players_are_tagged_two(board):
@@ -159,24 +167,31 @@ def test_full_time_value_never_below_expected(board):
 # valuation fails here rather than in a trade discussion.
 
 GOLDEN = [
-    ("Shohei Ohtani",    50, 120),   # best player in the league, two-way
-    ("Tarik Skubal",     35,  70),   # elite starter
-    ("Paul Skenes",      25,  60),
-    ("Mason Miller",     20,  60),   # elite closer
-    ("Junior Caminero",  20,  50),
-    ("Elly De La Cruz",  20,  50),
-    ("Julio Rodríguez",  15,  40),
-    ("Pete Alonso",      10,  35),
-    ("Christian Scott",   0,  12),   # good rates, tiny sample
-    ("Kevin Gausman",     0,  12),   # replacement level
+    # Ohtani prices as two separate 2027 auction assets from
+    # config.TWO_WAY_SPLIT_NAMES on -- one golden entry per role, not the
+    # old single combined-$78 figure. Bounds are loose, same philosophy as
+    # every other row here, not pinned to today's exact $49.98 / $0.00.
+    ("Shohei Ohtani", "HIT", 30, 70),    # hitter side alone
+    ("Shohei Ohtani", "PIT",  0, 30),    # pitcher side: cautious 2027 IP ramp
+    ("Tarik Skubal",  None, 35,  70),   # elite starter
+    ("Paul Skenes",   None, 25,  60),
+    ("Mason Miller",  None, 20,  60),   # elite closer
+    ("Junior Caminero", None, 20,  50),
+    ("Elly De La Cruz", None, 20,  50),
+    ("Julio Rodríguez", None, 15,  40),
+    ("Pete Alonso",   None, 10,  35),
+    ("Christian Scott", None, 0,  12),   # good rates, tiny sample
+    ("Kevin Gausman", None,  0,  12),   # replacement level
 ]
 
 
-@pytest.mark.parametrize("name,lo,hi", GOLDEN)
-def test_golden_player_values(board, name, lo, hi):
+@pytest.mark.parametrize("name,role,lo,hi", GOLDEN)
+def test_golden_player_values(board, name, role, lo, hi):
     b, _, _ = board
     row = b[b["name"] == name]
-    assert len(row) == 1, f"{name} not found exactly once"
+    if role is not None:
+        row = row[row["role"] == role]
+    assert len(row) == 1, f"{name}{' ' + role if role else ''} not found exactly once"
     v = float(row["redraft_value"].iloc[0])
     assert lo <= v <= hi, f"{name} valued at ${v:.1f}, expected ${lo}-${hi}"
 
@@ -321,8 +336,14 @@ def test_app_payload_has_no_column_collisions_and_no_nans():
     ix = {c: i for i, c in enumerate(p["cols"])}
     for col in ["PA", "AB", "IP", "redraft_value", "keeper_cost", "surplus_multiyear"]:
         assert col in ix
+    # Two rows from 2027 on -- hitter and pitcher, priced as separate
+    # auction assets (config.TWO_WAY_SPLIT_NAMES). The PA>0 check belongs
+    # on his hitter row specifically; his pitcher row has PA==0 by
+    # construction, same as any other pitcher.
     ohtani = [r for r in p["board"] if r[ix["name"]] == "Shohei Ohtani"]
-    assert len(ohtani) == 1 and ohtani[0][ix["PA"]] > 0
+    assert {r[ix["role"]] for r in ohtani} == {"HIT", "PIT"}
+    hit_row = next(r for r in ohtani if r[ix["role"]] == "HIT")
+    assert hit_row[ix["PA"]] > 0
     # every rostered row must carry the fields the UI dereferences
     for r in p["board"]:
         for col in ["name", "team", "role", "salary", "keeper_cost", "redraft_value"]:
@@ -751,8 +772,15 @@ def test_positional_adjustment_only_touches_catchers_and_shortstops():
     on, _, _ = value_players(None, positional=True)
     elig = load_position_eligibility()
     adjusted_ids = elig["C"] | elig["SS"]
-    m = off[["fg_id", "rp_above_repl"]].merge(
-        on[["fg_id", "rp_above_repl"]], on="fg_id", suffixes=("_off", "_on"))
+    # Merge on (fg_id, role), not fg_id alone -- a true two-way player
+    # (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id in both
+    # `off` and `on`, and a plain fg_id merge cartesian-joins his 2x2 rows
+    # into 4, comparing e.g. his HIT row's off-value against his PIT row's
+    # on-value and reporting a bogus mismatch. Everyone else still has one
+    # role per fg_id, so this is a no-op widening for them.
+    m = off[["fg_id", "role", "rp_above_repl"]].merge(
+        on[["fg_id", "role", "rp_above_repl"]], on=["fg_id", "role"],
+        suffixes=("_off", "_on"))
     unaffected = m[~m["fg_id"].isin(adjusted_ids)]
     assert (unaffected["rp_above_repl_off"] == unaffected["rp_above_repl_on"]).all()
 
@@ -769,7 +797,12 @@ def test_positional_adjustment_2028_actually_uses_the_position_specific_bar():
     _, exch_on, meta_on = build_board(positional=True)
 
     players_on, _, _ = value_players(exch_on, positional=True)
-    sv27 = players_on.set_index("fg_id")["SV"] if "SV" in players_on else None
+    # .groupby(...).max(), not .set_index(...) -- a true two-way player
+    # (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id, and a
+    # duplicate-keyed Series breaks the .map() lookup inside
+    # project_saves(). Same fix as klab.board.build_board() /
+    # klab.freeagents.free_agent_board().
+    sv27 = players_on.groupby("fg_id")["SV"].max() if "SV" in players_on else None
     # Same exch/meta (same $/point scale, same pooled replacement_rp) for
     # both calls -- positional=False here just skips the override block, so
     # this isolates the replacement-level effect from the scale-rescale

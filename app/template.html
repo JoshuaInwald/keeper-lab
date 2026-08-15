@@ -680,12 +680,24 @@ function auctionEstPanel(r){
   const rows = est.comps.map(c=>
     `<tr><td>${c.season}</td><td class="l">${esc(c.player)}</td><td class="l">${esc(c.team)}</td>
      <td>${usd(c.salary)}</td><td class="l">${esc(c.pos)}</td>
-     <td style="white-space:nowrap">${sgn(c.premium_pct,0)}%</td></tr>`
+     <td style="white-space:nowrap">${sgn(c.premium_pct,0)}%</td><td>${c.appearances}</td></tr>`
   ).join("");
   const confNote = est.fallback
     ? `Too few same-position comps (${est.n_same_pos}), so this pulls from the full `
       + `${g(r,"role")==="PIT"?"pitcher":"hitter"} pool instead of ${g(r,"position")||"his position"} alone.`
     : `Based on the ${est.n_comps} most similar historical purchases at his position.`;
+  // Track-record note: a target who's never been bought in this league
+  // before (first_timer) gets compared against OTHER first-timers when
+  // there are enough of them (tenure_filtered) -- a rookie/breakout debut
+  // sold in a market that hadn't yet decided he'd repeat it, a different
+  // market than the one pricing a proven arm/bat with the same stat line.
+  const tenureNote = !est.first_timer ? "" :
+    est.tenure_filtered
+      ? `<div class="note">He's never been bought in this league before, so comps above are `
+        + `drawn from other first-time sales, not established players with a similar line.</div>`
+      : `<div class="note">He's never been bought in this league before, but there weren't enough `
+        + `other first-time sales at his position to comp against exclusively -- comps above may `
+        + `include established players with a similar line.</div>`;
   return `<div class="panel">
     <h3 title="A second, independent estimate, not a correction to the value above -- see the note below.">
       Next-auction estimate, comp-based</h3>
@@ -697,9 +709,10 @@ function auctionEstPanel(r){
     <div class="note">${confNote} No age or debut-year data exists anywhere in this league's
       records, so this can't do age-based comps the way a real market read would -- a stated
       gap, not a silent one.</div>
+    ${tenureNote}
     <table style="margin-top:9px"><thead><tr>
       <th class="l">Yr</th><th class="l">Comp</th><th class="l">Team</th>
-      <th>Paid</th><th class="l">Pos</th><th>Premium</th>
+      <th>Paid</th><th class="l">Pos</th><th>Premium</th><th title="Times this comp had been bought in this league before this sale">Yrs bought</th>
     </tr></thead><tbody>${rows}</tbody></table>
   </div>`;
 }
