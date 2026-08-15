@@ -458,10 +458,18 @@ $("foot").innerHTML = `Values are 2027 projections priced off this league's own 
   + `what was tried and rejected in <code>out/LAB_NOTEBOOK.md</code>.`;
 
 // ---------- board ----------
+// Grouped identity | playing-time/roto | dollar, not interleaved (Josh's
+// ask, 2026-08-15 -- he trusts the roto math more than the dollar
+// conversions right now and wants that legible, not just a wall of columns
+// with equal visual weight). "PA" is the sort key (a real column; IP isn't
+// unified with it server-side) but the cell itself renders role-appropriate
+// PA or IP via ptCell() -- same pattern "value_lo" already uses to sort by
+// one field while rendering a fuller cell via band().
 const BOARD_COLS=[
   ["name","Player","l"],["team","Team","l"],["role","",""],
+  ["PA","Playing time"],["roto_points","Roto pts"],
   ["salary","Sal"],["contract","Yr"],["keeper_cost","Cost"],
-  ["roto_points","Roto pts"],["redraft_value","Worth '27"],
+  ["redraft_value","Worth '27"],
   ["value_lo","likely range"],
   ["surplus_y2027","Surplus '27"],["surplus_multiyear","Surplus, all yrs"],
   ["p_surplus_positive","Sure?"],
@@ -484,6 +492,10 @@ const COL_HELP = {
   contract:"Seasons left AFTER 2026. F = confirmed free agent after 2026, not extendable — "
     +"the extension window closes before his own walk-year draft, and it already has.",
   keeper_cost:"What it costs to roster him in 2027, extension included.",
+  PA:"Projected 2027 PA (hitters) or IP (pitchers), the workload his roto points assume. "
+    +"A ×N.NN tag means it's been scaled up from a shorter observed season -- hover the tag "
+    +"for whether that's a health bet (nothing keeps him off the field) or a role bet "
+    +"(handed the closer job outright).",
   roto_points:"Projected 2027 standings points he adds, all ten categories.",
   redraft_value:"What he'd be worth in a 2027 auction, in dollars.",
   value_lo:"80% of bootstrap draws landed inside this range.",
@@ -592,10 +604,11 @@ function playerRow(r){
   + `</td>
   <td class="l dim">${esc(g(r,"team"))} <span class="mlbteam">${esc(g(r,"mlb_team"))}</span></td>
   <td class="dim">${g(r,"role")==="PIT"?"P":g(r,"role")==="TWO"?"H/P":"H"}</td>
+  <td class="dim">${ptCell(r)}</td>
+  <td title="${esc(valueBreakdownTooltip(r))}">${nf(g(r,"roto_points"))}</td>
   <td>${usd(g(r,"salary"))}</td>
   <td class="dim">${esc(g(r,"contract"))}</td>
   <td>${usd(g(r,"keeper_cost"))}</td>
-  <td title="${esc(valueBreakdownTooltip(r))}">${nf(g(r,"roto_points"))}</td>
   <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"redraft_value"))}</td>
   <td>${band(r,"value_lo","value_hi")}</td>
   <td>${sgn(adj(g(r,"surplus_y2027")),0,"$")}</td>
@@ -604,6 +617,22 @@ function playerRow(r){
   <td class="dim">${money(g(r,"redraft_value_2028"))}</td>
   <td class="dim">${upsideCell(r)}</td>
   <td class="dim">${nf(rosVal(r),2)}</td></tr>`;
+}
+// Playing-time assumption behind the roto-point projection (Josh's ask,
+// 2026-08-15): PA for a hitter, IP for a pitcher, plus a ×N.NN tag when
+// klab.keeper.to_full_time() has scaled it up from a shorter observed
+// season -- same health-vs-role distinction as upsideCell() below, since
+// it's the same pt_scale_kind field.
+function ptCell(r){
+  const role = g(r,"role");
+  const v = role==="PIT" ? g(r,"IP") : g(r,"PA");
+  const label = role==="PIT" ? "IP" : "PA";
+  const scale = g(r,"pt_scale"), kind = g(r,"pt_scale_kind");
+  const extrap = scale!=null && scale>1.05;
+  const tag = !extrap ? "" : `<span class="tag ${kind==="role"?"role":""}" title="${kind==="role"
+      ? "scaled to a full closer's save total -- a bullpen-role bet, not a health one"
+      : "scaled up to a full healthy workload from a shorter observed season"}">×${nf(scale,2)}</span>`;
+  return (v==null?'<span class="dim">—</span>':nf(v,0)+" "+label) + tag;
 }
 // upside_ft mixes two different bets (out/FINDINGS.md #53): "health" (what
 // he's worth if nothing keeps him off the field, at his own role) and
@@ -758,7 +787,9 @@ function showPlayer(id){
     <div class="sub dim">${esc(g(r,"team"))} <span class="mlbteam">${esc(g(r,"mlb_team"))}</span> · ${esc(g(r,"keeper_status"))}
       ${g(r,"extension_used")?" · extension already used":""}</div>
     <div class="panel" style="margin-top:14px">
-      <h3>2027 projection${g(r,"pt_scale")>1.001?` · playing time scaled ×${nf(g(r,"pt_scale"),2)}`:""}</h3>
+      <h3>2027 projection${g(r,"pt_scale")>1.001?` · playing time scaled ×${nf(g(r,"pt_scale"),2)}`
+        +(g(r,"pt_scale_kind")==="role"?" (role bet -- if he's handed the closer job, not a health question)"
+                                        :" (health bet -- if nothing keeps him off the field)"):""}</h3>
       ${line}
       <h3 style="margin-top:12px">Roto points by category</h3>
       <div class="note">How much of his 2027 dollar value each category is carrying -- same $/point

@@ -49,7 +49,7 @@ PLAYER_COLS = [
     "roto_points_ft", "redraft_value_ft", "upside_ft", "upside_kind",
     "redraft_value_2028", "surplus_redraft",
     "surplus_y2027", "surplus_y2028", "surplus_y2029", "surplus_multiyear",
-    "pt_scale",
+    "pt_scale", "pt_scale_kind",
     "value_lo", "value_hi", "surplus_lo", "surplus_hi", "p_surplus_positive",
     "PA", "AB", "H", "HR", "R", "RBI", "SB", "AVG",
     "IP", "W", "SV", "K", "ER", "BB", "ERA", "WHIP",
