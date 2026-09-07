@@ -134,7 +134,7 @@ Flip counts are keep/cut changes out of 275 rostered players (`scripts/sensitivi
 
 | check | result | source |
 |---|---|---|
-| current rosters rolled over 2026 actuals vs 2026 standings | Spearman 0.863, Pearson 0.889; league leader predicted 1st | `scripts/validate.py` |
+| current rosters rolled over 2026 actuals vs 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale); league leader predicted 1st | `scripts/validate.py` |
 | replacement level, two independent routes | 4.81 (230th projection) vs 3.98 (auction intercept) | `out/model_params.json` |
 | budget identity | top-230 `redraft_value` sums to exactly $2,600 (caught a $3,854 build) | `scripts/audit.py`, pytest |
 | decision robustness | 92% of keep/cut calls hold across all variants (HANDOFF, 2026-08-14); recount of the committed `sensitivity_keep_flags.csv` gives 246/275 = 89% | `scripts/sensitivity.py` |

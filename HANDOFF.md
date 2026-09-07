@@ -6,7 +6,7 @@ Last updated: 2026-09-07 (compaction pass). Read `CONSTRAINTS.md` first, then "N
 - Repo: `~/PycharmProjects/keeper-lab` on the Mac, GitHub `JoshuaInwald/keeper-lab` (public, `main`), mirror at `~/Documents/Fantasy Baseball/keeper-lab/`. See `CLAUDE.md` for the three-surface rule.
 - Build: `PYTHONPATH=.:scripts python3 scripts/run_all.py`; tests: `PYTHONPATH=. python3 -m pytest tests/ -q` (64 pass, 2026-09-07); app check: `node app/verify.mjs` (15 pass).
 - Data: `data/` current as of 2026-08-15 exports (2026 season ~75% complete at that pull). ZiPS 2027 and 2028 Depth Charts loaded. Refresh cadence in `data/README.md`.
-- Committed build numbers: $9.17 per roto point (keeper-adjusted auction scale), $6.56 (redraft scale), replacement 4.81 roto pts, +33% projected 2027 inflation, Spearman 0.863 vs 2026 standings. Every one moves on a rebuild; quote from `out/model_params.json`.
+- Committed build numbers: $9.17 per roto point (keeper-adjusted auction scale), $6.56 (redraft scale), replacement 4.81 roto pts, +33% projected 2027 inflation, Spearman 0.851 vs 2026 standings. Every one moves on a rebuild; quote from `out/model_params.json`.
 
 ## State of the model
 - Headline `redraft_value` is a production scale normalised to top-230 = $2,600. It is NOT a market price and is known to overshoot at the top (Skubal $52 vs a $45 league ceiling) and undershoot young/no-track-record players. `docs/ROADMAP.md` item 1 is the fix, diagnosed 2026-09-07 with numbers; nothing has been built yet.

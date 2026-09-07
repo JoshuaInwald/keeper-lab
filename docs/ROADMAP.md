@@ -35,7 +35,7 @@ Pushback on the review itself: a single owner's price sense is a noisy instrumen
 
 **Step 5. Upside as a feature, not an afterthought (1 session, can follow 1-4).** ZiPS P10-P90 columns are already in the export. Add spread (P90 minus P50) to the price model; test whether the market pays for it (hypothesis: yes for hitters under tenure 2, no for pitchers). This is the principled version of "rookies are undervalued" and subsumes the parked rookie item.
 
-**What to expect.** Even a good model will leave roughly half the price variance unexplained; report that ceiling rather than tune to the reviewer's list. The ordering of players by `production_value` is already validated (Spearman 0.86-0.89 against three external systems); what changes is the dollar level and the identity of who is cheap relative to market.
+**What to expect.** Even a good model will leave roughly half the price variance unexplained; report that ceiling rather than tune to the reviewer's list. The ordering of players by `production_value` is already validated (Spearman 0.85-0.89 against three external systems); what changes is the dollar level and the identity of who is cheap relative to market.
 
 ## 2. Team-specific category value (1 session to scope)
 Roto points add linearly today; the marginal value of a category unit depends on where a team sits in it. Turn one value per player into one per team. The trade evaluator's win-now lens already re-ranks standings; the general fix is unbuilt. Highest-value gap after item 1.

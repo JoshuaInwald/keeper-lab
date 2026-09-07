@@ -26,7 +26,7 @@ open out/keeper_lab.html                                # the app: one file, no 
 
 | check | result |
 |---|---|
-| rostered players to 2026 standings | Spearman 0.863, Pearson 0.889 |
+| rostered players to 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale) |
 | replacement level, two independent routes | 4.81 roto pts (projection) vs 3.98 (auction intercept) |
 | budget identity | top 230 `redraft_value` sums to exactly $2,600 |
 | decision robustness | ~90% of keep/cut calls hold across six modelling variants |
