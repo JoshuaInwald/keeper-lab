@@ -1,36 +1,13 @@
-"""Uncertainty bands on every dollar figure.
+"""Uncertainty bands on every dollar figure, from denominator uncertainty.
 
-The denominators are estimated from a small number of team-seasons, and the
-bootstrap says the typical one is good to about ±38%. Until now that number
-lived in a footnote. This module propagates it to the quantity you actually
-act on: what a player is worth, and whether his contract has surplus.
+Roto points are linear in 1/denominator and only `sigma_rel` is resampled,
+so a bootstrap draw is a per-category rescaling of the computed `rp_*`
+columns: rp_cat(draw) = rp_cat(point) * sigma_0(cat) / sigma_b(cat).
 
-**Why this is cheap, and exact.** Roto points are *linear in one over the
-denominator* in every category:
-
-    counting:  rp_cat = stat / d_cat
-    rate:      rp_AVG = (team_AVG_with_him − league_AVG) / d_AVG
-
-and the denominator is `sigma_rel × level × c_n/(n−1)`, of which only
-`sigma_rel` is resampled. So a bootstrap draw is a per-category rescaling of
-the already-computed `rp_*` columns:
-
-    rp_cat(draw) = rp_cat(point) × sigma_0(cat) / sigma_b(cat)
-
-No re-projection, no re-fit, no approximation in the scoring step. A thousand
-draws is a thousand multiplications of a 2,000 × 10 matrix.
-
-**Where it is approximate**, stated plainly:
-
-1. The 2028 valuation is shocked by each player's own 2027 ratio rather than
-   rescored from its own category lines, which the board does not store. Same
-   player, same categories, so the shock is close to right.
-2. Replacement level and the $2,600 calibration are recomputed inside every
-   draw, so the budget identity holds in each one. That is deliberate: it
-   means the bands describe *relative* mispricing, not a leaguewide inflation
-   of every value at once.
-3. It is uncertainty in **how to score a stat line**, not in the stat line.
-   Projection error is separate and additional.
+Approximations: (1) 2028 is shocked by each player's own 2027 ratio;
+(2) replacement level and the $2,600 calibration are refit inside every
+draw, so bands describe relative mispricing; (3) this is uncertainty in how
+to score a stat line, not in the line -- projection error is additional.
 """
 
 from __future__ import annotations
@@ -77,12 +54,9 @@ def _pools(seasons=None) -> dict:
 @cached
 def bootstrap_bands(B: int = 1000, seed: int = 0,
                     lo_pct: float = 10.0, hi_pct: float = 90.0) -> pd.DataFrame:
-    """Per-player dollar bands, indexed by `fg_id`.
-
-    Returns lo/hi on `redraft_value` and on `surplus_multiyear`, plus the
-    share of draws in which the player is still worth keeping. That last
-    column is the one that matters: a player whose surplus is positive in 96%
-    of draws is a different decision from one who is positive in 55%.
+    """Per-player dollar bands, indexed by (`fg_id`, `role`): lo/hi on
+    `redraft_value` and `surplus_multiyear`, plus the share of draws in
+    which the player is still worth keeping.
     """
     rng = np.random.default_rng(seed)
     players, exch, meta = value_players()
@@ -97,16 +71,8 @@ def bootstrap_bands(B: int = 1000, seed: int = 0,
     dollars_above_min = C.N_TEAMS * C.BUDGET - n_rostered * 1.0
     rank = C.WAIVER_RANK.get(C.WAIVER_VALUE, n_rostered)
 
-    # Keyed on (fg_id, role), not fg_id alone -- a true two-way player
-    # (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id from 2027
-    # on (see klab.board.project_all_players). A fg_id-only dict/index would
-    # collapse his two rows to one during the `pos` lookup and then
-    # duplicate-expand them back out unevenly during the `.loc[keep_ids]`
-    # calls below (each occurrence of his fg_id in `keep_ids` matching BOTH
-    # of his rows in `b`), which is exactly what produced the shape
-    # mismatch this comment replaces. Adding role to both keys makes every
-    # lookup here 1:1 again; everyone else still has one role per fg_id, so
-    # this is a no-op widening for them.
+    # Keyed on (fg_id, role), not fg_id alone: a two-way player has two rows
+    # per fg_id and a fg_id-only .loc duplicate-expanded them (shape mismatch).
     ids = players["fg_id"].to_numpy()
     roles = players["role"].to_numpy()
     pos = {(int(f), r): i for i, (f, r) in enumerate(zip(ids, roles))}
@@ -120,12 +86,8 @@ def bootstrap_bands(B: int = 1000, seed: int = 0,
     b = board.set_index(["fg_id", "role"])
     v27_0 = b.loc[loc_key, "redraft_value"].to_numpy(float)
     v28_0 = b.loc[loc_key, "redraft_value_2028"].to_numpy(float)
-    # .set_axis(keep_ids), not the MultiIndex .loc[] leaves them with --
-    # multiyear_surplus() below aligns its Series args by index label, and
-    # the v27/v28 Series it receives are built with plain `keep_ids` labels
-    # (which repeat for a two-way player's two rows). Leaving cost/years/
-    # salary on the (fg_id, role) MultiIndex here would make every label
-    # fail to align against those, silently producing all-NaN surplus.
+    # .set_axis(keep_ids): multiyear_surplus() aligns by label against plain
+    # keep_ids Series; a MultiIndex here silently produced all-NaN surplus.
     cost = b.loc[loc_key, "keeper_cost"].astype(float).set_axis(keep_ids)
     years = b.loc[loc_key, "years_controlled"].astype(float).set_axis(keep_ids)
     salary = b.loc[loc_key, "salary"].astype(float).set_axis(keep_ids)

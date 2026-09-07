@@ -29,3 +29,21 @@ data/
 # anything" goal the rest of out/ does -- kept as a local archive only, not
 # pushed to GitHub. See out/HANDOFF.md / README.md for the policy note.
 out/snapshots/
+
+# Regenerable out/ files (run_all.py / leaderboard_2026.py / team_reports.py
+# still write these; only the documented deliverables in out/ are tracked).
+out/player_values_2027.csv
+out/free_agent_board.csv
+out/leaderboard_2026.csv
+out/optimal_keepers_2027.csv
+out/draft_surplus_sample.csv
+out/keep_vs_cash.csv
+out/zscores_2026.csv
+out/experiments.txt
+out/market_analysis.txt
+out/backtest.txt
+out/team_reports.txt
+out/acquisition_channels_2026.csv
+out/denominator_dispersion.csv
+out/league_levels_by_season.csv
+out/auction_regression_battery.csv

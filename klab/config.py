@@ -18,18 +18,9 @@ N_HIT_SLOTS = 14          # C,1B,2B,3B,SS,CI,MI,5xOF,2xUTIL
 N_PIT_SLOTS = 9
 N_ACTIVE = N_HIT_SLOTS + N_PIT_SLOTS
 
-# Standings payout, corrected 2026-08-14 -- first built and shipped assuming
-# a flat top-2-only payout (out/FINDINGS.md #55), which was wrong: the real
-# structure is 50% pot for 1st, 25% for 2nd, 15% for 3rd, buy-in back for
-# 4th. PAYOUT_SPOTS is how many places matter AT ALL (the count, not the
-# weighting) -- klab/standings_sim.py's p_money is P(finish in one of the
-# top PAYOUT_SPOTS places). The weighting itself (50/25/15/breakeven) is
-# real information a single "in the money" threshold discards -- 4th is
-# structurally a different outcome (break even) from 1st (the bulk of the
-# pot), not a scaled-down version of the same thing. Not modeled yet; see
-# out/ROADMAP.md Phase 5's note on this. Kept as one named constant, not
-# hard-coded at each call site, specifically so getting this number wrong
-# a second time costs one edit, not a rename across the whole stack.
+# Standings payout: 50/25/15% of the pot for 1st-3rd, buy-in back for 4th
+# (shipped as flat top-2 once, docs/FINDINGS.md #55). PAYOUT_SPOTS is the
+# count of places that pay at all; the weighting is not modeled yet (ROADMAP Phase 5).
 PAYOUT_SPOTS = 4
 PAYOUT_SHARE = {1: 0.50, 2: 0.25, 3: 0.15, 4: 0.0}   # 4th = buy-in back, not a pot share
 
@@ -37,8 +28,6 @@ HIT_CATS = ["R", "HR", "RBI", "SB", "AVG"]
 PIT_CATS = ["W", "SV", "K", "ERA", "WHIP"]
 CATS = HIT_CATS + PIT_CATS
 NEG_CATS = {"ERA", "WHIP"}          # lower is better
-RATE_CATS = {"AVG", "ERA", "WHIP"}
-COUNT_CATS = [c for c in CATS if c not in RATE_CATS]
 
 # --- Keeper economics -------------------------------------------------------
 EXTENSION_COST = 5        # +$5/yr to extend a player in his final year
@@ -47,68 +36,28 @@ MAX_KEEPERS = 13
 FA_SALARY_PRE_ASB = 10
 FA_SALARY_POST_ASB = 20
 
-# Contract year semantics. CORRECTED 2026-08-13 -- the previous handoff had
-# this backwards, which understated every multi-year contract by a full season.
-#
-# The code is the number of seasons remaining AFTER the current one:
+# Contract code = seasons remaining AFTER the current one (the old handoff
+# had this backwards, understating every multi-year deal by a season):
 #   "3" -> 2027, 2028, 2029 at current salary (only reachable via extension)
-#   "2" -> 2027, 2028 at current salary
-#   "1" -> 2027 only, at current salary
+#   "2" -> 2027, 2028;  "1" -> 2027 only
 #   "F" -> confirmed unrestricted free agent after 2026. NOT extendable.
-#
-# CORRECTED AGAIN 2026-08-13, this one bigger (out/FINDINGS.md #39): "F" used
-# to be documented as "keep only by extending at salary + $5", i.e. a live
-# choice available right now. It isn't. The constitution's extension clause
-# is for a player "about to enter the final year of his contract eligibility"
-# -- the decision has to be made BEFORE that season's own draft, not during
-# or after it. contracts_parsed.csv is a mid-2026-or-later snapshot, so any
-# player still coded "F" in it already missed that window (back around the
-# 2026 keeper deadline, before the 2026 draft) -- he is confirmed heading to
-# the open 2027 auction pool, full stop, not a keeper decision at all. This
-# feeds klab.board.build_board's `keepable` flag directly: every "F" player
-# is unkeepable unconditionally now, not just the ones who already used a
-# prior extension. Read that as "F = gone" wherever it appears in this
-# codebase or the docs, not "F = pay $5 to keep him."
-#
-# The ONLY currently-live extension decision in this whole model is for a
-# code-"1" player: he has one guaranteed year left (2027), which makes HIM
-# the one "about to enter his final year" -- so the decision about extending
-# him into 2028/2029 is legitimately being made right now, for the upcoming
-# 2027 keeper deadline. See klab/keeper.py::multiyear_surplus's `live` branch.
-#
-# Evidence in contracts_parsed.csv:
-#   * $10 and $20 salaries -- the pre- and post-All-Star-break FA acquisition
-#     prices -- cluster almost entirely in code "2". Those are 2026 in-season
-#     pickups, and a 3-year deal signed in 2026 leaves exactly 2027 and 2028.
-#   * Code "F" holds the big 2024 auction prices (Judge $39, Witt $39,
-#     Tucker $33, Tatis $34, Devers $30): 2024 + 3 years = final year 2026.
-#   * Only Skubal ($38) and Cal Raleigh ($16) carry "3", consistent with the
-#     +$5/yr extension being exercised rather than "3" meaning a final year.
+# "F" = gone, never "pay $5 to keep him" (docs/FINDINGS.md #39): the extension
+# window closes before a player's own walk-year draft, so an F in this
+# mid-2026 snapshot already missed it. The only live extension decision is
+# for a code-"1" player (klab/keeper.py::multiyear_surplus's `live` branch).
 YEARS_REMAINING = {"1": 1, "2": 2, "3": 3}
 EXTENSION_REQUIRED = {"F"}
-KEEPABLE_AT_SALARY = set(YEARS_REMAINING)
-# Extension rules, verified against the constitution (Keeper Eligibility):
-#   "owners must extend the player's contract by adding $5 for each additional
-#    year... extend the player for one more season at $15 or two more seasons
-#    at $20"  -> +$5 PER YEAR, and the owner chooses 1 or 2 years.
-#   "Players can only be extended once per contract"  -> one bite, ever.
+# Constitution (Keeper Eligibility): +$5 PER YEAR, owner chooses 1 or 2 years;
+# "Players can only be extended once per contract".
 EXTENSION_MAX_YEARS = 2
-# A player whose current salary exceeds his last auction price has already
-# used his extension and cannot extend again.
-EXTENSION_ALREADY_USED_IF_SALARY_ABOVE_DRAFT = True
-# Extra-constitutional rulings. The league agreed Ohtani is not extendable --
-# a one-off to deal with a two-way player the contract rules never anticipated.
-# This is not derivable from any file we hold, so it lives here as an explicit
-# override rather than as a silent special case somewhere downstream.
+# Extra-constitutional ruling: the league agreed Ohtani is not extendable.
+# Not derivable from any file, so it lives here as an explicit override.
 NON_EXTENDABLE_NAMES = {"Shohei Ohtani"}
 
-# The league auctions a true two-way player as two separate assets (hitter
-# and pitcher) starting with the 2027 auction -- Josh's confirmation,
-# 2026-08-15. Before 2027 he was one combined roster/keeper commitment, so
-# this only affects the forward-looking valuation path
-# (klab.board.project_all_players / value_2028), not klab.auction.py's
-# score_season(), which scores realized past auctions under the old rule and
-# is deliberately left summing his two lines into one purchase.
+# A true two-way player is auctioned as two separate assets from the 2027
+# auction on (Josh, 2026-08-15). Affects only the forward valuation path
+# (klab.board.project_all_players / value_2028); klab.auction.score_season
+# still sums his two lines into one realized past purchase.
 TWO_WAY_SPLIT_NAMES = {"Shohei Ohtani"}
 
 # Contracts the CBS export left unreadable, resolved by the commissioner.
@@ -122,23 +71,16 @@ CONTRACT_OVERRIDES = {
 }
 
 # --- Keeper playing-time floor ---------------------------------------------
-# Nobody keeps a part-time player. Real keeper candidates project for a full
-# workload, so keeper value is computed at full-season playing time: rates are
-# held fixed and playing time is scaled up to the floor. Guards against ZiPS
-# durability haircuts and rookie-ramp projections burying a breakout.
+# Upside (_ft) value holds rates fixed and scales playing time to the floor,
+# so ZiPS durability haircuts and rookie ramps don't bury a breakout.
 KEEPER_PA_FLOOR = 600
 KEEPER_IP_FLOOR = 150
 
 # --- Rest-of-2026 projection basis (klab/trade.py) --------------------------
-# ros_lines() (ZiPS's own rest-of-season system) is the default and only
-# thing used unless a caller opts into an alternate ROS_BASIS -- see
-# out/FINDINGS.md #45. These two constants only affect
-# prorated_to_date_lines(), the "current pace" alternative.
+# ZiPS ROS is the default (docs/FINDINGS.md #45); these two only affect
+# prorated_to_date_lines(), the "current pace" alternative. Team games
+# played is estimated as the GAMES_PLAYED_PCTILE of G among PA > 300 hitters.
 SEASON_GAMES = 162
-# Team games played-to-date isn't in the data directly, so it's estimated
-# from the high end of the games-played distribution among regular hitters
-# (PA > 300) -- a few days off/DH rotation sit below this, not a shorter
-# team schedule.
 GAMES_PLAYED_PCTILE = 0.95
 KEEPER_SV_FLOOR = 25
 KEEPER_RP_IP_FLOOR = 65
@@ -152,131 +94,49 @@ MAX_PT_SCALE = 2.0
 FUTURE_YEAR_DISCOUNT = 0.85
 
 # --- Denominator estimation knobs ------------------------------------------
-# Seasons used to fit denominators. 2026 is in progress (~70%) so it is
-# excluded from denominator fitting but used for projections.
-DENOM_SEASONS = [2024, 2025, 2026]   # regime changed in 2024; 2026 added below
-# 2026 is in progress. Each team's counting totals are ~75% of a full season,
-# but `pooled_relative_dispersion` divides every team by its own season mean
-# before pooling, so a uniform scale factor cancels exactly -- "scale 2026 up
-# to full-season volume" and "use 2026 raw" are the same computation.
-#
-# What does NOT cancel is sampling noise. Relative variance of a team total is
-# roughly  sigma_talent^2 + sigma_noise^2 / f, so a partial season is
-# over-dispersed by the noise term. CORRECTED 2026-08-13 -- the original
-# version of this comment checked five categories (ERA, WHIP, R, HR, SB),
-# generalized "rate cats bad, counting cats fine," and shipped that as
-# DENOM_EXCLUDE_PARTIAL_FOR_RATES. All ten, measured per-season CV:
-#
-#            2024    2025    2026(f=.75)
-#   R       0.142   0.063   0.054
-#   HR      0.190   0.104   0.103
-#   RBI     0.150   0.053   0.064
-#   SB      0.341   0.301   0.127
-#   AVG     0.036   0.014   0.026   <-- NOT inflated, despite being a rate cat
-#   W       0.114   0.144   0.121
-#   SV      0.254   0.177   0.328   <-- inflated, despite being a counting cat
-#   K       0.090   0.164   0.085
-#   ERA     0.037   0.035   0.073   <-- 2x the full-season figure
-#   WHIP    0.028   0.028   0.042
-#
-# The rate-vs-counting split was a proxy, and it fails on both ends: AVG
-# denominates over at-bats, which accumulate at a stable known rate all
-# season (every hitter plays ~daily), so a partial season is not meaningfully
-# noisier there. SV denominates over save opportunities, which depend on a
-# specific role (closer) that is unstable and gets reassigned mid-season --
-# the actual mechanism is "denominator accumulates unevenly / is subject to
-# role churn," not "is this a rate stat." Pooling AVG's 2026 data tightens its
-# standard error by ~21% for a ~2% shift in the point estimate (clear win);
-# excluding SV's 2026 data drops the pooled estimate by 16% (0.250 -> 0.209,
-# about 1.2 current-scheme standard errors, so directionally supported by the
-# closer-role-churn mechanism but not overwhelming on its own). See
-# out/FINDINGS.md #26 for the full experiment, and out/LAB_NOTEBOOK.md for why
-# the original five-category check wasn't wrong, just incomplete.
+DENOM_SEASONS = [2024, 2025, 2026]   # regime changed in 2024
+# 2026 is ~75% complete. Mean-normalising cancels the scale, not the sampling
+# noise; the over-dispersed categories are measured per category (ERA, WHIP,
+# SV), NOT "rate cats" -- AVG is fine and SV is not (docs/FINDINGS.md #26).
 PARTIAL_SEASONS = {2026: 0.75}
-# Categories whose 2026 data is excluded from denominator pooling because a
-# partial season measurably inflates their dispersion. Not RATE_CATS -- see
-# comment above. Set DENOM_EXCLUDE_PARTIAL_SEASON = False to pool all thirty
-# team-seasons everywhere and accept the ERA/WHIP/SV inflation.
 PARTIAL_EXCLUDE_CATS = {"ERA", "WHIP", "SV"}
 DENOM_EXCLUDE_PARTIAL_SEASON = True
 # Teams below this SV total are punting saves and are dropped before
 # computing the SV denominator (HANDOFF §7).
 SV_PUNT_THRESHOLD = 15
-# MLB stolen-base rule change landed in 2023; weight the new regime.
+# MLB stolen-base rule change landed in 2023; pre-regime SB seasons are skipped.
 SB_REGIME_START = 2023
-SB_PRE_REGIME_WEIGHT = 0.0
 
-# Seasons whose auction results set the $/roto-point exchange rate.
-#
-# CAREFUL: these auctions did not happen in the same world. Keepers removed
-# from the pool before each auction ran 25, 28, 29, 29, then **100** in 2026,
-# and $/roto-point tracks that count at r = 0.80. Pooling 2024-25 (29 keepers)
-# with 2026 (100) averages two different regimes, and 2027 will look like 2026
-# or more extreme -- so the pooled number understates what a dollar will cost.
+# Seasons whose auction results set the $/roto-point exchange rate. These
+# auctions happened in different worlds: keepers removed ran 25/28/29/29 then
+# 100 in 2026, and $/point tracks that count (r = 0.80), so pooling understates
+# what a 2027 dollar will cost.
 AUCTION_SEASONS = [2024, 2025, 2026]
-
-# Keepers removed from the pool before each auction. Drives the environment
-# adjustment below.
 KEEPERS_REMOVED = {2022: 25, 2023: 28, 2024: 29, 2025: 29, 2026: 100}
 KEEPERS_EXPECTED_2027 = 100
-
-# How to set the 2027 exchange rate:
-#   "pooled"          straight fit on AUCTION_SEASONS. Most data, wrong world.
-#   "keeper_adjusted" fit $/pt on keeper count across all five seasons, then
-#                     predict at KEEPERS_EXPECTED_2027. Uses every auction but
-#                     lands in the right environment. Default.
-#   "recent"          2026 alone. Right world, but n=112 and its two halves
-#                     disagree by a factor of three.
+# "pooled": straight fit on AUCTION_SEASONS. "keeper_adjusted" (default): fit
+# $/pt on keeper count, predict at KEEPERS_EXPECTED_2027. "recent": 2026 alone.
 EXCHANGE_BASIS = "keeper_adjusted"
 # League level (mean team total) to build 2027 denominators against.
 LEVEL_SEASONS = [2024, 2025]
 
 # --- Waiver-wire value ------------------------------------------------------
-# Replacement level is "the best player you can get for free". How good that
-# player is depends on how rich the waiver wire is, and this league's wire is
-# rich: in-season free agents supplied 40% of all 2026 roto production.
-#
-# The three settings are anchored on real quantities, not taste:
-#   "low"    the 230th-best projection -- one per active roster slot. The
-#            textbook choice, and it assumes the wire adds nothing you could
-#            not already have drafted. Replacement 4.14 roto points.
-#   "medium" the (rostered + one round)th projection, reflecting that this
-#            league carries 275 players and churns hard, so the marginal
-#            player is deeper than the 230th. Replacement ~3.9.
-#   "high"   the median production of players actually acquired from free
-#            agency in 2026 (5.04 roto points). This is an upper bound and
-#            deliberately biased: those pickups were selected *after* they
-#            started producing, so it overstates what is available ex ante.
-#            Use it to see how much the answer moves, not as a point estimate.
-#
-# Higher replacement means free talent is better, which makes every rostered
-# player worth LESS. "low" is the most generous to your own roster.
+# Replacement level = "the best player you can get for free". "low": the
+# 230th-best projection (one per active slot). "medium": the 300th. "high":
+# median 2026 production of actual FA pickups (5.04 rp) -- an ex-post upper
+# bound, for sensitivity only. Higher replacement = every rostered player worth less.
 WAIVER_VALUE = "low"
 WAIVER_RANK = {"low": 230, "medium": 300}
 WAIVER_HIGH_RP = 5.04
 
 # --- Positional adjustment --------------------------------------------------
-# OFF by default, and that is a considered choice rather than an omission.
-# FanGraphs' 13-system test found the variants with the largest positional
-# adjustments finished last, and Razzball -- who tested four stances -- found
-# "very close to zero impact". Where it plausibly does matter in this format
-# is catcher and middle infield, the two slots with genuinely thin pools.
-#
-# When enabled, replacement level is computed per position group rather than
-# league-wide, so a catcher is measured against other catchers.
+# Full-spectrum positional adjustment is OFF and unimplemented (FanGraphs'
+# 13-system test: largest adjustments finished last). Reported in settings only.
 POSITIONAL_ADJUSTMENT = False
-# Roster slots by position group, used to set each group's replacement rank.
-POSITION_SLOTS = {"C": 1, "MI": 2, "CI": 2, "OF": 5, "UTIL": 2, "P": 9}
 
-# --- Positional adjustment, catcher/shortstop only ---------------------------
-# Narrower than POSITIONAL_ADJUSTMENT above, and the one actually wired up in
-# the app. Josh's call, 2026-08-14 (out/FINDINGS.md #52): only catcher and
-# shortstop are scarce enough in this format to bother adjusting for -- every
-# other position stays on the pooled replacement level regardless of this
-# setting. Needs data/fg_catchers_2026.csv and data/fg_shortstops_2026.csv
-# (FanGraphs batting-leaderboard exports, pre-filtered by position; see
-# data/README.md). Exposed as an app toggle (both variants ship every
-# build), not a rebuild-to-flip config flag like POSITIONAL_ADJUSTMENT.
+# Catcher/shortstop-only adjustment, the one wired into the app as a toggle
+# (both variants ship every build; docs/FINDINGS.md #52). Needs
+# data/fg_catchers_2026.csv and data/fg_shortstops_2026.csv.
 TWO_POS_ADJUST = {"C", "SS"}
 TWO_POS_SLOTS = {"C": 1, "SS": 1}   # dedicated roster slots per team
 
@@ -294,51 +154,21 @@ PROJ_2028_PITCHERS = "fg_zips_dc_2028_pitchers_projections.csv"
 #   "projection"    the projection system alone
 #   "actuals"       2026 actuals + rest-of-season alone
 PROJECTION_BASIS = os.environ.get("KLAB_PROJECTION_BASIS", "blend")
-# ^ env override exists so scripts/build_app.py can rebuild the whole board
-# three times in three fresh subprocesses (blend/projection/actuals) without
-# in-process cache pollution -- klab.io.cached() memoises on function args
-# only, not on this global, so flipping it mid-process would silently hand
-# back stale results from whichever basis ran first. See out/FINDINGS.md #42.
+# ^ env override so build_app.py can rebuild per basis in fresh subprocesses:
+# klab.io.cached() keys on args, not this global (docs/FINDINGS.md #42).
 
 # --- Projection knobs -------------------------------------------------------
-# 50/50 blend of (2026 actuals + ROS ZiPS) and pre-season ZiPS 2027.
-# This governs the RATE-stat blend only (talent) -- see PT_BLEND_CAP_* below
-# for playing time, which is intentionally a separate, lower-weighted knob.
+# Max weight on the 2026 leg for RATE stats (talent); playing time uses the
+# separate, lower PT_BLEND_CAP_* caps below.
 BLEND_W_2026 = 0.50
-BLEND_W_ZIPS27 = 0.50
 
-# How much of the 2026 leg's PLAYING TIME (not rate) survives into the 2027
-# blend, capped separately and lower than BLEND_W_2026 on purpose (2026-08-14,
-# out/FINDINGS.md #51). A short 2026 season is evidence about TALENT (small
-# sample, already discounted per-stat by RELIABILITY) but is much weaker
-# evidence about a healthy 2027 ROLE -- a pitcher who got hurt in June is not
-# thereby projected to throw fewer innings next year, and the un-decoupled
-# blend used to do exactly that (see the Tarik Skubal / Hunter Brown
-# writeups this session). Pitchers get a lower cap than hitters: an
-# interrupted pitcher-season skews injury-driven, while a short hitter
-# season is more often role/platoon/performance-driven -- information
-# actually worth keeping some weight on. Both are Josh's judgment calls,
-# not fit from data, and are meant to be tuned.
+# Max weight on 2026 PLAYING TIME (docs/FINDINGS.md #51): a short 2026 is weak
+# evidence about a healthy 2027 role, and injury-shortened pitcher seasons
+# especially must not dock next year's IP. Josh's judgment calls, tunable.
 PT_BLEND_CAP_HITTER = 0.30
 PT_BLEND_CAP_PITCHER = 0.15
-
-# Direction-aware exception to PT_BLEND_CAP_PITCHER (2026-08-14,
-# out/FINDINGS.md #53). The cap above assumes ZiPS's 2027 IP opinion is
-# always the better-informed number, which holds when a pitcher fell SHORT
-# of it -- hurt in 2026, ZiPS's healthy-year number is the right forward
-# guess (Hunter Brown, #51). It does not hold the other direction: a
-# pitcher who already EXCEEDED ZiPS's 2027 IP with his real 2026 workload
-# (Cam Schlittler threw 187 IP in 2026 against ZiPS's own cautious
-# sophomore-workload 128 for 2027; Jacob Misiorowski and Chase Burns show
-# the same pattern) has direct proof he can carry that workload, which is
-# stronger evidence than a system's generic caution about ramping a young
-# arm's innings. Applied only when IP_a > IP_b -- see project_pitchers().
-# Set above PT_BLEND_CAP_HITTER, not equal to it: "he already did this in
-# the same year" is more direct evidence than a hitter's short-season role
-# signal, but a team's actual workload-management plan is still real
-# information worth keeping a majority weight on, so this stops short of
-# fully trusting the 2026 number either. Josh's judgment call, not fit from
-# data, meant to be tuned.
+# Higher cap when a pitcher's 2026 IP already EXCEEDED ZiPS's 2027 IP -- he
+# proved the workload (docs/FINDINGS.md #53). Applied only when IP_a > IP_b.
 PT_BLEND_CAP_PITCHER_EXCEEDED = 0.40
 
 # --- Decision weights -------------------------------------------------------

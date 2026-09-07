@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 from . import config as C
-from .board import build_board, fit_exchange_rate, value_players
+from .board import build_board
 from .freeagents import free_agent_board
 from .io import cached, load_standings_long
 from .trade import standings_points
@@ -80,12 +80,9 @@ def _inflation(board: pd.DataFrame) -> dict:
 
 @cached
 def snapshot(positional: bool = False) -> Snapshot:
-    """`positional=True` (out/FINDINGS.md #52) prices catchers and
-    shortstops against their own position's replacement level instead of
-    the pooled one; every other position is unaffected. Cached per
-    argument value like everything else `klab.io.cached()` wraps, so
-    `snapshot()` and `snapshot(positional=True)` are two independent,
-    correctly-separate cache entries, not one that flips underneath you."""
+    """`positional=True` (docs/FINDINGS.md #52) prices catchers and shortstops
+    against their own position's replacement level; cached per argument, so
+    the two settings are independent cache entries."""
     board, exch, meta = build_board(positional=positional)
     fa = free_agent_board(positional=positional)
 

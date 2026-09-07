@@ -114,9 +114,7 @@ def pooled_relative_dispersion(standings: pd.DataFrame | None = None,
                 continue        # pre-rule-change stolen bases are a different game
             if (C.DENOM_EXCLUDE_PARTIAL_SEASON and cat in C.PARTIAL_EXCLUDE_CATS
                     and s in C.PARTIAL_SEASONS):
-                continue        # see config.PARTIAL_SEASONS / PARTIAL_EXCLUDE_CATS
-                                # -- these categories are over-dispersed while
-                                # their denominator is still accumulating
+                continue        # over-dispersed mid-season; see config.PARTIAL_EXCLUDE_CATS
             gs = g[g["season"] == s]["total"].astype(float).values
             if cat == "SV":
                 gs = gs[gs >= C.SV_PUNT_THRESHOLD]
@@ -149,12 +147,9 @@ def denominators_for_level(sigma_rel: pd.DataFrame, levels: dict,
 
     `levels` maps category -> that season's mean team total.
 
-    The bridge from sigma to "units per standings point" is
-    E[range]/(n-1) = c_n * sigma / (n - 1), and c_n depends on how many teams
-    are actually in the comparison. Saves are the case that matters: after
-    punters are excluded the SV field is 8 or 9 teams, not 10, and applying
-    the 10-team constant there understates the SV denominator by 9-19% --
-    which overvalues every closer in the league by the same margin.
+    E[range]/(n-1) = c_n * sigma / (n - 1), where n is the field actually
+    compared: SV is 8-9 teams after punters are dropped, and the 10-team c_n
+    there understated the SV denominator by 9-19% (overvaluing closers).
     """
     s = sigma_rel.set_index("category")["sigma_rel"]
     n_by_cat = n_by_cat or {}
@@ -173,14 +168,9 @@ def teams_per_category(standings: pd.DataFrame | None = None,
                        seasons=None) -> dict:
     """Mean size of the field actually compared in each category.
 
-    Feeds `denominators_for_level`'s c_n range-constant lookup, so the season
-    set here has to match `pooled_relative_dispersion`'s exactly -- this used
-    to average over every season in DENOM_SEASONS unconditionally, including
-    the excluded partial 2026 for ERA/WHIP/SV, so the field size backing the
-    c_n constant described a different set of team-seasons than the sigma_rel
-    estimate it was scaling (out/FINDINGS.md #31). Only SV's rounded field
-    size actually changes (9 -> 8) -- ERA/WHIP always compare all 10 teams,
-    so punter-dropping never bites them the way it does SV.
+    Feeds `denominators_for_level`'s c_n lookup, so the season/partial-season
+    exclusions here must match `pooled_relative_dispersion`'s exactly; they
+    once diverged and the SV field size was wrong (docs/FINDINGS.md #31).
     """
     st = standings if standings is not None else load_standings_long()
     seasons = seasons or C.DENOM_SEASONS

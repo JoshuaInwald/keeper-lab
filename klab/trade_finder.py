@@ -1,49 +1,15 @@
 """Precomputed trade suggestions, three scenarios per team pair.
 
-Built 2026-08-13, a deliberately separate exercise from the interactive
-trade evaluator (`klab/trade.py`) it's built on top of -- this module
-*searches* for trades instead of scoring one you already have in mind.
+Searches for 1-for-1 trades on top of `klab/trade.py`'s evaluator.
+Precomputed at build time (`scripts/build_trade_suggestions.py` writes
+`out/trade_suggestions.json`) because the app is static HTML with no server.
 
-**Why precomputed, not live.** The app is a single static HTML file with no
-server (see `README.md`'s whole pitch), and only one thing is re-implemented
-in JS for exactly that reason. A real search — even the bounded one here —
-is a few thousand `evaluate_trade()` calls; that's a build-time cost, not a
-click-time one. `scripts/build_trade_suggestions.py` runs this for every
-team pair and writes `out/trade_suggestions.json`; `build_app.py` ships the
-result as static data, same as everything else in the payload.
-
-**The three scenarios**, and why these three specifically: they're the
-three shapes a real fantasy trade actually takes, not an arbitrary menu.
-
-1. **Win-now for future** — one team is competing, one isn't. The
-   contender sends a real multi-year keeper for the other team's best
-   rest-of-season rental (prioritizing players who cost the seller nothing
-   long-term — `F`-contract players especially, who are confirmed heading
-   to free agency anyway per `out/FINDINGS.md` #39).
-2. **Challenge trade** — both teams are live in the 2026 race but have
-   complementary category profiles (one's stacked in HR, thin in SB; the
-   other's the reverse). Swapping a player each can raise BOTH teams'
-   standings points simultaneously, at little or no dollar cost.
-3. **Mutual value swap** — both teams are effectively out of 2026 contention
-   and each has a player the other's roster construction values more than
-   its own does. A dynasty-style trade: both sides' multi-year surplus goes
-   up, current-season standings barely move either way.
-
-**One shared search, three scores.** All three scenarios draw candidates
-from the same shortlist (each team's top players by `roto_points`, contract
-status agnostic -- Scenario 1 specifically wants rental-only `F` players in
-the pool) and evaluate the same 1-for-1 combinations through
-`evaluate_trade()` once. Only the SCORING differs per scenario. This is 3x
-cheaper than three independent searches and is honest about what's
-happening: these are three different lenses on the same real trade market
-between two teams, not three unrelated searches.
-
-**What this doesn't do.** Multi-player packages (2-for-1, 2-for-2) are not
-searched — 1-for-1 keeps the combinatorics small enough to run for all 45
-team pairs in a reasonable build step, and a clean single-player suggestion
-is also the most legible starting point for two managers actually talking.
-Nothing stops a human from building a bigger package around a suggestion
-this surfaces.
+Scenarios: (1) win-now for future -- a contender sends a multi-year keeper
+for a seller's best rental (F-contract players especially, FINDINGS #39);
+(2) challenge trade -- both live in 2026 with complementary categories, both
+gain standings points; (3) mutual value swap -- both out of contention, both
+gain multi-year surplus. One shared shortlist and one evaluate_trade() pass
+per pair; only the scoring differs. Multi-player packages are not searched.
 """
 from __future__ import annotations
 
@@ -56,21 +22,14 @@ STANDINGS_GAP_FOR_WIN_NOW = 8.0   # points apart before we call one side a selle
 
 
 def _shortlist(board: pd.DataFrame, team: str, n: int = SHORTLIST_SIZE) -> list[str]:
-    """Union of top-n by roto_points (talent -- catches rentals, since an
-    F-contract player's talent doesn't disappear even though his keeper
-    value is zero) and top-n by surplus_multiyear (real trade chips).
-    Talent-only was too narrow: a team can easily have 6+ of its top-10
-    talents be unkeepable F-contract rentals, which crowds out the actual
-    keepers a trade partner would want in return -- checked directly on
-    Spehr's Army, which is exactly this shape."""
+    """Union of top-n by roto_points (catches F-contract rentals) and top-n
+    by surplus_multiyear (real keepers); talent-only let rentals crowd out
+    the keepers a partner would want."""
     t = board[board["team"] == team]
     by_talent = set(t.nlargest(n, "roto_points")["name"])
     by_value = set(t.nlargest(n, "surplus_multiyear")["name"])
-    # Sorted, not just de-duplicated: iterating a raw set is order-unstable
-    # across processes (Python randomises string hashing per run), and the
-    # scenario pickers below break ties on first-seen-wins. An unsorted
-    # shortlist made suggest_trades() silently return a different, sometimes
-    # worse, "best" trade on every identical rerun -- see FINDINGS.md #41.
+    # Sorted: set iteration order varies per process and the pickers break
+    # ties first-seen-wins, so reruns silently differed (FINDINGS #41).
     return sorted(by_talent | by_value)
 
 
@@ -111,20 +70,12 @@ def _pick_win_now(board: pd.DataFrame, results: list[dict], team_a: str, team_b:
     for r in results:
         buyer_gain = r["a_standings_delta"] if buyer == team_a else r["b_standings_delta"]
         seller_gain = r["a_surplus_delta"] if seller == team_a else r["b_surplus_delta"]
-        # incoming_to_seller: the specific player the seller receives -- not
-        # just "is the net delta positive," which a trade like "bad $35
-        # contract for a $0 throwaway" can satisfy without the seller
-        # actually getting anything of value (checked directly: this exact
-        # failure mode showed up testing NPB/Spehr's Army -- Guerrero Jr.
-        # for James Wood scored positive purely because Guerrero's own
-        # surplus was so negative, not because Wood is a real asset).
+        # The seller must receive a positive-surplus player, not just a
+        # positive net delta (dumping a bad contract for a $0 throwaway passes that).
         incoming_to_seller = r["b_sends"] if seller == team_a else r["a_sends"]
         if seller_gain <= 0 or surplus.get(incoming_to_seller, 0.0) <= 0:
             continue
-        # Tie-break on seller_gain: buyer_gain alone ties often (many
-        # rentals move the buyer's standings by the same amount), and
-        # picking the first tie encountered means the shortlist's iteration
-        # order silently decides the answer. See FINDINGS.md #41.
+        # Tie-break on seller_gain, or iteration order decides (FINDINGS #41).
         score = (buyer_gain, seller_gain)
         if best is None or score > best["_score"]:
             best = {**r, "_score": score, "buyer": buyer, "seller": seller}
@@ -138,11 +89,8 @@ def _pick_win_now(board: pd.DataFrame, results: list[dict], team_a: str, team_b:
 
 
 def _pick_challenge(results: list[dict], team_a: str, team_b: str) -> dict | None:
-    """Score is (min(a,b), sum(a,b)): min is the real criterion -- neither
-    side should be shortchanged -- but ties on min are common (many
-    candidates move one side's standings by the exact same amount), and the
-    sum breaks the tie toward the Pareto-better candidate instead of
-    whichever the shortlist happened to reach first. See FINDINGS.md #41."""
+    """Score is (min(a,b), sum(a,b)): min so neither side is shortchanged,
+    sum to break the frequent ties on min (FINDINGS #41)."""
     best = None
     for r in results:
         if r["a_standings_delta"] <= 0 or r["b_standings_delta"] <= 0:
@@ -178,9 +126,7 @@ def _pick_mutual_value(results: list[dict], team_a: str, team_b: str) -> dict | 
 def suggest_trades(board: pd.DataFrame, exch: dict, team_a: str, team_b: str,
                    standings_pts: dict) -> dict:
     """Up to three suggested trades between team_a and team_b, one per
-    scenario. Any scenario that finds nothing clearing its bar returns None
-    for that key -- not every pair has a real challenge trade or a real
-    seller, and forcing one would ship a bad suggestion as if it were real."""
+    scenario; a scenario with nothing clearing its bar returns None."""
     results = _search_pair(board, exch, team_a, team_b, standings_pts)
     return {
         "team_a": team_a, "team_b": team_b,

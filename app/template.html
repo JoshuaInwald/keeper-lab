@@ -174,17 +174,17 @@ const idByName = {}; BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
 let AUCTION_EST = D.auction_estimates || {};
 // ros_value_over_replacement per player, keyed [rosBasis][fg_id] -- powers
 // the Keeper Board/Free Agents "ROS value" column. Varies by BOTH toggles
-// (out/FINDINGS.md #46's _ros_values()), so reassigned wholesale by
+// (docs/FINDINGS.md #46's _ros_values()), so reassigned wholesale by
 // setBasis() same as AUCTION_EST, and read live by rosVal() per S.rosBasis
 // rather than mutated into row arrays like the raw ros_* stat fields.
 let ROS_VALUES = D.ros_values || {};
 // 2027 standings projected from each team's keeper set alone, empty roster
-// slots filled at replacement level (out/FINDINGS.md #49). Varies with
+// slots filled at replacement level (docs/FINDINGS.md #49). Varies with
 // PROJECTION_BASIS (the keeper set and its 2027 production both do), not
 // with the rest-of-2026 toggle -- reassigned by setBasis() only.
 let KEEPER_STANDINGS_2027 = D.keeper_standings_2027 || [];
 const TRADE_SUGGESTIONS = D.trade_suggestions || [];
-// Alternate 2026 rest-of-season signals (out/FINDINGS.md #45/#46): "ros"
+// Alternate 2026 rest-of-season signals (docs/FINDINGS.md #45/#46): "ros"
 // (ZiPS alone, default), "prorated" (season-to-date pace), "blend" (50/50).
 // Independent of the projection-basis selector above -- this never touches
 // a dollar value, only the ros_* fields rosterAgg() reads for the
@@ -212,7 +212,7 @@ let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
 
 // ---------- projection basis ----------
-// PROJECTION_BASIS is the model's biggest fork (out/ROADMAP.md 2.2): ~17%
+// PROJECTION_BASIS is the model's biggest fork (docs/SESSION-LOG.md 2.2): ~17%
 // of keep/cut calls move depending on it. All three variants ship in the
 // payload (klab/config.py's PROJECTION_BASIS values) so switching is a
 // re-render, not a rebuild.
@@ -225,7 +225,7 @@ const BASIS_HELP = "Which source drives every 2027 number on this page. "
   + "actual performance and ignores the projection system entirely. About 17% of "
   + "keep/cut calls move depending on this choice.";
 // ---------- positional adjustment ----------
-// out/FINDINGS.md #52: prices catchers and shortstops off their own
+// docs/FINDINGS.md #52: prices catchers and shortstops off their own
 // position's replacement level instead of the pooled one. Every basis
 // carries both settings (D.basis_variants[b].positional_variants.off/on),
 // same "all variants ship, switching is a re-render" approach as the basis
@@ -250,7 +250,7 @@ function applyVariant(){
   Object.keys(D.constants).forEach(k=>delete D.constants[k]);
   Object.assign(D.constants, pv.constants);
   INFL = D.constants.inflation || 1;
-  // Not positional-aware (documented scope limit, out/FINDINGS.md #52) --
+  // Not positional-aware (documented scope limit, docs/FINDINGS.md #52) --
   // stay pinned to whichever basis is active, same for either setting of
   // S.positional.
   AUCTION_EST = bv.auction_estimates || {};
@@ -287,7 +287,7 @@ function setRosBasis(basis){
 }
 
 // ---------- roto engine (mirrors trade.win_now_delta) ----------
-// shadeCols (optional, Intuition tab only -- see out/FINDINGS.md #50):
+// shadeCols (optional, Intuition tab only -- see docs/FINDINGS.md #50):
 // {fg_id: {colName: multiplier, ...}}, unlisted columns default to 1. A
 // per-column map, not one scalar per player, because "he's better" and
 // "he's healthier" are different axes that shouldn't move the same stats
@@ -344,7 +344,7 @@ function recomputeProjections(){   // re-run after setRosBasis() changes ros_* f
   PROJ_PTS = rotoPoints(PROJ_TOT);
 }
 
-// ---------- Monte Carlo finish odds (out/ROADMAP.md Phase 5) -------------
+// ---------- Monte Carlo finish odds (docs/SESSION-LOG.md Phase 5) -------------
 // This league pays 50%/25%/15%/breakeven for 1st-4th (D.finish_sim.
 // payout_spots/payout_share) -- corrected 2026-08-14 from an earlier,
 // wrong top-2-only build. A point ESTIMATE of final standings ("PROJ_PTS"
@@ -401,7 +401,7 @@ function jitteredShadeCols(shockScale){
 // "current rosters," set for "what if this trade happened." payoutSpots
 // defaults to the league's real payout structure (D.finish_sim.
 // payout_spots) so a future payout-structure change (this league has
-// already gotten this wrong once -- see out/FINDINGS.md #55) touches one
+// already gotten this wrong once -- see docs/FINDINGS.md #55) touches one
 // payload field, not a rewrite here.
 function simulateFinishOdds(swap, B, shockScale, payoutSpots){
   B = B || 500;
@@ -454,8 +454,8 @@ function renderHeader(){
 renderHeader();
 $("foot").innerHTML = `Values are 2027 projections priced off this league's own auction history `
   + `(n≈677 purchases). Honest error bar is <b>±34% per category</b> — read every dollar figure `
-  + `with that in mind. Methodology in <code>out/METHODS.md</code>; `
-  + `what was tried and rejected in <code>out/LAB_NOTEBOOK.md</code>.`;
+  + `with that in mind. Methodology in <code>docs/METHODS.md</code>; `
+  + `what was tried and rejected in <code>LAB_NOTEBOOK.md (git history, commit 8353172)</code>.`;
 
 // ---------- board ----------
 // Grouped identity | playing-time/roto | dollar, not interleaved (Josh's
@@ -477,7 +477,7 @@ const BOARD_COLS=[
   ["ros_value","ROS value"],
 ];
 // ros_value isn't a board-row field -- it's looked up per the active
-// rest-of-2026 basis toggle (out/FINDINGS.md #45/#46), same data the
+// rest-of-2026 basis toggle (docs/FINDINGS.md #45/#46), same data the
 // Standings/Trade tabs' toggle drives, now also on the board.
 function rosVal(r){
   const m = ROS_VALUES[S.rosBasis];
@@ -634,7 +634,7 @@ function ptCell(r){
       : "scaled up to a full healthy workload from a shorter observed season"}">×${nf(scale,2)}</span>`;
   return (v==null?'<span class="dim">—</span>':nf(v,0)+" "+label) + tag;
 }
-// upside_ft mixes two different bets (out/FINDINGS.md #53): "health" (what
+// upside_ft mixes two different bets (docs/FINDINGS.md #53): "health" (what
 // he's worth if nothing keeps him off the field, at his own role) and
 // "role" (a reliever already at 5+ saves, scaled to a full closer's save
 // total -- a bet on a bullpen decision, not on his health). Tagged inline
@@ -928,7 +928,7 @@ function teamsView(){
     "Every column sorts — click a header, click again to reverse.");
 }
 
-// ---------- contention (out/ROADMAP.md Phase 5) -------------------------
+// ---------- contention (docs/SESSION-LOG.md Phase 5) -------------------------
 // This league pays 50%/25%/15%/breakeven for 1st-4th (D.finish_sim.
 // payout_spots/payout_share), so a point-estimate "projected finish"
 // (Standings tab) answers the wrong question. This tab answers the right
@@ -1003,7 +1003,7 @@ function contentionView(){
 // ---------- standings ----------
 const CAT_DP = c=> c==="AVG" ? 3 : (c==="ERA"||c==="WHIP") ? 2 : 0;
 // Which signal projects the REST of 2026 -- Standings and the Trade tab's
-// win-now numbers only, nothing with a dollar sign (out/FINDINGS.md #45/#46).
+// win-now numbers only, nothing with a dollar sign (docs/FINDINGS.md #45/#46).
 const ROS_BASIS_LABEL = {ros: "ZiPS rest-of-season", prorated: "season-to-date pace", blend: "blend (50/50)"};
 const ROS_BASIS_HELP = "Which signal projects the REST of 2026 on this screen. "
   + "\"ZiPS rest-of-season\" (default) is FanGraphs' own projection system. "
@@ -1200,7 +1200,7 @@ function suggestedTradesPanel(){
     </div>`;
   }).join("");
   return `<div class="panel"><h3>Suggested trades between these two teams</h3>
-    <div class="dim" style="font-size:11px;margin-bottom:8px">Precomputed 1-for-1 search, out/FINDINGS.md #40 — "no trade cleared this bar" is a real result, not a gap.</div>
+    <div class="dim" style="font-size:11px;margin-bottom:8px">Precomputed 1-for-1 search, docs/FINDINGS.md #40 — "no trade cleared this bar" is a real result, not a gap.</div>
     <div class="sugg-grid">${cards}</div></div>`;
 }
 
@@ -1212,11 +1212,11 @@ function tradeResult(){
   const after=rotoPoints(catTotals(rosterAgg(swap)));
   // One 2026 standings point is priced at what a roto point costs at
   // auction, matching klab/trade.py::evaluate_trade -- not the redraft
-  // scale, which is what d_surplus below uses. See out/FINDINGS.md #32.
+  // scale, which is what d_surplus below uses. See docs/FINDINGS.md #32.
   const usdpt=D.constants.usd_per_roto_point_auction;
   const cw=D.league.contention_weight;
 
-  // Finish odds (out/ROADMAP.md Phase 5): this league pays the top
+  // Finish odds (docs/SESSION-LOG.md Phase 5): this league pays the top
   // D.finish_sim.payout_spots places, so Δ standings points above isn't
   // actually the question that matters -- Δ P(money) is. "Before" reads
   // the SAME precomputed figure the Contention tab shows (not re-simulated
@@ -1249,7 +1249,7 @@ function tradeResult(){
         <div class="k">Δ surplus, 2027</div><div class="v">${sgn(adj(dS),1,"$")}</div>
         <div class="k">Δ surplus, multi-year</div><div class="v">${sgn(adj(dMY),1,"$")}</div>
         <div class="k">Δ 2026 standings points</div><div class="v">${sgn(dP,1)}</div>
-        <div class="k" title="This league pays the top ${D.finish_sim.payout_spots} places -- this is the trade's effect on how OFTEN this team actually lands there, not just its point total. Simulated live for this specific swap (klab/standings_sim.py, out/ROADMAP.md Phase 5).">Δ P(money), this trade</div>
+        <div class="k" title="This league pays the top ${D.finish_sim.payout_spots} places -- this is the trade's effect on how OFTEN this team actually lands there, not just its point total. Simulated live for this specific swap (klab/standings_sim.py, docs/SESSION-LOG.md Phase 5).">Δ P(money), this trade</div>
         <div class="v">${sgn(dMoney*100,1)}pp <span class="dim" style="font-size:11px">(${nf(pMoneyBefore*100,0)}%→${nf(pMoneyAfter*100,0)}%)</span></div>
       </div>
       <div class="bars" style="margin-top:8px">${cats}</div>
@@ -1277,7 +1277,7 @@ function tradeResult(){
 const CONST_HELP = {
   "usd_per_roto_point_auction": "What one standings point costs in a live auction, estimated by regressing what teams actually paid for players against how many points those players delivered. This is the number the trade evaluator uses to compare a dollar of value against a standings point.",
   "usd_per_roto_point_redraft": "A slightly different scale for the player-card “Worth” figures: what a point is worth if you drafted the player fresh today, not what an actual auction (with its own quirks, like saves being underpaid) says a specific player costs.",
-  "auction_intercept": "A second, independent estimate of replacement level: what the auction-price regression predicts a $0 player would produce, in roto points. No one has ever actually paid $0 in this league (the minimum bid is $1) -- this is a straight-line extrapolation one dollar past the edge of the real data, which is exactly why out/FINDINGS.md #27 treats it as a LOWER-BOUND estimate, not the number the model actually prices players against (that's \"replacement level\" below, fit a different way). Deliberately never fit to match that number — when the two roughly agree, that's a real cross-check, not a coincidence.",
+  "auction_intercept": "A second, independent estimate of replacement level: what the auction-price regression predicts a $0 player would produce, in roto points. No one has ever actually paid $0 in this league (the minimum bid is $1) -- this is a straight-line extrapolation one dollar past the edge of the real data, which is exactly why docs/FINDINGS.md #27 treats it as a LOWER-BOUND estimate, not the number the model actually prices players against (that's \"replacement level\" below, fit a different way). Deliberately never fit to match that number — when the two roughly agree, that's a real cross-check, not a coincidence.",
   "replacement_level": "How many roto points the best player you could add for free (off any team's bench or the waiver wire) actually produces. Every rostered player's dollar value is measured relative to this baseline, not to zero.",
   "budget_check": "A sanity check on the whole scale: this league has 10 teams × 23 active roster spots = 230 rostered players, and 10 teams × $260 = $2,600 total. If the top 230 projected players' dollar values don't sum close to $2,600, something upstream is miscalibrated.",
   "inflation": "How much more a dollar of talent costs in the real 2027 auction than the “fair value” redraft scale says — because keeper-league owners have already locked up a lot of cheap production, leaving less available talent chasing the same total budget.",
@@ -1298,7 +1298,7 @@ const SETTING_HELP = {
 // ---------- intuition (manual player shading) ----------
 // A personal "what if I think the model's wrong about this guy" layer,
 // deliberately sandboxed: it never touches BOARD or any other tab's
-// numbers (out/FINDINGS.md #50). Two axes, on purpose, not one:
+// numbers (docs/FINDINGS.md #50). Two axes, on purpose, not one:
 // "talent" (is he actually better/worse than projected) moves his
 // PRODUCTION RATE; "health" (assume no missed time) moves his PLAYING
 // TIME. Conflating them would make "shade him up" ambiguous between "he'll
@@ -1329,7 +1329,7 @@ function buildShadeCols(){
 // Transparent LINEAR SCALING of the already-computed 2027 dollar value --
 // explicitly NOT a re-run of the model. A true re-derivation needs the
 // denominators, the roto scorer, and the auction exchange rate, all of
-// which stay server-side on purpose (out/ARCHITECTURE.md §4.2) so this
+// which stay server-side on purpose (docs/METHODS.md section 2) so this
 // app never maintains two implementations of the valuation pipeline that
 // can drift apart -- a real bug class this project has hit before.
 // "Force health" reuses the ALREADY-COMPUTED full-time projection
@@ -1343,7 +1343,7 @@ function shaded2027(r, s){
 }
 // Per-player hover context requested for this tab (and, per Josh, as a
 // general design rule: sortable/scannable numbers are columns, everything
-// else is a tooltip so it doesn't clutter the table -- out/FINDINGS.md #50).
+// else is a tooltip so it doesn't clutter the table -- docs/FINDINGS.md #50).
 // No age anywhere: no file in data/ has one, same gap already stated for
 // the auction estimator.
 function playerTooltip(r){
@@ -1542,7 +1542,7 @@ function modelView(){
     const d=den[x], se=denSe[x];
     const dp = d<1?4:2;
     return `<tr><td class="l">${x}</td>
-      <td title="1 standard error, propagated from this category's dispersion estimate (out/FINDINGS.md #26) through the same units-per-point conversion. Roughly a 68% interval; double it for something closer to 95%.">${nf(d,dp)} <span class="dim">± ${nf(se,dp)}</span></td>
+      <td title="1 standard error, propagated from this category's dispersion estimate (docs/FINDINGS.md #26) through the same units-per-point conversion. Roughly a 68% interval; double it for something closer to 95%.">${nf(d,dp)} <span class="dim">± ${nf(se,dp)}</span></td>
       <td class="l dim">${kind(x)}</td></tr>`;}).join("");
   // PROJECTION_BASIS is overridden with the live S.basis, not the
   // build-time D.settings value -- the selector in the header can change
@@ -1563,8 +1563,8 @@ function modelView(){
     <div class="panel"><h3>Denominators — units per standings point</h3>
       <table><thead><tr>
         <th class="l" title="Roto category.">Cat</th>
-        <th title="How many units of this stat buy one standings point, pooled from this league's own history — see out/FINDINGS.md #26.">Units / pt</th>
-        <th class="l" title="Counting stats sum directly; rate stats (AVG/ERA/WHIP) are computed as a marginal shift against a league-average team, not the player's raw rate — out/ARCHITECTURE.md §1.2.">Kind</th>
+        <th title="How many units of this stat buy one standings point, pooled from this league's own history — see docs/FINDINGS.md #26.">Units / pt</th>
+        <th class="l" title="Counting stats sum directly; rate stats (AVG/ERA/WHIP) are computed as a marginal shift against a league-average team, not the player's raw rate — docs/METHODS.md section 2.1.">Kind</th>
       </tr></thead>
       <tbody>${rows}</tbody></table>
       <div class="note">Estimated from pooled relative dispersion across

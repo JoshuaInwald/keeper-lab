@@ -11,7 +11,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from . import config as C
 from .io import cached
 from .denoms import (RotoScorer, denominators_for_level,
                      pooled_relative_dispersion, season_levels, team_baselines,
@@ -75,10 +74,7 @@ def score_season(season: int, sigma_rel: pd.DataFrame, levels: pd.DataFrame,
     b = baselines.set_index("season").loc[season].to_dict()
     sc = RotoScorer(D, b)
 
-    # The FanGraphs hitter export carries a zero-PA row for every pitcher (and
-    # vice versa). They contribute nothing to roto points but do decide the
-    # role label, so drop them before scoring or every pitcher reads as a
-    # hitter.
+    # Drop the zero-PA/zero-IP cross-file rows or every pitcher reads as a hitter.
     h = hit[(hit["season"] == season) & (hit["PA"].fillna(0) > 0)].copy()
     p = pit[(pit["season"] == season) & (pit["IP"].fillna(0) > 0)].copy()
     H = h[["season", "fg_id", "name"]].join(sc.hitters(h))
@@ -86,10 +82,8 @@ def score_season(season: int, sigma_rel: pd.DataFrame, levels: pd.DataFrame,
     P = p[["season", "fg_id", "name"]].join(sc.pitchers(p))
     P["is_hit"] = 0
     out = pd.concat([H, P], ignore_index=True)
-    # Ohtani carries the same fg_id in both files: sum his two lines. The role
-    # label rides on a numeric flag rather than a lambda -- a Python-level
-    # groupby aggregation over thousands of groups was costing more than the
-    # scoring itself.
+    # A two-way player's two lines are summed here (past auctions bought him
+    # as one asset -- see config.TWO_WAY_SPLIT_NAMES); role via a numeric flag.
     agg = {c: "sum" for c in out.columns if c.startswith("rp_")}
     agg["roto_points"] = "sum"
     agg["name"] = "first"
@@ -112,15 +106,12 @@ def auction_sample(seasons=(2022, 2023, 2024, 2025, 2026),
                         for s in seasons], ignore_index=True)
     drafts = match_drafts(verbose=False)
     drafts = drafts[drafts["season"].isin(seasons)].copy()
-    # Unmatched names are players who never took an MLB plate appearance or
-    # inning that year (Bauer 2022, Painter/Buehler on TJ, deep prospect
-    # fliers). That is real money burned, so they stay in at zero.
+    # Unmatched names never played that year: real money burned, kept at zero.
     drafts["fg_id"] = drafts["fg_id"].fillna(-1).astype(int)
 
     m = drafts.merge(scored, on=["season", "fg_id"], how="left",
                      suffixes=("", "_fg"))
-    # A drafted player with no stat line never appeared: that is a real $0
-    # return, not missing data. Keep it at zero roto points.
+    # No stat line = a real $0 return, not missing data.
     m["played"] = m["roto_points"].notna()
     for c in [c for c in m.columns if c.startswith("rp_")] + ["roto_points"]:
         m[c] = m[c].fillna(0.0)

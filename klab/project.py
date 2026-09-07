@@ -32,25 +32,11 @@ from .io import (load_hitters_history, load_pitchers_history, load_ros_hitters,
 SHRINK_PA = 250.0
 SHRINK_IP = 70.0
 
-# Year-over-year reliability of each rate, measured on this dataset
-# (hitters 250+ PA in consecutive years, n=693; pitchers 40+ IP, n=785).
-# The 2026 leg of the blend is raw observed performance while ZiPS is already
-# regressed, so giving every stat the same 50% weight injects noise wherever
-# the stat does not repeat. Wins are the extreme case: r = 0.15 means last
-# year's win rate is almost pure noise, and carrying it forward buried a
-# pitcher who went 3-17 on a bad team. Each stat's weight on the 2026 leg is
-# scaled by its reliability relative to the most repeatable stat.
-#
-# CORRECTED 2026-08-13 (out/FINDINGS.md #28) -- BB and H were both hard-coded
-# to 0.237, WHIP's own year-over-year r. WHIP is never actually looked up
-# through rel_weight() (it's a downstream ratio of BB+H over IP, blended via
-# its two components, same pattern as AVG/H-AB), so this was a copy-paste
-# into the two keys that ARE live, silently discounting last year's walk and
-# hit rates as if they were as noisy as WHIP itself. Refit directly: BB
-# r=0.463, H r=0.359 -- both meaningfully more repeatable than 0.237.
-# Reproduced every other value in this dict exactly (same three
-# season-pairs, same PA/IP thresholds), so this was the one entry with a
-# fitting error, not a wholesale re-derivation.
+# Year-over-year r of each rate on this dataset (hitters 250+ PA, n=693;
+# pitchers 40+ IP, n=785); the 2026 leg's weight is scaled by r / max r, so
+# a non-repeating stat like W (r=0.15) barely carries forward.
+# BB and H must be their own fitted r, not WHIP's 0.237 -- a copy-paste once
+# discounted walk/hit rates as if they were as noisy as WHIP (FINDINGS #28).
 RELIABILITY = {
     "HR": 0.607, "R": 0.425, "RBI": 0.380, "SB": 0.739, "AVG": 0.436,
     "K": 0.701, "W": 0.151, "ER": 0.176, "WHIP": 0.237, "BB": 0.463,
@@ -110,17 +96,11 @@ def project_saves(sv_2026: pd.Series, model: dict,
 def _blend_weight(pt_a: pd.Series, shrink: float,
                   cap: float | pd.Series = C.BLEND_W_2026) -> pd.Series:
     """Weight on source A (2026 form): rises with its own sample size, capped
-    at `cap`. PROJECTION_BASIS can force it to either pole so the same board
-    can be rebuilt on a pure projection or on 2026 alone.
+    at `cap`. PROJECTION_BASIS can force it to either pole.
 
-    `cap` is a parameter, not always `C.BLEND_W_2026`, because playing time
-    and rate stats need different caps -- see `PT_BLEND_CAP_HITTER`/
-    `PT_BLEND_CAP_PITCHER` in klab/config.py and out/FINDINGS.md #51. Rate
-    calls (the talent blend) keep the original shared cap; PA/IP calls pass
-    a lower one. `cap` may itself be a per-player Series (out/FINDINGS.md
-    #53) -- `pd.Series.clip` applies an elementwise bound just like a
-    scalar, so project_pitchers() can hand every player a different cap
-    depending on whether his own 2026 workload exceeded ZiPS's opinion."""
+    `cap` is a parameter because playing time uses a lower cap than rates
+    (PT_BLEND_CAP_*, docs/FINDINGS.md #51) and may be a per-player Series
+    (docs/FINDINGS.md #53) -- Series.clip bounds elementwise."""
     if C.PROJECTION_BASIS == "projection":
         return pd.Series(0.0, index=pt_a.index)
     if C.PROJECTION_BASIS == "actuals":
@@ -170,12 +150,8 @@ def project_hitters() -> pd.DataFrame:
     w = w.where(has_a, 0.0)            # no 2026 line -> lean fully on ZiPS
     m["w_2026"] = w
 
-    # Playing time gets its OWN, lower-capped weight -- decoupled from the
-    # rate/talent weight above on purpose (out/FINDINGS.md #51). A short
-    # 2026 is real evidence about how good a player is (already priced in
-    # via `w` + RELIABILITY); it's much weaker evidence about how much he'll
-    # play in a healthy 2027, which is closer to what ZiPS's own PA
-    # projection already assumes.
+    # Playing time gets its own lower-capped weight, decoupled from the rate
+    # weight: a short 2026 says little about a healthy 2027 role (FINDINGS #51).
     w_pt = _blend_weight(m["PA_a"], SHRINK_PA, cap=C.PT_BLEND_CAP_HITTER)
     w_pt = w_pt.where(has_b, 1.0).where(has_a, 0.0)
     m["PA"] = w_pt * m["PA_a"].fillna(0) + (1 - w_pt) * m["PA_b"].fillna(0)
@@ -241,22 +217,9 @@ def project_pitchers(save_model: dict | None = None) -> pd.DataFrame:
     w = w.where(has_a, 0.0)
     m["w_2026"] = w
 
-    # Own, lower-capped weight for playing time -- see project_hitters()'s
-    # comment and out/FINDINGS.md #51. Pitchers get a lower cap than
-    # hitters: a shortened pitcher-season skews injury-driven (hurt in June,
-    # expected to be fine next year), which shouldn't dock his 2027 innings
-    # the way it currently did for e.g. Hunter Brown -- 107 IP actual+ROS
-    # blended 50/50 with ZiPS's own healthy 163 IP opinion landed at 135,
-    # understating him. Hitters keep more weight because a short hitter
-    # season is more often role/platoon-driven, which IS informative.
-    #
-    # Direction-aware exception (out/FINDINGS.md #53): the cap above assumes
-    # ZiPS's 2027 number is the better-informed one, which is backwards for
-    # a pitcher who already threw MORE 2026 innings than ZiPS projects for
-    # 2027 -- Cam Schlittler (187 actual vs. 128 ZiPS 2027), Jacob
-    # Misiorowski and Chase Burns (both proved a near-full workload that
-    # ZiPS is still conservative about repeating). "He already did this"
-    # gets the higher PT_BLEND_CAP_PITCHER_EXCEEDED instead.
+    # Playing-time weight is capped lower for pitchers (injury-shortened
+    # 2026 must not dock 2027 IP, FINDINGS #51); a pitcher whose 2026 IP
+    # already EXCEEDED ZiPS's 2027 IP gets the higher cap (FINDINGS #53).
     exceeded = m["IP_a"].fillna(0) > m["IP_b"].fillna(0)
     pt_cap = pd.Series(np.where(exceeded, C.PT_BLEND_CAP_PITCHER_EXCEEDED,
                                 C.PT_BLEND_CAP_PITCHER), index=m.index)

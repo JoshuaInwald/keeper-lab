@@ -62,7 +62,7 @@ def main():
     print("\nros_value_over_repl: this player's rest-of-2026 roto value over a")
     print("replacement player for the SAME remaining playing time -- a")
     print("player-intrinsic number, not a team-standings swap (see win_now")
-    print("below for that). out/FINDINGS.md #34.")
+    print("below for that). docs/FINDINGS.md #34.")
     print("\nval_2027_range / surplus_range: 10th-90th percentile bootstrap band")
     print("(1,000 resamples of the team-seasons the denominators are fit on --")
     print("klab/uncertainty.py). p_surplus_pos: share of draws where the")

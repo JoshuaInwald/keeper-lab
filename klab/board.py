@@ -43,12 +43,8 @@ def build_2027_scorer():
     lvl27 = projected_2027_levels(levels)
     n_by_cat = teams_per_category()
     D = denominators_for_level(sigma, lvl27, n_by_cat=n_by_cat)
-    # Standard error on each denominator, same units as D ("units per
-    # point"), for the Model tab's error bars. denom = sigma_rel * level * k
-    # is linear in sigma_rel, so its standard error scales the same way --
-    # swap se_sigma_rel in for the point estimate and run it through the
-    # exact same conversion rather than re-deriving the algebra separately,
-    # which would risk the two silently drifting apart on a future change.
+    # SE of each denominator: denom is linear in sigma_rel, so run
+    # se_sigma_rel through the same conversion rather than separate algebra.
     D_se = denominators_for_level(sigma.assign(sigma_rel=sigma["se_sigma_rel"]),
                                   lvl27, n_by_cat=n_by_cat)
     bl = team_baselines(C.LEVEL_SEASONS)
@@ -60,15 +56,10 @@ def build_2027_scorer():
 def fit_exchange_rate(sigma=None, seasons=None):
     """Roto points per auction dollar, projected into the 2027 environment.
 
-    A straight pooled fit answers "what did a dollar buy on average across
-    these auctions". That is the wrong question when the auctions happened in
-    different worlds: 29 keepers were withheld before 2024 and 2025, but 100
-    before 2026, and $/roto-point tracks that count at r = 0.80. 2027 will
-    look like 2026, so the pooled figure understates what a dollar will cost.
-
-    EXCHANGE_BASIS = "keeper_adjusted" fits the rate on keeper count across
-    all five auctions and predicts at the expected 2027 count -- every
-    observation used, but landing in the right regime.
+    $/roto-point tracks the keeper count withheld before each auction
+    (r = 0.80; 29 in 2024-25 vs 100 in 2026), so EXCHANGE_BASIS =
+    "keeper_adjusted" fits the rate on keeper count and predicts at the
+    expected 2027 count instead of pooling two different regimes.
     """
     import statsmodels.api as sm
 
@@ -84,8 +75,7 @@ def fit_exchange_rate(sigma=None, seasons=None):
     usd = 1.0 / slope
 
     if C.EXCHANGE_BASIS == "keeper_adjusted":
-        # one full-history sample serves both the pooled fit and the
-        # per-season fits; sampling twice doubled the most expensive call
+        # one full-history sample serves both fits (sampling twice was slow)
         full = auction_sample(seasons=tuple(sorted(C.KEEPERS_REMOVED)), sigma_rel=sigma)
         per = []
         for y in sorted(C.KEEPERS_REMOVED):
@@ -121,10 +111,8 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
     H = project_hitters()
     P = project_pitchers(sm_)
     if full_time:
-        # A two-way player must not collect both playing-time floors. Ohtani
-        # already projects past 600 PA, so his bat is not scaled; without this
-        # his arm would still be lifted from 97 to 150 IP and he would gain
-        # $20 of value from a workload nobody expects him to carry.
+        # A two-way player must not collect both PT floors (his arm was once
+        # lifted 97 -> 150 IP, +$20, from a workload nobody expects).
         two_way = set(H.loc[H["PA"] >= 300, "fg_id"]) & set(P.loc[P["IP"] >= 20, "fg_id"])
         H = to_full_time(H)
         P = to_full_time(P, exclude_ids=two_way)
@@ -148,14 +136,8 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
         if c not in out:
             out[c] = np.nan
 
-    # A player can share one FanGraphs id across the hitter and pitcher
-    # files two ways: an incidental one (a position player who mop-up
-    # pitched a few innings, or a pitcher with a token PA -- not a real
-    # two-way roster asset, and still combined into one row below) and a
-    # true two-way player (Ohtani), who from 2027 on is auctioned/rostered
-    # as two separate assets (config.TWO_WAY_SPLIT_NAMES) and must NOT be
-    # combined. Pull his rows out before the incidental-combine groupby so
-    # they pass through untouched.
+    # Incidental two-way rows (mop-up pitching, token PA) are combined into
+    # one row; a true two-way player (TWO_WAY_SPLIT_NAMES) is kept as two.
     split_names = out["name"].isin(C.TWO_WAY_SPLIT_NAMES)
     split_rows = out[split_names].copy()
     out = out[~split_names]
@@ -170,7 +152,6 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
                 "AVG": "max", "ERA": "min", "WHIP": "min",
                 "_hit": "max", "_pit": "max"})
     out = out.groupby("fg_id", as_index=False).agg(agg)
-    # numeric flags instead of a per-group lambda; same answer, far cheaper
     out["role"] = np.where(out["_hit"] & out["_pit"], "TWO",
                            np.where(out["_hit"] > 0, "HIT", "PIT"))
     out = out.drop(columns=["_hit", "_pit"])
@@ -192,22 +173,12 @@ def value_players(exch: dict | None = None, positional: bool = False
     on the expected-PT scale, so they answer "what would he be worth in a
     normal market if he played every day" -- a counterfactual, not a price.
 
-    An earlier build valued everyone at full time while calibrating on
-    expected time. That combination broke the budget identity badly (top 230
-    summed to $3,854) because a full-time-scaled player was being priced
-    against a replacement level built from real, injury-shortened seasons.
+    Valuing at full time while calibrating on expected time once broke the
+    budget identity (top 230 summed to $3,854); both must use the same pool.
 
-    `positional=True` (out/FINDINGS.md #52) swaps the pooled replacement
-    level for a per-player one: catchers and shortstops (the only two spots
-    Josh's scoping call treats as scarce enough to matter) are priced
-    against `two_position_replacement()`'s catcher-only / shortstop-only
-    replacement level instead of the league-wide one; everyone else is
-    unaffected. `usd_per_rp` is recalibrated against the SAME per-player
-    replacement levels used for `rp_above_repl`/`redraft_value` -- giving
-    some players a different (not necessarily lower -- see the finding)
-    bar to clear changes how many total roto-points-above-replacement the
-    top-230 pool has, and the $/point scale has to be refit to that or the
-    top-230-sums-to-$2,600 budget identity breaks.
+    `positional=True` (docs/FINDINGS.md #52) prices catchers/shortstops
+    against `two_position_replacement()`'s level; `usd_per_rp` is refit
+    against the SAME per-player levels or the $2,600 identity breaks.
     """
     base_players, D, base, D_se = project_all_players(full_time=False)
     ft_players, _, _, _ = project_all_players(full_time=True)
@@ -224,21 +195,8 @@ def value_players(exch: dict | None = None, positional: bool = False
         ranked = base_players.nlargest(rank, "roto_points")
         repl_rp = float(ranked["roto_points"].min())
 
-    # Per-player replacement level: pooled by default; overridden for
-    # catcher/shortstop when `positional` is on -- ALWAYS overridden for an
-    # eligible player, not just when it happens to help him. Real bug caught
-    # testing this directly: the first version took min(pooled, position-
-    # specific) meant to break a tie for a player eligible at both adjusted
-    # positions, but that same "min" silently compared against the POOLED
-    # level too -- and since both catcher (5.12) and shortstop (6.76) come
-    # out ABOVE the pooled level (4.78) on this league's real 2026 data (see
-    # out/FINDINGS.md #52), "take the min" always kept the pooled number,
-    # so positional=True produced byte-identical output to positional=False
-    # with no error or warning. Fixed: an eligible player's replacement
-    # level is always the position-specific one; "most favorable" only
-    # applies to *choosing between* multiple adjusted positions he's
-    # eligible for (which the data shows essentially never happens for
-    # C/SS -- zero overlap -- but is handled correctly either way).
+    # Replacement level must be position-specific for every eligible player;
+    # min(pooled, pos) silently no-op'd since C/SS sit ABOVE pooled (FINDINGS #52).
     repl_series = pd.Series(repl_rp, index=base_players.index)
     pos_repl: dict = {}
     if positional:
@@ -255,27 +213,8 @@ def value_players(exch: dict | None = None, positional: bool = False
         repl_series = repl_series.where(~any_mask, override)
 
     top = base_players.nlargest(n_rostered, "roto_points")
-    # clip(lower=0) here has to roughly match the clip inside dollars()
-    # below, or the budget identity breaks badly: under pooled replacement
-    # every top-230 player is by construction above the pooled bar
-    # (repl_rp IS the 230th-ranked value), so this clip was always a no-op
-    # there. Positional adjustment breaks that guarantee -- a player can be
-    # good enough overall to rank in the top 230 while sitting BELOW his
-    # own position's (higher) bar, e.g. a shortstop who's a fine overall
-    # player but below the loaded 2026 SS replacement level. His dollars()
-    # floors at $0 instead of going negative; pool_rp has to floor
-    # similarly or it calibrates against points that never actually get
-    # paid out. This isn't an EXACT match, though: dollars() floors the
-    # final DOLLAR figure at $0 (i.e. at roto-points-space
-    # `rp - repl == -1/usd_per_rp`, not exactly 0, because of the +$1
-    # minimum-salary floor folded into the same clip), while this clips at
-    # exactly 0 in roto-points space for simplicity. Solving that exactly
-    # would need an iterative fit (which players end up floored depends on
-    # the scale you're solving for). Checked directly: this approximation
-    # lands the top-230 budget check within ~1% of $2,600 under positional
-    # adjustment (was exact under pooled) -- close enough for what is
-    # already a documented sanity-check number, not a value anything else
-    # depends on. See out/FINDINGS.md #52.
+    # clip(lower=0) must roughly match dollars()'s $0 floor: under positional
+    # adjustment a top-230 player can sit below his own bar (FINDINGS #52; ~1%).
     pool_rp = float((top["roto_points"] - repl_series.loc[top.index]).clip(lower=0.0).sum())
     dollars_above_min = C.N_TEAMS * C.BUDGET - n_rostered * 1.0
     usd_per_rp = dollars_above_min / pool_rp
@@ -286,17 +225,12 @@ def value_players(exch: dict | None = None, positional: bool = False
     players = base_players.copy()
     players["rp_above_repl"] = players["roto_points"] - repl_series
     players["redraft_value"] = dollars(players["roto_points"], repl_series)
-    # A player cannot be worth less than nothing: a bad arm gets benched and
-    # the roster spot reverts to a waiver pickup at replacement level.
+    # A player cannot be worth less than nothing (bench him, use the wire).
     players["keep_value"] = (
         (players["roto_points"] - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
 
-    # Merge on (fg_id, role), not a fg_id-keyed .map() -- a true two-way
-    # player (config.TWO_WAY_SPLIT_NAMES) now has two rows sharing one
-    # fg_id in both `players` and `ft_players` (see
-    # project_all_players()), and a duplicate-keyed index breaks .map()'s
-    # lookup. role disambiguates; everyone else still has exactly one row
-    # per fg_id, so this is a plain 1:1 merge for them, same as before.
+    # Merge on (fg_id, role), not a fg_id-keyed .map(): a two-way player
+    # (TWO_WAY_SPLIT_NAMES) has two rows per fg_id, which breaks .map().
     ft = ft_players[["fg_id", "role", "roto_points", "pt_scale", "pt_scale_kind"]].rename(
         columns={"roto_points": "roto_points_ft", "pt_scale": "pt_scale_full",
                 "pt_scale_kind": "pt_scale_kind_full"})
@@ -306,14 +240,8 @@ def value_players(exch: dict | None = None, positional: bool = False
     players["redraft_value_ft"] = dollars(players["roto_points_ft"].fillna(
         players["roto_points"]), repl_series)
     players["upside_ft"] = players["redraft_value_ft"] - players["redraft_value"]
-    # Which floor produced upside_ft (out/FINDINGS.md #53): "health" (hitter
-    # PA floor, starter IP floor, two-way bat, or a low/zero-save reliever's
-    # own IP floor) means "what if nothing kept him off the field" -- a
-    # grounded number. "role" (a reliever already at 5+ saves, scaled to
-    # KEEPER_SV_FLOOR) means "what if he's handed the closer job outright" --
-    # a bullpen-decision bet, not a health one. Conflating the two under one
-    # number made Griffin Jax and Grant Taylor's huge upside_ft look like
-    # hidden health value when it was really "if he becomes the closer."
+    # Which floor produced upside_ft (FINDINGS #53): "health" = full healthy
+    # workload; "role" = 5+ save reliever handed the closer job, a weaker bet.
     players["upside_kind"] = players["pt_scale_kind_full"].fillna("health")
     players = players.drop(columns=["pt_scale_kind_full"])
 
@@ -335,14 +263,8 @@ def keeper_status(contract) -> str:
     if c in C.YEARS_REMAINING:
         return f"keepable x{C.YEARS_REMAINING[c]}yr"
     if c in C.EXTENSION_REQUIRED:
-        # This used to read "extension +$5", true before the correction in
-        # out/FINDINGS.md #39: an "F" observed here means the extension
-        # window (which closes before his own walk-year draft) has already
-        # passed, so there is no extension to buy. Left stale here even
-        # after board.py's `keepable` logic was fixed -- nothing re-checked
-        # this string against the corrected model, and it only surfaced
-        # visually in the app's player-card subheader. Caught 2026-08-13
-        # UI audit; see out/FINDINGS.md #44.
+        # "F" = extension window already closed, nothing to buy (FINDINGS
+        # #39); this string once still said "extension +$5" (FINDINGS #44).
         return "free agent after 2026 (not extendable)"
     return "unknown"
 
@@ -351,30 +273,21 @@ def value_2028(exch: dict, meta: dict, saves_2027: pd.Series,
                positional: bool = False) -> pd.DataFrame:
     """Dollar values for the out year, on the same 2027 scale.
 
-    `positional` (out/FINDINGS.md #52) reuses the SAME catcher/shortstop
-    replacement levels `meta["positional_replacement"]` already computed
-    for 2027 (from `value_players()`), rather than refitting a fresh
-    position-specific replacement level on the 2028 pool -- consistent
-    with how this function already reuses the pooled 2027 replacement
-    level and $/point scale for 2028 generally ("on the same 2027 scale").
+    `positional` (docs/FINDINGS.md #52) reuses the 2027 catcher/shortstop
+    replacement levels in `meta["positional_replacement"]`, as the pooled
+    2027 level and $/point scale are reused for 2028 generally.
     """
     from .keeper import project_2028
     scorer, _, _, _ = build_2027_scorer()
-    # No full-time scaling here: the headline 2027 value is on expected
-    # playing time, so the out year has to be too, or multi-year surplus
-    # silently mixes an expected-PT 2027 with a full-time 2028.
+    # No full-time scaling: 2027 is on expected PT, so 2028 must be too.
     H, P = project_2028(saves_2027)
     Hs = H[["fg_id", "name"]].join(scorer.hitters(H)[["roto_points"]])
     Ps = P[["fg_id", "name"]].join(scorer.pitchers(P)[["roto_points"]])
     Hs["role"], Ps["role"] = "HIT", "PIT"
     both = pd.concat([Hs, Ps], ignore_index=True)
 
-    # Mirror project_all_players()'s 2027 split: a true two-way player
-    # (config.TWO_WAY_SPLIT_NAMES) keeps separate 2028 hit/pitch lines too --
-    # summing them here would hand the SAME combined number to both of his
-    # split 2027 rows below via the fg_id merge in build_board(). `role` is
-    # only kept (non-null) for these rows; everyone else merges on fg_id
-    # alone, unchanged from before.
+    # Mirror project_all_players()'s split: a two-way player keeps separate
+    # 2028 lines (role non-null); summing would give both 2027 rows the total.
     split_names = both["name"].isin(C.TWO_WAY_SPLIT_NAMES)
     split_rows = both[split_names][["fg_id", "role", "roto_points"]]
     combined = (both[~split_names].groupby("fg_id", as_index=False)["roto_points"].sum()
@@ -385,17 +298,8 @@ def value_2028(exch: dict, meta: dict, saves_2027: pd.Series,
 
     repl = pd.Series(meta["replacement_rp"], index=out.index)
     if positional and meta.get("positional_replacement"):
-        # Same override/any_mask pattern as value_players() -- and the exact
-        # same bug this function had until caught here (out/FINDINGS.md #52,
-        # #53): `repl.where(~mask, np.minimum(repl, r))` compares the
-        # position-specific level against the POOLED one too, and since both
-        # adjusted positions come out ABOVE pooled on this league's data,
-        # `min()` always kept the pooled value -- silently making 2028
-        # positional adjustment a no-op (Bobby Witt Jr.'s 2028 dollar figure
-        # moved only from the leaguewide $/point rescale, never from his own
-        # shortstop-specific bar actually being applied). Caught by directly
-        # reverse-solving the replacement level implied by his 2028 dollar
-        # value and finding it equal to the pooled number, not the SS one.
+        # Same override/any_mask pattern as value_players(): min(pooled, pos)
+        # silently no-op'd here too (FINDINGS #52, #53).
         from .io import load_position_eligibility
         elig = load_position_eligibility()
         override = pd.Series(np.inf, index=out.index)
@@ -428,19 +332,12 @@ def build_board(exch: dict | None = None, positional: bool = False
     for c in ("roto_points_ft", "redraft_value_ft", "upside_ft"):
         b[c] = b[c].fillna(0.0)
 
-    # .groupby(...).max() rather than .set_index(...) -- a true two-way
-    # player (config.TWO_WAY_SPLIT_NAMES) now has two rows sharing one
-    # fg_id in `players` (see project_all_players()), and a duplicate-keyed
-    # Series breaks the .map() lookup inside project_saves(). max() recovers
-    # his real (pitcher-row) save total; every other fg_id is unique, so
-    # this is a no-op for everyone else.
+    # groupby().max(), not set_index(): a two-way player has two rows per
+    # fg_id and a duplicate index breaks .map() inside project_saves().
     sv27 = players.groupby("fg_id")["SV"].max() if "SV" in players else None
     v28 = value_2028(exch, meta, sv27, positional=positional)
-    # v28 tags a two-way player's rows with a real `role` (HIT/PIT) and
-    # leaves it null for everyone else. A plain fg_id merge would
-    # cartesian-join his 2 `b` rows against his 2 `v28` rows into 4 -- match
-    # those on (fg_id, role) instead; everyone else merges on fg_id alone,
-    # unchanged.
+    # Two-way rows (role non-null in v28) merge on (fg_id, role) or a plain
+    # fg_id merge cartesian-joins them 2x2; everyone else merges on fg_id.
     v28_normal = v28[v28["role"].isna()].drop(columns=["role"])
     v28_split = v28[v28["role"].notna()]
     two_way_ids = set(v28_split["fg_id"])
@@ -450,9 +347,8 @@ def build_board(exch: dict | None = None, positional: bool = False
     b["roto_points_2028"] = b["roto_points_2028"].fillna(0.0)
     b["redraft_value_2028"] = b["redraft_value_2028"].fillna(0.0)
 
-    # Commissioner-resolved contracts, applied before anything is priced off
-    # them. Three players came out of the export as "?" and were being valued
-    # with no contract at all.
+    # Commissioner-resolved contracts ("?" in the export), applied before
+    # anything is priced off them.
     for nm, (code, sal) in C.CONTRACT_OVERRIDES.items():
         m = b["name"] == nm
         if m.any():
@@ -476,25 +372,14 @@ def build_board(exch: dict | None = None, positional: bool = False
     my["surplus_multiyear"] = (my["surplus_y2027"] + my["surplus_y2028"]
                                + my["surplus_y2029"] + my["extension_option"])
     b["extension_used"] = used.values
-    # CORRECTED 2026-08-13 (out/FINDINGS.md #39): an `F` player observed in
-    # THIS data is never keepable, full stop -- not conditional on whether
-    # he has used a prior extension. The constitution's extension window is
-    # "about to enter the final year," i.e. it closes before that season's
-    # OWN draft. `contracts_parsed.csv` is a mid-season-or-later snapshot, so
-    # any player still coded `F` in it already missed that window; he is
-    # confirmed for unrestricted free agency after this season, not offering
-    # a live extension choice for 2027. This used to read
-    # `~(used & is_final)`, which only caught a player who had *already*
-    # spent an extension -- a first-time F player (the common case) was
-    # incorrectly treated as extendable right now.
+    # Every `F` player is unkeepable unconditionally -- the extension window
+    # closed before his own draft; `~(used & is_final)` missed first-timers (FINDINGS #39).
     is_final = b["contract"].astype(str).str.upper().isin(C.EXTENSION_REQUIRED)
     b["keepable"] = ~is_final
     b = pd.concat([b, my], axis=1)
 
-    # A player who cannot be kept has no future surplus -- not "unknown"
-    # surplus. He is a 2026 rental and hits the 2027 auction like anyone else,
-    # so every forward-looking figure is zero, not NaN. NaN also sorted oddly
-    # and left a positive "Surplus '27" showing next to a LOCKED tag.
+    # Unkeepable = zero forward surplus, not NaN (NaN sorted oddly and showed
+    # a positive Surplus '27 next to a LOCKED tag).
     surplus_cols = ["surplus_y2027", "surplus_y2028", "surplus_y2029",
                     "extension_option", "extension_years", "surplus_multiyear",
                     "surplus_keep", "surplus_redraft"]
@@ -507,13 +392,9 @@ def build_board(exch: dict | None = None, positional: bool = False
 
 def mark_optimal_keepers(b: pd.DataFrame,
                          col: str = "surplus_redraft") -> pd.DataFrame:
-    """Flag each team's best legal keeper set.
-
-    Rostering 27 players says nothing about keeper value -- most of them will
-    be cut. The decision is which 6-13 to hold, so the surplus that matters is
-    the sum over the chosen set, not over the whole roster. Take every player
-    with positive surplus, capped at MAX_KEEPERS; if fewer than MIN_KEEPERS
-    clear zero, the league forces you to keep the least-bad ones anyway.
+    """Flag each team's best legal keeper set: every player with positive
+    surplus, capped at MAX_KEEPERS; if fewer than MIN_KEEPERS clear zero the
+    league forces the least-bad ones anyway.
     """
     b = b.copy()
     b["keep_2027"] = False

@@ -1,34 +1,14 @@
 """Comp-based next-auction price estimator -- a separate exercise from the
-rest of klab/, built 2026-08-13 at Josh's request after a trade review
-raised a real question the existing model doesn't answer.
+rest of klab/. Nothing here feeds back into board.py/auction.py/keeper.py.
 
-**What this is not.** `board.py`'s `redraft_value` is a regression-based
-FAIR-VALUE estimate: it answers "what should a player with this production
-be worth, on average, given how this league's money has behaved
-historically." It does not know that name recognition, a big recent year,
-positional scarcity panic, or a specific owner's blind spot move real
-auction prices around that fair value. Nothing in `board.py`, `auction.py`,
-or `keeper.py` is touched by this module, and nothing here feeds back into
-those numbers -- this is deliberately a second, independent estimate, not a
-correction to the first one.
+`board.py`'s `redraft_value` is a regression FAIR-VALUE estimate; real
+auction prices move around it (name recognition, a big recent year, owner
+blind spots). This module finds the K most similar historical purchases
+from `out/auction_sample.csv` by production profile and position and
+reports what they actually sold for, with the comp list attached.
 
-**What this is.** For a target player, find the K most similar historical
-auction purchases from this league's own 677-purchase, five-season record
-(`out/auction_sample.csv`) by production profile and position, and ask: did
-players like this typically sell for more or less than a pure production
-regression would have predicted, in the season they were actually bought?
-That premium/discount -- the part of the price the production regression
-alone can't explain -- is applied to the target's own `redraft_value` to
-produce a comp-adjusted estimate, reported as a range with the comp list
-attached so the estimate is auditable, not a black box.
-
-**Known limitation, stated up front.** There is no age or debut-year data
-anywhere in `data/` (checked directly -- no file has an age/birthdate
-column), so age-based comps (a real, standard input for this kind of
-estimate -- see the young-player-modeling research from this session) are
-not possible without a new data source. Position and realized production
-level are the only comp axes available. This is a real gap, not a silent
-one.
+Known limitation: no age/debut-year data exists in `data/`, so age-based
+comps are not possible; position and production level are the only axes.
 """
 from __future__ import annotations
 
@@ -60,12 +40,8 @@ def comp_pool() -> pd.DataFrame:
     """Every historical auction purchase, with a position group and a
     per-season market-premium residual attached.
 
-    The premium is computed against a regression fit *separately for each
-    season* (not pooled) -- deliberately not reusing `auction.py`'s
-    keeper-adjusted exchange rate, which this project's own FINDINGS #19
-    already flags as not causally identified. This tool needs "what did the
-    market pay for this level of production that season," which a plain
-    per-season OLS answers directly without inheriting that debate.
+    The premium regression is fit per season, not reusing `auction.py`'s
+    keeper-adjusted exchange rate (not causally identified, FINDINGS #19).
     """
     d = pd.read_csv(C.OUT / "auction_sample.csv")
     d = d[d["played"]].copy()
@@ -74,50 +50,26 @@ def comp_pool() -> pd.DataFrame:
     resid = pd.Series(index=d.index, dtype=float)
     predicted = pd.Series(index=d.index, dtype=float)
     for season, g in d.groupby("season"):
-        # Auction salaries are right-skewed and floored at $1, not normally
-        # distributed around a linear trend -- a plain OLS on raw dollars
-        # gets pulled by the handful of $30-45 stars and systematically
-        # over-predicts everyone else (checked directly: raw-dollar OLS gave
-        # a median residual of -8% to -22% every season, only balanced to a
-        # ~0 mean by a few huge positive outliers -- the "typical" comp
-        # looked overpriced by construction, which would bias every
-        # estimate this tool produces low). Fit on log(salary) instead.
+        # Fit on log(salary): raw-dollar OLS is pulled by the $30-45 stars
+        # and over-predicts everyone else (median residual -8% to -22%).
         X = sm.add_constant(g["roto_points"])
         fit = sm.OLS(np.log(g["salary"]), X).fit()
         pred = np.exp(fit.predict(X))
         predicted.loc[g.index] = pred
-        # premium as a fraction of predicted price, not a raw dollar diff,
-        # so a $2 miss on a $3 player and a $10 miss on a $30 player don't
-        # get treated as the same-sized signal.
+        # premium as a fraction of predicted price, not a raw dollar diff
         resid.loc[g.index] = (g["salary"] - pred) / pred.clip(lower=1.0)
 
-    # Recenter each season's premium to its own median rather than trust
-    # either regression's absolute calibration. Checked both: raw-dollar OLS
-    # has a systematically negative median (pulled positive only by a few
-    # $30+ stars); log-salary OLS has a systematically POSITIVE median
-    # instead (the classic retransformation/Jensen's-inequality bias from
-    # exponentiating a log-scale fit back to dollars). Neither center is
-    # trustworthy on its own. Recentering makes "premium" mean exactly what
-    # it's supposed to mean -- relative to the TYPICAL player at this
-    # production level that season, not relative to a regression line
-    # that's biased one direction or the other by construction.
+    # Recenter each season's premium to its own median: neither raw-dollar
+    # (negative median) nor log-fit (positive, retransformation bias) is centred.
     for season, g in d.groupby("season"):
         resid.loc[g.index] -= resid.loc[g.index].median()
 
     d["predicted_salary"] = predicted
     d["premium_frac"] = resid
 
-    # Track record: how many times this player has already been bought in
-    # this league's real history, strictly before this row's own season --
-    # 0 means this sale was his first. Comps otherwise can't tell a
-    # rookie/breakout debut from a proven veteran with an identical stat
-    # line, which is exactly why a first-year closer (Cade Smith) or a
-    # pitcher's best-ever season (Skubal) get comped against established
-    # stars and overshoot even the already-high regression fair value.
-    # fg_id == -1 is auction.py's "name didn't resolve to a real player"
-    # placeholder for unmatched drafts -- not one player, so those rows
-    # can't have a real tenure count against each other; left at 0 (the
-    # conservative first-timer default) rather than counted together.
+    # Prior purchases of this player before this row's season (0 = first
+    # sale), so debuts aren't comped against proven veterans. fg_id == -1
+    # (unmatched draft placeholder) is not one player; left at 0.
     d = d.sort_values("season")
     real = d["fg_id"] != -1
     d["appearances_to_date"] = 0
@@ -130,21 +82,15 @@ def _distance(pool: pd.DataFrame, target: pd.Series) -> pd.Series:
     Each axis is scaled by the comp pool's own spread so no single category
     (e.g. SV, which is usually near zero for most players) dominates."""
     scale = pool[PROFILE_COLS].std().replace(0, 1.0)
-    # target is a row sliced from a mixed-dtype DataFrame (name/role are
-    # strings), so the Series itself comes back as dtype=object even though
-    # these particular values are floats -- cast explicitly or the object
-    # dtype propagates into the subtraction and np.sqrt chokes on it.
+    # target is an object-dtype row from a mixed frame; cast or np.sqrt chokes
     t = target[PROFILE_COLS].astype(float)
     diff = (pool[PROFILE_COLS] - t) / scale
     return np.sqrt((diff ** 2).sum(axis=1))
 
 
 def player_tenure(fg_id: int) -> int:
-    """How many times this player has already been bought in this league's
-    real auction history (any season in the sample) -- 0 means his next
-    sale would be his first. Used to tell find_comps() whether a target is
-    a first-timer, so his comps aren't drawn from proven veterans with a
-    coincidentally similar debut-season line."""
+    """Times this player has been bought in this league's auction history
+    (0 = his next sale would be his first); feeds find_comps()."""
     pool = comp_pool()
     return int((pool["fg_id"] == fg_id).sum())
 
@@ -152,20 +98,12 @@ def player_tenure(fg_id: int) -> int:
 def find_comps(target: pd.Series, role: str, pos_group: str,
                k: int = 15, target_is_first_timer: bool = False) -> pd.DataFrame:
     """K nearest comps by production-profile distance. Prefers same
-    position group; falls back to the full role if that group is too thin
-    to say anything (this league is small -- 677 purchases over 5 seasons
-    -- so a tight position+profile filter can leave single digits).
+    position group, falling back to the full role if fewer than `k` exist.
 
-    `target_is_first_timer`: the target has never been bought in this
-    league before (`player_tenure()` == 0) -- a rookie or a breakout debut.
-    When true, comps are preferred among OTHER first-timers first (same
-    fallback pattern as position: use it if there are at least `k`, drop it
-    if not). A first-time sale happened in a market that hadn't yet decided
-    the player would repeat his line, which is a different market than the
-    one that priced an established arm/bat with an identical stat line --
-    without this, a rookie closer's debut season gets comped against
-    proven $30+ closers and overshoots even the regression fair value
-    (Cade Smith, Tarik Skubal)."""
+    `target_is_first_timer` (`player_tenure()` == 0): prefer other
+    first-timers, same fallback rule -- a debut sale is a different market
+    than an established player's identical line, and without this a rookie
+    closer got comped against proven $30+ closers."""
     pool = comp_pool()
     pool = pool[pool["role"] == role].copy()
 
@@ -193,15 +131,9 @@ def estimate_auction_price(name: str, players: pd.DataFrame,
     """Comp-adjusted next-auction price estimate for one player.
 
     `players` must have the columns in PROFILE_COLS plus roto_points,
-    redraft_value, role, and fg_id -- i.e. `out/player_values_2027.csv`,
-    or the keeper board.
-
-    `role` disambiguates a name that resolves to more than one row -- a
-    true two-way player (config.TWO_WAY_SPLIT_NAMES) has separate HIT and
-    PIT rows sharing one name from 2027 on (see
-    klab.board.project_all_players). Omitting it keeps the old
-    first-match behavior for every other name, which still only ever
-    resolves to one row.
+    redraft_value, role, and fg_id -- i.e. `klab.board.value_players()`'s
+    frame, or the keeper board. `role` disambiguates a two-way player
+    (config.TWO_WAY_SPLIT_NAMES) whose name resolves to HIT and PIT rows.
     """
     from .keeper import position_map
 
@@ -219,32 +151,10 @@ def estimate_auction_price(name: str, players: pd.DataFrame,
     first_timer = player_tenure(int(row["fg_id"])) == 0
     comps = find_comps(row, row["role"], pg, k=k, target_is_first_timer=first_timer)
 
-    # CORRECTED 2026-08-15 (out/FINDINGS.md, this session): comp_adjusted_*
-    # used to be `redraft_value * (1 + premium)` -- a PERCENTAGE adjustment
-    # applied on top of redraft_value itself. That silently inherits every
-    # problem redraft_value has: its budget-conserving dollar scale has no
-    # reference to real prices at all, and once a player's production sits
-    # above anything in the 5-year auction history, the linear exchange-rate
-    # fit it's built from just keeps extrapolating past the highest price
-    # anyone has ever actually paid. A percentage on top of an already-
-    # runaway number stays runaway -- checked directly: Tarik Skubal's old
-    # comp_adjusted_mid came back at $64, ABOVE his own already-too-high
-    # $51 fair value, despite this league never once paying a pitcher more
-    # than $34 (Woodruff, 2023) or anyone more than $45 (Turner, 2023) in
-    # 677 real purchases.
-    #
-    # Using the comps' own real `salary` directly instead is a genuine
-    # absolute anchor: it can only ever describe a price somewhere in the
-    # range of what similar production has actually sold for, because
-    # that's literally what it's built from. Checked directly against the
-    # players Josh's league-mate flagged: Torkelson $14.35 fair -> $9.0
-    # comp median (he called $6-8), Cade Smith $31.55 -> $9.0 (he called
-    # "max 15"), Freeman $13.65 -> $17.0 (he called "more than 13"),
-    # McGonigle $8.32 -> $13.0 (he called "way more than 8"). Skubal moves
-    # to $23-29, below the real $34 ceiling rather than 50% past it -- still
-    # short of the $40 his league-mate guessed, an honest consequence of a
-    # k-NN estimate never overshooting its own comps by construction, not a
-    # bug to chase further here.
+    # Use the comps' own real salaries as the anchor, never
+    # redraft_value * (1 + premium): a percentage on top of an extrapolated
+    # fair value stayed runaway ($64 for a pitcher in a league that never
+    # paid one more than $34) -- docs/FINDINGS.md, 2026-08-15.
     lo = comps["salary"].quantile(0.25)
     mid = comps["salary"].median()
     hi = comps["salary"].quantile(0.75)

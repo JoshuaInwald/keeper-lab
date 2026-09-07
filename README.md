@@ -1,183 +1,75 @@
-# Keeper League Lab
+# Keeper Lab
 
-[github.com/JoshuaInwald/keeper-lab](https://github.com/JoshuaInwald/keeper-lab)
+Player-valuation engine for a private 10-team 5x5 roto keeper auction league (CBS Sports). It prices every player in dollars from the league's own auction and standings history, ranks 2027 keeper decisions by multi-year contract surplus, evaluates trades on two lenses (this season's standings, future assets), and simulates each team's odds of finishing in the money. Public repo: [github.com/JoshuaInwald/keeper-lab](https://github.com/JoshuaInwald/keeper-lab).
 
-A player-valuation engine for a 10-team 5×5 rotisserie keeper auction, built
-on the league's **own** auction history rather than generic dollar values.
-
-It prices every player in dollars, ranks 2027 keeper decisions by multi-year
-surplus, and evaluates trades on two independent lenses — what they do to this
-season's standings, and what they do to future assets.
-
-> **Asked to evaluate a trade, a keeper decision, or "what should team X
-> do"? Read `out/WORKFLOWS.md` before doing anything else.** Every one of
-> those questions has an existing, tested function — using it instead of
-> hand-calculating an answer is the entire point of this project. That file
-> also has the "does my environment actually have the data" check to run
-> first; skipping it is the single most common way a fresh session breaks.
-
-Requires **Python 3.11+** (or any scipy ≥1.9 — older scipy returns
-`spearmanr()` as a plain tuple without `.statistic`, which breaks one test
-silently rather than loudly).
+## Quickstart
 
 ```bash
-pip install pandas numpy scipy statsmodels pytest
-PYTHONPATH=.:scripts python3 scripts/run_all.py   # build everything into out/
-PYTHONPATH=. python3 -m pytest tests/ -q          # 78 invariants, ~2.5 min
-open out/keeper_lab.html                          # the app — no server needed
+pip install pandas numpy scipy statsmodels pytest      # Python 3.11+ (scipy >= 1.9)
+PYTHONPATH=.:scripts python3 scripts/run_all.py         # rebuild every output into out/ (~3 s)
+PYTHONPATH=. python3 -m pytest tests/ -q                # 64 invariants, ~3-6 min
+open out/keeper_lab.html                                # the app: one file, no server
 ```
 
-Raw projection and league exports are not redistributed — see
-`data/README.md` for the exact files needed, where the master copies live,
-and how/how often each one needs refreshing.
+`data/` is not in the repo (FanGraphs terms, private league exports). `data/README.md` lists every file and its refresh cadence; the master copies live in `~/Documents/Fantasy Baseball/`.
 
-## The app
+## What it does that a generic auction calculator does not
 
-`out/keeper_lab.html` is one self-contained file, ~6 MB, no server and no
-network. Eight tabs — a homepage routing five common owner questions to the
-right screen with the right filters pre-applied; keeper board; league;
-"Contention" (Monte Carlo odds of actually finishing in the money — this
-league pays 50%/25%/15%/breakeven for 1st-4th, not a flat cutoff — with a
-toggle between the live 2026 race and 2027 keeper-core strength alone;
-`out/FINDINGS.md` #55); trade evaluator (now reporting Δ P(money), not
-just Δ points, for a proposed trade); standings (live + historical + a
-2027 keeper-core projection); free agents; and an "Intuition" tab for
-manually shading a player's talent/health and seeing the ripple effect —
-plus a player drawer with the full arithmetic, an inflation-adjusted
-toggle, a projection-basis selector, and a C/SS positional-adjustment
-toggle. It opens on a phone, which is where a keeper decision actually
-gets made.
-
-One thing is re-implemented in JavaScript: the rest-of-season standings
-calculation, so a trade can be re-scored client-side. Re-implementations drift,
-so the build writes `out/app_reference.json` — pandas' answer for one real
-trade — and `app/verify.mjs` loads the page in headless Chromium, diffs all 25
-quantities, walks every tab and fails on any console error.
-
-```bash
-cd app && npm i playwright && cd ..
-PYTHONPATH=.:scripts python3 scripts/build_app.py
-node app/verify.mjs
-#   PASS  JS matches pandas on all 25 quantities
-#   PASS  no console errors across six tabs, drawer, filters, re-sort
-```
-
-## What makes it different from an off-the-shelf auction calculator
-
-Commercial tools (FanGraphs, RotoWire, FantasyPros) convert projections into
-dollars by assuming a league budget divides across a fixed player pool. This
-one **regresses realised production on prices actually paid in this league** —
-677 purchases across five auctions. Busts, injuries and never-played picks
-stay in the sample at the price paid, so the exchange rate is what a dollar
-genuinely returned, not what it would return if everyone stayed healthy.
-
-That buys three things a generic calculator cannot give you:
-
-- **League-specific mispricing.** This league underpays for saves by +2.23
-  roto points per closer (t=3.75) — conditional on competing in the category.
-- **Drift.** A dollar bought 2.5× as much production in 2022 as in 2026, as
-  keepers absorbed the elite talent. A static calculator cannot see this.
-- **Contract-aware surplus.** Multi-year value against a real salary
-  structure, with the +$5/yr extension priced as an option — including the
-  choice between one year and two, which is worth $25 on a single player.
-
-## How it works
-
-1. **Denominators** — how many units of a category buy one standings point.
-   Team totals are normalised by their season's league mean and pooled, so
-   dispersion is estimated off 30 team-seasons instead of 10 (20 for
-   ERA/WHIP/SV, which are excluded for the in-progress season — see
-   `config.PARTIAL_EXCLUDE_CATS`).
-2. **Exchange rate** — regress realised roto points on price paid.
-   `roto_points = 3.98 + 0.109 × $`, i.e. **$9.17 per point**.
-3. **Projections** — 2026 actuals + ZiPS rest-of-season, blended with ZiPS
-   2027 at the rate × playing-time level, each stat weighted by its measured
-   year-over-year reliability. Saves get their own persistence model because
-   the ZiPS export has no SV column.
-4. **Dollars and surplus** — two scales (opportunity cost and redraft), both
-   floored at $0, summed across contract years with a discount.
-
-Full detail in `out/HANDOFF.md`. The statistical core is also written in R at
-`R/keeper_lab.R` if you'd rather read tidyverse than pandas.
-
-## Documentation
-
-| file | what's in it |
+| generic tool | this engine |
 |---|---|
-| `out/WORKFLOWS.md` | **start here if you've been asked to evaluate a trade or keeper decision** — tested recipes, not theory |
-| `out/HANDOFF.md` | how the system works, league rules, validation, limitations |
-| `out/LAB_NOTEBOOK.md` | what was tried and rejected, every bug found, and why |
-| `out/FINDINGS.md` | empirical results, with the sensitivity analysis |
-| `out/RESEARCH.md` | how this compares to published fantasy-analytics practice |
-| `out/CODEBASE_REVIEW.md` | performance work: 10.7s → 2.7s, and how it was found |
-| `out/METHODS.md` | **every intermediate quantity, step by step, with the judgment calls flagged** |
-| `out/ROADMAP.md` | what's left to build and what it costs |
-| `out/audit.txt` | data-integrity identities you can check with a calculator |
-| `out/ORIGINAL_HANDOFF.md` | the pre-build planning doc, kept for history — several calls in it were later superseded |
+| budget divided across a fixed pool of projected players | dollar scale regressed on 677 real purchases in this league (2022-2026), busts included |
+| one season | contract-aware: 3-year salaries, the +$5/yr extension priced as an option (1 or 2 years) |
+| linear roto points | Monte Carlo P(1st..4th) under the league's 50/25/15/breakeven payout |
+| static prices | measured drift: a dollar bought 2.5x the production in 2022 as in 2026; +33% projected 2027 inflation |
 
-## Validation
+## Validation (committed build)
 
 | check | result |
 |---|---|
-| current rosters → 2026 standings | Spearman **0.863**, Pearson 0.889; league leader predicted 1st |
+| rostered players to 2026 standings | Spearman 0.863, Pearson 0.889 |
 | replacement level, two independent routes | 4.81 roto pts (projection) vs 3.98 (auction intercept) |
-| budget identity | top 230 sum to **exactly $2,600** |
-| decision robustness | 92% of keep/cut calls hold under all six modelling variants |
+| budget identity | top 230 `redraft_value` sums to exactly $2,600 |
+| decision robustness | ~90% of keep/cut calls hold across six modelling variants |
+| error bar | +/-34% per category (bootstrap); wider than most modelling knobs |
 
-Honest error bar: **±34% per category** (bootstrap, 2,000 resamples of the
-pooled team-seasons; the analytic ±16% is optimistic). That is wider than most of the knobs the model debates, and it
-should be read alongside every dollar figure.
-
-## Scripts
-
-| script | does |
-|---|---|
-| `run_all.py` | rebuild every output |
-| `validate.py` | the four checks above |
-| `team_reports.py [team…]` | keeper recommendations + acquisition-channel breakdown |
-| `eval_trade.py "A" "B" "P1,P2" "P3,P4"` | evaluate a trade both ways |
-| `leaderboard_2026.py` | 2026 value earned + perfect-foresight prices |
-| `draft_surplus.py` | where auction surplus sits on the price chain |
-| `sensitivity.py` | how much each modelling choice actually matters |
-| `audit.py` | data-integrity identities — run this before trusting anything |
-| `zscores.py` | player value as z-scores, team totals, difference-makers |
-| `market_analysis.py` | market biases, team characteristics, keep-vs-cash |
-| `backtest.py` | does the engine explain seasons other than 2026 |
-| `build_app.py` | serialise the snapshot into `out/keeper_lab.html` |
-| `estimate_auction_price.py "Name"` | comp-based next-auction price range — a deliberately separate estimate from `redraft_value`, see `out/FINDINGS.md` #35 |
-| `build_trade_suggestions.py` | precompute trade suggestions for every team pair, three scenarios each — a couple minutes, deliberately not in `run_all.py`'s hot path; run it after any roster change |
-
-Cold run ≈ 2.7s; a second build in the same process ≈ 0.08s.
-
-## Using it from code
-
-```python
-from klab.api import snapshot
-s = snapshot()          # ~2s cold, instant warm
-s.board                 # 275 rostered players, valued
-s.free_agents           # unrostered players with live draft contracts
-s.teams                 # keeper sets, budget left, surplus
-s.constants             # every fitted number, incl. inflation
-s.keepers("Pookie 2.0") # recommended keeper set
-```
-
-`write_snapshot()` persists a dated copy so values can be tracked over time.
-Snapshots live in `out/snapshots/` as a local archive only — gitignored, not
-pushed to GitHub, since they're binary and meant to accumulate indefinitely.
+Known gap, first on the roadmap: `redraft_value` is a production scale, not a market price. It exceeds what this league has ever paid at the top ($45 max ever; $34 for a pitcher) and misses what bidders pay for youth, upside, name and last contract. See `docs/ROADMAP.md` item 1.
 
 ## Layout
 
 ```
-klab/config.py   every league rule and modelling knob, in one file
-klab/io.py       loaders, memoisation, name resolution
-klab/denoms.py   pooled dispersion → denominators; RotoScorer
-klab/auction.py  draft ↔ production matching, regression battery
-klab/project.py  2027 blend, reliability weights, save persistence
-klab/keeper.py   playing-time scaling, 2028 lines, multi-year surplus
-klab/board.py    dollar values, keeper costs, optimal keeper sets
-klab/trade.py    two-lens trade evaluation
-klab/freeagents.py  the waiver wire, priced with live draft contracts
-klab/api.py      single entry point for any interface + snapshot store
-app/template.html  the interface; the build inlines the data into it
-app/verify.mjs     diffs the browser's arithmetic against pandas
+klab/            the engine (config, io, denoms, auction, project, keeper, board, trade,
+                 freeagents, trade_finder, standings_sim, uncertainty, auction_estimator, api)
+scripts/         run_all, build_app, validate, audit, sensitivity, team_reports, eval_trade,
+                 estimate_auction_price, build_trade_suggestions, leaderboard_2026, lookup
+tests/           invariants (64 tests)
+app/             template.html + verify.mjs (headless Chromium diffs the JS re-implementation against pandas)
+out/             keeper_lab.html, model_params.json, keeper_board_2027.csv, auction_sample.csv,
+                 trade_suggestions.json, app_reference.json, audit.txt, sensitivity_*.csv
+docs/            METHODS, FINDINGS, ROADMAP, WORKFLOWS, SESSION-LOG, constitution.txt
+R/               tidyverse port of the statistical core (illustrative; reads out/player_values_2027.csv after run_all)
+```
+
+## Documentation
+
+| file | read it when |
+|---|---|
+| `docs/WORKFLOWS.md` | asked to evaluate a trade, a keeper, a price, a team: tested recipes, run first |
+| `docs/METHODS.md` | how every number is computed, judgment calls, limitations, module map |
+| `docs/FINDINGS.md` | the 55 empirical results, condensed, retractions preserved |
+| `docs/ROADMAP.md` | what is next, starting with the market-price recalibration |
+| `docs/SESSION-LOG.md` | what was built and broken, by date |
+| `HANDOFF.md` | current state, next session start here |
+| `CONSTRAINTS.md` | permanent decisions; violating one is a session failure |
+| `CLAUDE.md` | session playbook for Claude |
+
+## From code
+
+```python
+from klab.api import snapshot
+s = snapshot()            # ~3 s cold, instant warm
+s.board                   # rostered players, valued
+s.free_agents             # unrostered players priced at their live draft contract
+s.teams                   # keeper sets, budget left, surplus
+s.constants               # every fitted number, incl. inflation
+s.keepers("Pookie 2.0")   # recommended keeper set
 ```

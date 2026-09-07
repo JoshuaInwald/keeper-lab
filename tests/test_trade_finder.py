@@ -3,7 +3,6 @@ module's separation from the rest of the model.
 
     PYTHONPATH=. python3 -m pytest tests/test_trade_finder.py -q
 """
-import pandas as pd
 import pytest
 
 import klab.config as C
@@ -74,7 +73,7 @@ def test_shortlist_is_sorted(board_and_pts):
     calls -- it only showed up rerunning `scripts/build_trade_suggestions.py`
     end to end with unchanged data and diffing the output. Fixed by sorting
     the shortlist and adding a real secondary tie-break (sum of both deltas)
-    to the scenario pickers. See out/FINDINGS.md #41."""
+    to the scenario pickers. See docs/FINDINGS.md #41."""
     board, _, _ = board_and_pts
     sl = _shortlist(board, "Pookie 2.0")
     assert sl == sorted(sl)

@@ -88,15 +88,6 @@
       "ERA",
       "WHIP"
     ],
-    "COUNT_CATS": [
-      "R",
-      "HR",
-      "RBI",
-      "SB",
-      "W",
-      "SV",
-      "K"
-    ],
     "EXTENSION_COST": 5,
     "MIN_KEEPERS": 6,
     "MAX_KEEPERS": 13,
@@ -108,7 +99,6 @@
       "3": 3
     },
     "EXTENSION_MAX_YEARS": 2,
-    "EXTENSION_ALREADY_USED_IF_SALARY_ABOVE_DRAFT": true,
     "CONTRACT_OVERRIDES": {
       "Cam Smith": [
         "2",
@@ -142,7 +132,6 @@
     "DENOM_EXCLUDE_PARTIAL_SEASON": true,
     "SV_PUNT_THRESHOLD": 15,
     "SB_REGIME_START": 2023,
-    "SB_PRE_REGIME_WEIGHT": 0.0,
     "AUCTION_SEASONS": [
       2024,
       2025,
@@ -168,14 +157,6 @@
     },
     "WAIVER_HIGH_RP": 5.04,
     "POSITIONAL_ADJUSTMENT": false,
-    "POSITION_SLOTS": {
-      "C": 1,
-      "MI": 2,
-      "CI": 2,
-      "OF": 5,
-      "UTIL": 2,
-      "P": 9
-    },
     "TWO_POS_SLOTS": {
       "C": 1,
       "SS": 1
@@ -186,7 +167,6 @@
     "PROJ_2028_PITCHERS": "fg_zips_dc_2028_pitchers_projections.csv",
     "PROJECTION_BASIS": "blend",
     "BLEND_W_2026": 0.5,
-    "BLEND_W_ZIPS27": 0.5,
     "PT_BLEND_CAP_HITTER": 0.3,
     "PT_BLEND_CAP_PITCHER": 0.15,
     "PT_BLEND_CAP_PITCHER_EXCEEDED": 0.4,

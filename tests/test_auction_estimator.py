@@ -4,7 +4,6 @@ mirroring that separation.
 
     PYTHONPATH=. python3 -m pytest tests/test_auction_estimator.py -q
 """
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -14,17 +13,12 @@ from klab.auction_estimator import (comp_pool, estimate_auction_price,
 
 @pytest.fixture(scope="module")
 def players():
-    """`player_values_2027.csv` restricted to rostered (fg_id, role) pairs.
-
-    An inner merge on (fg_id, role), not a fg_id-keyed .map() -- a true
-    two-way player (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one
-    fg_id from 2027 on (see klab.board.project_all_players), and
-    `board.set_index("fg_id")` used to break outright here with a
-    duplicate-index error. `p` already carries its own name/role columns,
-    so this only needs to filter to rostered pairs, not re-attach them.
-    """
-    board = pd.read_csv("out/keeper_board_2027.csv")
-    p = pd.read_csv("out/player_values_2027.csv")
+    """`value_players()` restricted to rostered (fg_id, role) pairs -- an
+    inner merge on both keys, not a fg_id-keyed .map(): a two-way player
+    (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id."""
+    from klab.board import build_board, value_players
+    board, exch, _ = build_board()
+    p, _, _ = value_players(exch)
     rostered = board[["fg_id", "role"]].drop_duplicates()
     return p.merge(rostered, on=["fg_id", "role"], how="inner")
 

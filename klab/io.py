@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from difflib import SequenceMatcher
-from functools import lru_cache, wraps
+from functools import wraps
 
 import pandas as pd
 
@@ -17,25 +17,17 @@ from .config import DATA
 
 
 def cached(fn):
-    """Memoise a zero-argument loader, handing back a copy each time.
+    """Memoise a loader on its arguments, handing back a copy each time.
 
-    Every script rebuilds the board from scratch, and a single run was
-    re-parsing the same CSVs three or four times: `build_board` calls
-    `project_all_players` twice, `fit_exchange_rate` and `value_2028` each
-    re-derive the scorer, and every script calls two or three of those in
-    sequence. Copying on the way out keeps the cache immutable, so a caller
-    that mutates its result cannot corrupt the next one.
+    Copying on the way out keeps the cache immutable, so a caller that
+    mutates its result cannot corrupt the next one. Keys on args only, not
+    on module globals such as config.PROJECTION_BASIS (docs/FINDINGS.md #42).
     """
     cache = {}
 
     def _key(args, kwargs):
-        """Hashable key, or None if any argument can't be one.
-
-        Lists become tuples so `team_baselines([2024, 2025])` still caches.
-        A DataFrame argument (sigma_rel, an exchange-rate dict) is not
-        hashable and not worth hashing, so those calls bypass the cache
-        rather than risk a stale or wrong hit.
-        """
+        """Hashable key, or None if any argument can't be one (lists become
+        tuples; DataFrame/dict arguments bypass the cache)."""
         try:
             norm = tuple(tuple(a) if isinstance(a, list) else a for a in args)
             kv = tuple(sorted(
@@ -116,14 +108,9 @@ def load_pitchers_history() -> pd.DataFrame:
 @cached
 def mlb_team_map() -> pd.Series:
     """fg_id -> current (2026) real MLB team, for display only -- never used
-    in valuation. FanGraphs' multi-year leaderboard rows a mid-season trade
-    as one "- - -" combined row plus one row per team; the combined row is
-    dropped here and, for a player traded more than once in 2026, whichever
-    single-team row has the most games wins. Right for the common case
-    (untraded, or traded once with time to accumulate games on the new
-    team); an approximation for a very recent trade, same caveat
-    `data/README.md` already notes for the FA pool -- no transaction-date
-    file exists to resolve it exactly."""
+    in valuation. The FanGraphs "- - -" combined row for a traded player is
+    dropped; the single-team row with the most games wins (an approximation
+    for a very recent trade -- no transaction-date file exists)."""
     h = load_hitters_history()
     p = load_pitchers_history()
     both = pd.concat([h[h["season"] == 2026], p[p["season"] == 2026]], ignore_index=True)
@@ -154,15 +141,11 @@ def load_ros_pitchers():
 
 @cached
 def load_position_eligibility() -> dict:
-    """fg_id sets for the two positions Josh believes are actually scarce
-    enough to adjust for (out/FINDINGS.md #52) -- catcher and shortstop,
-    not the full defensive spectrum. Each file is a FanGraphs batting
-    leaderboard export pre-filtered by the query that generated it (e.g.
-    "at least 1 PA at C in 2026"); the export itself carries no position
-    column, so which file a player came from IS the position label. A
-    player appearing in both files (essentially never happens defensively,
-    but not impossible) is eligible for both -- `two_position_replacement()`
-    decides which one actually applies to him.
+    """fg_id sets for catcher and shortstop (docs/FINDINGS.md #52). Each file
+    is a FanGraphs leaderboard export pre-filtered by position; the export
+    carries no position column, so the file a player came from IS the label.
+    A player in both files is eligible for both -- `two_position_replacement()`
+    decides which applies.
     """
     c = _read_fg_projection(DATA / "fg_catchers_2026.csv")
     ss = _read_fg_projection(DATA / "fg_shortstops_2026.csv")
@@ -261,13 +244,8 @@ class NameResolver:
         self.pool = pool.copy()
         self.pool["nname"] = self.pool["name"].map(norm_name)
         self.pool["nkey"] = self.pool["name"].map(name_key)
-        # Lookup indices, built with one sort instead of a groupby per key.
-        # Filtering an 11k-row frame inside every lookup was the hottest line
-        # in the build (570 lookups x a full boolean scan); the obvious fix --
-        # a dict of per-key sub-frames -- turned out to be worse, because
-        # materialising ~14k tiny DataFrames costs more than it saves. Sorting
-        # once by weight and keeping the first row per key gives the same
-        # answer (highest-weight player wins ties) at a fraction of the cost.
+        # Dict indices built from one weight-sorted pass: first row per key
+        # = highest-weight player wins ties, without a frame scan per lookup.
         srt = self.pool.sort_values("weight", ascending=False)
         self._by_season = {s: g for s, g in self.pool.groupby("season")}
 
@@ -275,10 +253,7 @@ class NameResolver:
             first = df.drop_duplicates(keycols)
             return dict(zip(map(tuple, first[keycols].to_numpy()), first["fg_id"]))
 
-        # Two indices: one keyed on season alone and one that also keys on
-        # role. Callers who know a player is a pitcher pass role=, and without
-        # a role-aware index every one of those lookups fell through to a
-        # DataFrame scan -- which was most of the 285 lookups per build.
+        # Role-aware variants so a role= lookup never falls through to a scan.
         self._exact = index(srt, ["season", "nname"])
         self._keyed = index(srt, ["season", "nkey"])
         self._exact_r = index(srt, ["season", "role", "nname"])
@@ -291,8 +266,7 @@ class NameResolver:
     def resolve(self, name, season, role=None):
         n, k = norm_name(name), name_key(name)
 
-        # Dict lookups first, role-aware when a role is known. Only fall back
-        # to scanning the frame if both miss.
+        # Dict lookups first; scan the frame only if both miss.
         ex = self._exact_r.get((season, role, n)) if role else self._exact.get((season, n))
         if ex is not None:
             return int(ex), "exact", 1.0

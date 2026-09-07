@@ -129,7 +129,7 @@ const basisBad = basisResult.changedProj === 0 || basisResult.changedAct === 0
   || basisResult.selAfterBlend !== 'blend';
 if (basisBad) console.log('  BASIS SELECTOR MISMATCH:', JSON.stringify(basisResult));
 
-// Homepage 5-question router (out/ROADMAP.md 2.12): the app now opens on
+// Homepage 5-question router (docs/SESSION-LOG.md 2.12): the app now opens on
 // "Home," and each question button must be disabled without a team picked
 // (for the two team-specific ones) and land on the right tab with the
 // right state pre-applied once one is.
@@ -161,7 +161,7 @@ const homeBad = homeResult.startTab !== 'model' || !homeResult.keepDisabledNoTea
   || !homeResult.standingsLandedRight;
 if (homeBad) console.log('  HOMEPAGE QUESTION ROUTER MISMATCH:', JSON.stringify(homeResult));
 
-// Positional-adjustment toggle (out/FINDINGS.md #52): switching it must move
+// Positional-adjustment toggle (docs/FINDINGS.md #52): switching it must move
 // a catcher's dollar value, must round-trip back to identical numbers, the
 // checkbox must reflect the active setting, and -- the same cross-toggle
 // hazard the ROS-basis check guards against -- it must survive a
@@ -191,7 +191,7 @@ const positionalBad = !positionalResult.changed || positionalResult.checkedBefor
   || Math.abs(positionalResult.back - positionalResult.before) > 1e-6;
 if (positionalBad) console.log('  POSITIONAL-ADJUSTMENT TOGGLE MISMATCH:', JSON.stringify(positionalResult));
 
-// Monte Carlo top-2 simulator (out/ROADMAP.md Phase 5, klab/standings_sim.py):
+// Monte Carlo top-2 simulator (docs/SESSION-LOG.md Phase 5, klab/standings_sim.py):
 // the one feature in this app that genuinely can't be byte-diffed against
 // pandas -- two different RNGs never produce the same draw sequence, so this
 // checks STATISTICAL agreement (within Monte Carlo noise) instead of exact
@@ -250,7 +250,7 @@ const auctionBad = !auctionResult.hasPanel || auctionResult.nCompRows === 0
   || !auctionResult.noPanelForMissing || !auctionResult.basisAware;
 if (auctionBad) console.log('  AUCTION ESTIMATOR PANEL MISMATCH:', JSON.stringify(auctionResult));
 
-// ROS-basis toggle (out/FINDINGS.md #45/#46): switching it must move
+// ROS-basis toggle (docs/FINDINGS.md #45/#46): switching it must move
 // PROJ_PTS (proves recomputeProjections() ran), round-trip exactly, and --
 // the real bug this specifically guards against -- survive a PROJECTION_BASIS
 // switch afterward, since setBasis() replaces BOARD/FA wholesale with rows
@@ -277,7 +277,7 @@ const rosBasisBad = !rosBasisResult.perTeamChanged
   || !rosBasisResult.survivedBasisSwitch || rosBasisResult.selValue !== 'ros';
 if (rosBasisBad) console.log('  ROS-BASIS TOGGLE MISMATCH:', JSON.stringify(rosBasisResult));
 
-// Board tab "ROS value" column (out/FINDINGS.md #46): must sort correctly
+// Board tab "ROS value" column (docs/FINDINGS.md #46): must sort correctly
 // (not the raw unsorted BOARD array -- curRows() applies the filter+sort)
 // and must respond to the same rest-of-2026 toggle as Standings/Trade.
 const boardRosResult = await page.evaluate(() => {
@@ -294,7 +294,7 @@ const boardRosResult = await page.evaluate(() => {
 const boardRosBad = !boardRosResult.isDescending || !boardRosResult.changedOnToggle;
 if (boardRosBad) console.log('  BOARD ROS-VALUE COLUMN MISMATCH:', JSON.stringify(boardRosResult));
 
-// Historical standings (out/FINDINGS.md #48): season picker must render a
+// Historical standings (docs/FINDINGS.md #48): season picker must render a
 // real table for a past year and cleanly return to the live view.
 const historyResult = await page.evaluate(() => {
   go('standings');
@@ -314,7 +314,7 @@ const historyBad = !historyResult.skipped
   && (historyResult.rowsShown !== historyResult.expected || !historyResult.backToLive);
 if (historyBad) console.log('  HISTORICAL STANDINGS MISMATCH:', JSON.stringify(historyResult));
 
-// 2027 keeper-only standings (out/FINDINGS.md #49): must render all 10
+// 2027 keeper-only standings (docs/FINDINGS.md #49): must render all 10
 // teams and must vary with PROJECTION_BASIS, since the keeper set's 2027
 // production is basis-dependent -- unlike history (#48), which isn't.
 const keeper2027Result = await page.evaluate(() => {
@@ -332,7 +332,7 @@ const keeper2027Result = await page.evaluate(() => {
 const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
-// Contention tab's 2027 season toggle (out/ROADMAP.md Phase 5 Stage 3):
+// Contention tab's 2027 season toggle (docs/SESSION-LOG.md Phase 5 Stage 3):
 // must render all 10 teams and must vary with PROJECTION_BASIS, since
 // which players are flagged keep_2027 is basis-dependent -- unlike the
 // 2026 rest-of-season view, which isn't.
@@ -351,7 +351,7 @@ const contention2027Result = await page.evaluate(() => {
 const contention2027Bad = contention2027Result.rowsShown !== 10 || !contention2027Result.basisAware;
 if (contention2027Bad) console.log('  CONTENTION 2027 TOGGLE MISMATCH:', JSON.stringify(contention2027Result));
 
-// upside_ft's role/health split (out/FINDINGS.md #53): a reliever whose
+// upside_ft's role/health split (docs/FINDINGS.md #53): a reliever whose
 // full-time upside comes from being scaled to a closer's save total must be
 // tagged "role" in both the board cell and the drawer, and at least one
 // real player in each bucket must exist so the badge logic is actually
@@ -372,7 +372,7 @@ const upsideKindBad = !upsideKindResult.hasRoleCase || !upsideKindResult.hasHeal
   || !upsideKindResult.drawerTagged;
 if (upsideKindBad) console.log('  UPSIDE_FT ROLE/HEALTH SPLIT MISMATCH:', JSON.stringify(upsideKindResult));
 
-// Intuition tab (out/FINDINGS.md #50): shading a player must (a) stay
+// Intuition tab (docs/FINDINGS.md #50): shading a player must (a) stay
 // sandboxed -- never mutate BOARD or PROJ_PTS -- and (b) actually move
 // both the 2026 standings recompute and the 2027 linear-scaled dollar
 // figure once "recalculate" runs.

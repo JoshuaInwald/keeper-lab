@@ -29,14 +29,11 @@ DRAFT_YEAR_TO_CODE = {2026: "2", 2025: "1"}
 def free_agent_board(positional: bool = False) -> pd.DataFrame:
     """Every unrostered player, with the contract he would carry if re-added.
 
-    `positional` (out/FINDINGS.md #52) must match whatever the board it's
-    being shown alongside used -- a free agent's `redraft_value` comes from
-    the same per-player replacement level as a rostered player's, so a
-    catcher on the waiver wire needs the same catcher-specific replacement
-    level a rostered catcher gets, or the two would be on different scales.
+    `positional` (docs/FINDINGS.md #52) must match the board it's shown
+    alongside, or free agents and rostered players sit on different scales.
     """
     from .auction import match_drafts
-    from .board import build_board, fit_exchange_rate, value_players
+    from .board import build_board, value_players
 
     board, exch, meta = build_board(positional=positional)
     players, _, _ = value_players(exch, positional=positional)
@@ -44,8 +41,7 @@ def free_agent_board(positional: bool = False) -> pd.DataFrame:
 
     fa = players[~players["fg_id"].isin(rostered)].copy()
 
-    # most recent auction price for each player, which is the contract he
-    # would resume on re-acquisition
+    # most recent auction price = the contract he would resume on re-add
     d = match_drafts(verbose=False).dropna(subset=["fg_id"]).copy()
     d["fg_id"] = d["fg_id"].astype(int)
     last = (d.sort_values("season")
@@ -56,35 +52,21 @@ def free_agent_board(positional: bool = False) -> pd.DataFrame:
     fa["contract"] = fa["draft_year"].map(DRAFT_YEAR_TO_CODE)
     has_contract = fa["contract"].notna()
 
-    # No live contract -> the league's standard acquisition price. Post-break
-    # is the conservative assumption for a player added from here on.
+    # No live contract -> the post-break FA price (conservative from here on).
     fa["acquisition"] = np.where(has_contract, "draft contract", "free agent price")
     fa["salary"] = np.where(has_contract, fa["draft_salary"], C.FA_SALARY_POST_ASB)
-    # A player priced at the post-break FA price is, by that same assumption,
-    # being acquired in 2026 -- so his contract clock starts in 2026 too, same
-    # as DRAFT_YEAR_TO_CODE[2026]. CORRECTED 2026-08-13 (out/FINDINGS.md #32):
-    # this used to fillna("1"), one year short of what the salary assumption
-    # implies. Zero dollar impact found on the current board (every affected
-    # free agent is already well underwater on surplus_multiyear regardless
-    # of contract length), but the years_controlled/contract columns shown to
-    # the user were understating control length.
+    # A 2026 FA-price acquisition starts its contract clock in 2026, i.e.
+    # code "2"; fillna("1") understated control by a year (FINDINGS #32).
     fa["contract"] = fa["contract"].fillna(DRAFT_YEAR_TO_CODE[2026])
 
     fa["keeper_cost"] = [keeper_cost(s, c) for s, c in zip(fa["salary"], fa["contract"])]
     fa["years_controlled"] = fa["contract"].map(years_controlled)
 
-    # 2028 values must come from the full projection, not from the rostered
-    # board -- a free agent is by definition absent from it, so merging there
-    # silently zeroed every out-year value and understated multi-year surplus.
+    # 2028 values must come from the full projection, not the rostered board
+    # (a free agent is absent there; merging silently zeroed every out-year).
     from .board import value_2028
-    # .groupby(...).max(), not .set_index(...) -- a true two-way player
-    # (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id in
-    # `players` (see klab.board.project_all_players), and a duplicate-keyed
-    # Series breaks the .map() lookup inside project_saves(). max() recovers
-    # his real (pitcher-row) save total; every other fg_id is unique, so
-    # this is a no-op for everyone else. `fa` itself never contains him --
-    # he's rostered -- so the v28 merge below stays a safe fg_id-only merge,
-    # unlike the rostered-board merges in klab.board.build_board().
+    # groupby().max(), not set_index(): a two-way player has two rows per
+    # fg_id and a duplicate index breaks .map() inside project_saves().
     sv27 = players.groupby("fg_id")["SV"].max() if "SV" in players else None
     v28 = value_2028(exch, meta, sv27, positional=positional)[["fg_id", "redraft_value_2028"]]
     fa = fa.merge(v28, on="fg_id", how="left")

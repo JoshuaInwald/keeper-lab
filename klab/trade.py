@@ -14,7 +14,6 @@ A single verdict combines them using CONTENTION_WEIGHT.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 from . import config as C
@@ -63,38 +62,16 @@ def ros_lines() -> pd.DataFrame:
 def prorated_to_date_lines(season_games: int | None = None,
                            games_played_pctile: float | None = None) -> pd.DataFrame:
     """Rest-of-2026 counting lines implied by each player's season-to-date
-    rate PER TEAM GAME, extended over however many team games are left in
-    the season -- a genuinely different signal from `ros_lines()`'s ZiPS
-    system, meant for blending with it (see `ros_lines_for_basis`), not for
-    use alone.
+    rate PER TEAM GAME, extended over the team games left -- a different
+    signal from `ros_lines()`, meant for blending (see `ros_lines_for_basis`).
 
-    Rate is per TEAM game, not per the player's own `G`, on purpose --
-    real bug from the first version of this function, caught before it
-    shipped (out/LAB_NOTEBOOK.md #24): a starting pitcher's own `G` counts
-    his STARTS (roughly one every five team games), not team games played.
-    Dividing his to-date innings by his own 18 starts and multiplying by ~43
-    remaining TEAM games projected Tarik Skubal for 256 more innings --
-    treating every remaining team game as a start. Dividing by team games
-    played instead gives every player (hitter or pitcher, everyday or
-    part-time) a consistent "production per team game," which correctly
-    dilutes a starter's rate by the ~4 team games he doesn't pitch in, and
-    is the same idea a per-PA or per-appearance rate is trying to
-    approximate anyway -- just denominated in something that actually means
-    "how much season is left" for every role at once.
+    Rate is per TEAM game, never per the player's own `G`: a starter's G
+    counts starts, and dividing by it projected 256 more IP for one ace
+    (LAB_NOTEBOOK.md (git history, commit 8353172) #24). Team games played is one league-wide
+    estimate (GAMES_PLAYED_PCTILE of G among hitters with PA > 300).
 
-    "Team games played to date" is a single, shared, league-wide estimate,
-    not a per-team schedule lookup: the `C.GAMES_PLAYED_PCTILE` percentile
-    of games played among hitters with PA > 300 (a few players below that
-    are platoon/DH rotation, not proof their own team has played fewer
-    games). `C.SEASON_GAMES` minus that is games left.
-
-    Known limitation, stated directly rather than silently accepted: an
-    injured player's healthy-pace rate gets extended over the FULL
-    remaining schedule, because this method has no notion of an expected
-    return date. That's not a bug to patch here -- it's exactly the blind
-    spot `ros_lines()` (ZiPS, injury- and role-aware) covers, which is the
-    whole reason to blend the two rather than pick one. See
-    out/FINDINGS.md #45.
+    Known limitation: an injured player's pace is extended over the full
+    remaining schedule -- the blind spot ZiPS ROS covers (docs/FINDINGS.md #45).
     """
     from .io import load_hitters_history, load_pitchers_history
     season_games = season_games or C.SEASON_GAMES
@@ -130,18 +107,9 @@ ROS_BASES = ("ros", "prorated", "blend")
 
 
 def ros_lines_for_basis(basis: str = "ros") -> pd.DataFrame:
-    """Dispatcher for which rest-of-2026 signal feeds the win-now standings
-    engine and (via the caller) `ros_value_over_replacement`.
-
-    "ros" (default -- every existing caller keeps this behavior unless it
-    opts in): `ros_lines()`, the ZiPS rest-of-season system alone.
-    "prorated": `prorated_to_date_lines()`, current pace only.
-    "blend": the two averaged 50/50, at Josh's request -- a middle ground
-    between "trust the projection system" and "trust what's actually
-    happening right now." There is no "pre-season 2026" option: no file in
-    `data/` has a full-season 2026 projection made before the season started
-    (the ZiPS Depth Charts exports on hand are for 2027/2028 only) -- see
-    `data/README.md` and out/FINDINGS.md #45.
+    """Which rest-of-2026 signal feeds the win-now engine: "ros" (default,
+    ZiPS ROS alone), "prorated" (current pace), or "blend" (50/50). No
+    pre-season-2026 projection file exists (docs/FINDINGS.md #45).
     """
     if basis == "ros":
         return ros_lines()
@@ -161,26 +129,11 @@ def ros_lines_for_basis(basis: str = "ros") -> pd.DataFrame:
 def ros_value_over_replacement(players: pd.DataFrame, D: dict, base: dict,
                                replacement_rp: float) -> pd.DataFrame:
     """Rest-of-season roto value over a replacement player, for the SAME
-    remaining playing time -- not a full season, not a team-standings swap.
+    remaining playing time (per-player `remaining_frac` from his own ROS PT).
 
-    This answers a different question than `win_now_delta`: not "what does
-    this trade do to two specific teams' 2026 standings" but "how much
-    better is this player than a replacement-level guy, for however much of
-    the season he individually has left." Dynamic per player on purpose --
-    `remaining_frac` comes from each player's own ROS playing time (already
-    ZiPS-forecast-specific to his own team's remaining schedule and his own
-    role), not a single league-wide "season is X% over" constant.
-
-    Uses the SAME full-season denominators (`D`) and baseline (`base`) as the
-    2027 keeper board -- these are stable, already-validated "units per
-    standings point" conversion factors and don't need re-deriving for a
-    partial season. What DOES need to scale down is the marginal-team
-    dilution baseline (`base_AB`/`base_H`/etc.): comparing a 6-week rest-of-
-    season sample against a FULL season's team volume would dilute a rate
-    stat's marginal impact by roughly 4x too much. Scaling the baseline by
-    each player's own `remaining_frac` keeps the "1 player diluting a
-    13/14-man team" ratio consistent with how the full-season board computes
-    it, just at a smaller volume.
+    Uses the board's full-season denominators; only the team-dilution
+    baseline is scaled by remaining_frac, or a 6-week sample against a full
+    season's volume dilutes rate stats ~4x too much.
     """
     from .denoms import RotoScorer
 
@@ -235,21 +188,11 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
                    ros_basis: str = "ros") -> dict:
     """Evaluate a proposed trade from both sides.
 
-    `usd_per_point` has no default on purpose (out/FINDINGS.md #32.1): this
-    used to fall back to a hardcoded, silently-stale constant that every
-    real caller forgot to override. Pass `exch["usd_per_point"]` from
-    `klab.board.build_board()`, or `snapshot().constants["usd_per_roto_point_auction"]`
-    if you're working from a `Snapshot`. A wrong number here is wrong in a
-    way nothing else in this function would catch.
-
-    `ros_basis` controls which rest-of-2026 signal the win-now half uses --
-    see `ros_lines_for_basis`. Default "ros" (ZiPS alone) matches every
-    existing caller's established behavior; pass "blend" for the
-    50/50-with-current-pace read. `d_roto_points_2027` in each side's dict is
-    the *context-free* roto-point swing (this league's fixed denominators,
-    not either team's current category profile) -- the number to read when
-    the question is "how much is this player worth to an average team," as
-    opposed to `win_now`'s team-specific standings-point delta.
+    `usd_per_point` has no default on purpose (docs/FINDINGS.md #32.1): a
+    hardcoded fallback went stale and every caller forgot to override it.
+    Pass `exch["usd_per_point"]` from build_board(). `ros_basis` selects the
+    win-now signal (see `ros_lines_for_basis`); `d_roto_points_2027` is the
+    context-free swing, `win_now` the team-specific standings delta.
     """
     a_players = [find_player(board, x) for x in a_sends]
     b_players = [find_player(board, x) for x in b_sends]
@@ -304,11 +247,8 @@ def evaluate_trade(board: pd.DataFrame, team_a: str, team_b: str,
 
 
 def _season_baseline(cur: pd.DataFrame) -> pd.DataFrame:
-    """Implied season-to-date volume behind each team's current rate stats,
-    anchored on the league-wide 2026 pace. Shared by `win_now_delta()` and
-    `klab.standings_sim`'s Monte Carlo simulator, so both compute standings
-    totals with the exact same arithmetic rather than two hand-written
-    copies that can silently drift apart."""
+    """Implied season-to-date volume behind each team's current rate stats.
+    Shared by `win_now_delta()` and `klab.standings_sim` so the two never drift."""
     from .denoms import team_baselines
     b26 = team_baselines([2026]).iloc[0]
     add_base = pd.DataFrame(index=cur.index)
@@ -322,8 +262,7 @@ def _season_baseline(cur: pd.DataFrame) -> pd.DataFrame:
 
 def _team_volume(rosters_df: pd.DataFrame, ros: pd.DataFrame, cur_index) -> pd.DataFrame:
     """Sum each team's rest-of-season counting-stat volume from a roster map
-    (fg_id -> team) and a rest-of-season stat-line table. Shared the same
-    way `_season_baseline` is."""
+    (fg_id -> team) and a rest-of-season stat-line table."""
     m = rosters_df.merge(ros, on="fg_id", how="left").fillna(0.0)
     g = m.groupby("team")[["AB", "H", "HR", "R", "RBI", "SB",
                            "IP", "W", "SV", "K", "ER", "BB",
@@ -332,13 +271,9 @@ def _team_volume(rosters_df: pd.DataFrame, ros: pd.DataFrame, cur_index) -> pd.D
 
 
 def _totals_from(cur: pd.DataFrame, vol_df: pd.DataFrame) -> pd.DataFrame:
-    """Full-season-to-date category totals: current totals + rest-of-season
-    volume. Rate categories are rebuilt from implied volume, not averaged as
-    raw rates -- averaging ignores how much support each rate has, the same
-    mistake #45 fixed in a different layer. `vol_df` is `_team_volume()`'s
-    output concatenated with `_season_baseline()`'s -- both live in one
-    frame because every rate reconstruction needs both. Shared the same way
-    the two functions above are."""
+    """Current totals + rest-of-season volume. Rate categories are rebuilt
+    from implied volume, never averaged as raw rates (FINDINGS #45). `vol_df`
+    = `_team_volume()` concatenated with `_season_baseline()`."""
     w = pd.DataFrame(index=cur.index)
     add = vol_df
     w["R"] = cur["R"] + add["R"]
@@ -358,12 +293,8 @@ def _totals_from(cur: pd.DataFrame, vol_df: pd.DataFrame) -> pd.DataFrame:
 
 def win_now_delta(board: pd.DataFrame, team_a: str, team_b: str,
                   a_players, b_players, ros_basis: str = "ros") -> dict:
-    """Rest-of-2026 standings-point change for all ten teams after the swap.
-
-    `ros_basis` -- see `ros_lines_for_basis` -- selects which rest-of-season
-    signal drives this. Default "ros" preserves every existing caller's
-    established numbers.
-    """
+    """Rest-of-2026 standings-point change for all ten teams after the swap
+    (`ros_basis`: see `ros_lines_for_basis`)."""
     ros = ros_lines_for_basis(ros_basis)
     rosters = board[["team", "fg_id"]].copy()
 

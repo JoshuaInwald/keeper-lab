@@ -24,7 +24,7 @@ there).
 | `fg_ros_hitters.csv`, `fg_ros_pitchers.csv` | ZiPS rest-of-season 2026 projections |
 | `fg_zips_dc_2027_hitters_projections.csv`, `fg_zips_dc_2027_pitchers_projections.csv` | ZiPS Depth Charts full-year 2027 projections |
 | `fg_zips_dc_2028_hitters_projections.csv`, `fg_zips_dc_2028_pitchers_projections.csv` | ZiPS Depth Charts full-year 2028 projections (out-year, used for multi-year keeper surplus) |
-| `fg_catchers_2026.csv`, `fg_shortstops_2026.csv` | FanGraphs batting leaderboard, filtered to every player with ≥1 PA at C / at SS in 2026 — the eligibility set the positional-adjustment toggle checks membership against (`out/FINDINGS.md` #52). No Position column; eligibility is which file a player's row appears in, not a labeled field. |
+| `fg_catchers_2026.csv`, `fg_shortstops_2026.csv` | FanGraphs batting leaderboard, filtered to every player with ≥1 PA at C / at SS in 2026 — the eligibility set the positional-adjustment toggle checks membership against (`docs/FINDINGS.md` #52). No Position column; eligibility is which file a player's row appears in, not a labeled field. |
 
 ## League exports (CBS Sports, private league)
 
@@ -55,7 +55,7 @@ Documents, copy it into `data/` here before rebuilding
 else:** `contracts_parsed.csv`, `rosters_current.csv`, `rosters_valued.csv`,
 `cbs_rank_2026.csv`, `fg_catchers_2026.csv`, `fg_shortstops_2026.csv`. The
 first four were produced directly here (`contracts_parsed.csv`
-via LLM-assisted parsing of a CBS contracts dump — see `out/LAB_NOTEBOOK.md`
+via LLM-assisted parsing of a CBS contracts dump — see `docs/METHODS.md` section 1
 §2 for the parsing rules that were reverse-engineered) and never copied back
 to Documents. The raw contracts dump they were parsed from (`contracts_raw.txt`
 in the old handoff docs) no longer exists on disk anywhere. The last two
@@ -75,7 +75,7 @@ wiped.
 | `draft_20XX.csv`, `draft_salaries_all.csv` | CBS auction results | once a year, right after the auction | manual export from CBS |
 | `keepers_20XX.csv` | CBS keeper submissions | once a year, at the keeper deadline | manual export |
 | `standings_20XX.csv`, `standings_long_all.csv` | CBS standings page | in-season if you want live trade evaluation to be accurate; final once the season ends | manual export |
-| `contracts_parsed.csv` | CBS contracts dump | whenever a contract changes — trade, extension, FA signing | no standalone script; paste the raw dump to an LLM session and re-derive using the code-semantics in `out/LAB_NOTEBOOK.md` §2 |
+| `contracts_parsed.csv` | CBS contracts dump | whenever a contract changes — trade, extension, FA signing | no standalone script; paste the raw dump to an LLM session and re-derive using the code-semantics in `docs/METHODS.md` section 1 §2 |
 | `rosters_current.csv`, `rosters_valued.csv` | CBS rosters | whenever rosters move, ideally right before any fresh valuation run | manual export |
 | `cbs_rank_2026.csv` | CBS's own rankings | optional, informational only | manual export |
 | `franchise_map.csv` | hand-maintained | only when a franchise renames | manual edit |

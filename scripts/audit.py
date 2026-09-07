@@ -19,7 +19,7 @@ import pandas as pd
 
 import klab.config as C
 from klab.io import (load_contracts, load_drafts, load_hitters_history,
-                     load_pitchers_history, load_rosters, load_standings_long)
+                     load_rosters, load_standings_long)
 
 pd.set_option("display.width", 300)
 
@@ -40,8 +40,7 @@ def roster_accounting():
     print("\n1. ROSTER ACCOUNTING — keepers + auction picks should fill 230 slots")
     d = load_drafts()
     kc = {}
-    for f in sorted(glob.glob(str(C.DATA / "keepers_*.csv"))) + \
-             sorted(glob.glob("/mnt/user-data/uploads/Fantasy Baseball/keepers_*.csv")):
+    for f in sorted(glob.glob(str(C.DATA / "keepers_*.csv"))):
         y = int(f.split("_")[-1][:4])
         kc.setdefault(y, len(pd.read_csv(f)))
     rows = []
@@ -108,7 +107,7 @@ def stats_vs_standings():
     """Do the players in the stats files add up to the league's team totals?"""
     print("\n4. STATS vs STANDINGS — is the player pool big enough to produce the totals?")
     st = load_standings_long()
-    hit, pit = load_hitters_history(), load_pitchers_history()
+    hit = load_hitters_history()
     for y in sorted(st["season"].unique()):
         w = st[st["season"] == y].pivot(index="team", columns="category", values="total")
         lg_hr = w["HR"].sum()

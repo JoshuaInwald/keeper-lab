@@ -12,9 +12,9 @@ import pytest
 
 import klab.config as C
 from klab.auction import match_drafts
-from klab.board import build_board, fit_exchange_rate, keeper_status, value_players
+from klab.board import build_board, keeper_status, value_players
 from klab.denoms import teams_per_category
-from klab.keeper import keeper_cost, years_controlled
+from klab.keeper import keeper_cost, multiyear_surplus, years_controlled
 from klab.trade import evaluate_trade, ros_value_over_replacement, standings_points
 from klab.io import load_hitters_history, load_pitchers_history
 from klab.project import _blend_weight
@@ -27,26 +27,35 @@ def board():
     return b, exch, meta
 
 
+@pytest.fixture(scope="module")
+def fa():
+    from klab.freeagents import free_agent_board
+    return free_agent_board()
+
+
+@pytest.fixture(scope="module")
+def trade_pair(board):
+    """One player from each of the first two teams, for evaluate_trade tests."""
+    b, _, _ = board
+    teams = b["team"].unique()
+    a_name = b[b["team"] == teams[0]]["name"].iloc[0]
+    b_name = b[b["team"] == teams[1]]["name"].iloc[0]
+    return teams[0], teams[1], a_name, b_name
+
+
 # --- the bug external review found -----------------------------------------
 
 def test_budget_identity(board):
-    """The 230 rostered players must clear exactly the league's cap.
-
-    This failed silently for a whole build: values were calculated at
-    full-time playing time against a scale calibrated on expected playing
-    time, and the top 230 summed to $3,854 instead of $2,600.
-    """
+    """The 230 rostered players must clear exactly the league's cap. Values
+    at full-time PT against a scale calibrated on expected PT once summed to
+    $3,854 instead of $2,600."""
     _, _, meta = board
     assert meta["budget_check_top230"] == pytest.approx(C.N_TEAMS * C.BUDGET, rel=1e-6)
 
 
 def test_replacement_agrees_with_auction_intercept(board):
-    """Two unrelated routes to 'production you get for free' must agree.
-
-    Replacement level is the 230th-best projection. The auction regression
-    intercept is what $0 bought historically. Nothing forces them to match, so
-    a large gap means one of the two chains is broken.
-    """
+    """Replacement level (230th projection) and the auction intercept ($0
+    bought historically) estimate the same quantity from unrelated data."""
     _, exch, meta = board
     assert abs(meta["replacement_rp"] - exch["intercept"]) < 1.5
 
@@ -55,16 +64,26 @@ def test_replacement_agrees_with_auction_intercept(board):
 
 def test_standings_points_direction():
     """Biggest counting total earns the most points; lowest ERA/WHIP wins.
-
-    An inverted rank here made every category backwards and put the league
-    leader in last place. It was caught by a human noticing, not by the code.
-    """
+    An inverted rank once put the league leader in last place."""
     wide = pd.DataFrame(
         {c: [1.0, 2.0, 3.0] for c in C.CATS}, index=["a", "b", "c"])
     pts = standings_points(wide)
     assert pts.loc["c", "HR"] > pts.loc["a", "HR"]      # more HR = more points
     assert pts.loc["a", "ERA"] > pts.loc["c", "ERA"]    # lower ERA = more points
     assert pts.loc["a", "WHIP"] > pts.loc["c", "WHIP"]
+
+
+def test_category_sign_conventions_hold_every_season():
+    from klab.io import load_standings_long
+    from scipy.stats import spearmanr
+    st = load_standings_long()
+    for y in st["season"].unique():
+        w = st[st["season"] == y].pivot(index="team", columns="category", values="total")
+        pts = standings_points(w[C.CATS])
+        for cat in C.CATS:
+            rho = spearmanr(w[cat], pts[cat]).statistic
+            want = -1.0 if cat in C.NEG_CATS else 1.0
+            assert abs(rho - want) < 0.01, f"{y} {cat}: rho={rho}"
 
 
 def test_denominators_positive_and_sane(board):
@@ -77,10 +96,8 @@ def test_denominators_positive_and_sane(board):
 
 
 def test_saves_use_the_reduced_field_constant():
-    """After punters are dropped the SV field is 8 teams, not 10.
-
-    Using the 10-team range constant there overvalued every save by 19%.
-    """
+    """After punters are dropped the SV field is 8 teams, not 10; the 10-team
+    range constant overvalued every save by 19%."""
     n = teams_per_category()
     assert n["SV"] < C.N_TEAMS
     assert n["HR"] == C.N_TEAMS
@@ -93,10 +110,7 @@ def test_saves_use_the_reduced_field_constant():
 ])
 def test_contract_codes(code, years, cost):
     """The code is seasons remaining AFTER the current one; only F pays +$5.
-
-    The original handoff had this backwards, which understated every
-    multi-year contract by a season.
-    """
+    The original handoff had this backwards."""
     assert years_controlled(code) == years
     assert keeper_cost(20, code) == cost
 
@@ -106,45 +120,104 @@ def test_unknown_contract_is_charged_worst_case():
     assert keeper_status("?") == "unknown"
 
 
+def test_multiyear_surplus_never_penalises_length():
+    """A contract is an option: an extra year of control cannot make a player
+    worth less than the same player with one year."""
+    v27 = pd.Series([10.0, 10.0]); v28 = pd.Series([0.0, 0.0])
+    cost = pd.Series([11.0, 11.0]); yrs = pd.Series([1, 2])
+    out = multiyear_surplus(v27, v28, cost, yrs, pd.Series([11.0, 11.0]))
+    assert out["surplus_multiyear"].iloc[1] >= out["surplus_multiyear"].iloc[0] - 1e-9
+
+
+def test_final_year_player_can_buy_two_extension_years():
+    """multiyear_surplus()'s raw math in isolation: IF an F player's extension
+    were live, a 2028 line clearing the extra $5 is valued at two years, not
+    one. Never applied on the real board since docs/FINDINGS.md #39 -- see
+    test_f_contract_players_are_never_keepable."""
+    # Cheap star: $16 salary, worth $72 in 2027 and $62 in 2028.
+    v27, v28 = pd.Series([72.0]), pd.Series([62.0])
+    sal = pd.Series([16.0])
+    cost = sal + C.EXTENSION_COST          # keeper_cost for an `F` contract
+    out = multiyear_surplus(v27, v28, cost, pd.Series([1]), sal)
+    one_year = float(v27.iloc[0] - cost.iloc[0])
+    two_year = float((v27.iloc[0] - (sal.iloc[0] + 10))
+                     + (v28.iloc[0] - (sal.iloc[0] + 10)) * C.FUTURE_YEAR_DISCOUNT)
+    assert out["extension_years"].iloc[0] == 2
+    assert out["surplus_multiyear"].iloc[0] == pytest.approx(two_year)
+    assert out["surplus_multiyear"].iloc[0] > one_year
+
+    # ...and a player whose 2028 line does NOT clear it stays at one year.
+    out2 = multiyear_surplus(v27, pd.Series([18.0]), cost, pd.Series([1]), sal)
+    assert out2["extension_years"].iloc[0] == 1
+    assert out2["extension_option"].iloc[0] == pytest.approx(0.0)
+    assert out2["surplus_multiyear"].iloc[0] == pytest.approx(one_year)
+
+
+def test_extension_option_eligibility_and_worthless_option():
+    """Only code 1 (about to enter his final year) is extension-eligible --
+    codes 2/3 carried a phantom option before docs/FINDINGS.md #33 -- and a
+    live option not worth exercising reports 0 years, never "pay $5 for nothing"."""
+    sal = pd.Series([10.0, 10.0, 10.0])
+    v27 = pd.Series([30.0, 30.0, 30.0])
+    v28 = pd.Series([40.0, 40.0, 40.0])          # clearly clears any extension cost
+    out = multiyear_surplus(v27, v28, sal, pd.Series([1, 2, 3]), sal)
+    assert out["extension_option"].iloc[0] > 0, "code 1 should be extension-eligible"
+    assert out["extension_option"].iloc[1] == pytest.approx(0.0), "code 2 is not eligible yet"
+    assert out["extension_option"].iloc[2] == pytest.approx(0.0), "code 3 is not eligible yet"
+    assert out["extension_years"].iloc[1] == 0
+    assert out["extension_years"].iloc[2] == 0
+
+    sal = pd.Series([30.0])
+    out = multiyear_surplus(pd.Series([20.0]), pd.Series([5.0]), sal, pd.Series([2]), sal)
+    assert out["extension_years"].iloc[0] == 0
+    assert out["extension_option"].iloc[0] == pytest.approx(0.0)
+
+
+def test_f_contract_players_are_never_keepable(board):
+    """docs/FINDINGS.md #39: an F observed in contracts_parsed.csv already
+    missed the extension window, so keepable is False and every forward
+    figure is 0 for EVERY F player; and his status label must not claim an
+    extension exists (it said "extension +$5" until FINDINGS #44)."""
+    b, _, _ = board
+    f_players = b[b["contract"].astype(str).str.upper() == "F"]
+    assert len(f_players) > 0, "test needs at least one F-contract player to exist"
+    assert not f_players["keepable"].any()
+    assert not f_players["keep_2027"].any()
+    assert (f_players["extension_option"] == 0).all()
+    assert (f_players["surplus_multiyear"] == 0).all()
+    assert not f_players["keeper_status"].str.contains(r"\$", regex=True).any()
+    assert f_players["keeper_status"].eq("free agent after 2026 (not extendable)").all()
+
+
 # --- data integrity ---------------------------------------------------------
 
-def test_board_has_no_duplicate_players(board):
-    """A careless join could put a normal player on the board twice.
-
-    The one INTENDED exception: a true two-way player
-    (config.TWO_WAY_SPLIT_NAMES, e.g. Ohtani) legitimately has two rows
-    sharing one fg_id from 2027 on -- hitter and pitcher, priced as
-    separate auction assets (klab.board.project_all_players). Duplicated
-    (fg_id, role) pairs, or a duplicated fg_id for anyone NOT in that set,
-    are still the real bug this test exists to catch."""
+def test_board_two_way_handling(board):
+    """No duplicated (fg_id, role); the only duplicated fg_id is a true
+    two-way player (config.TWO_WAY_SPLIT_NAMES); and the zero-PA pitcher rows
+    in the FanGraphs hitter export must not tag every starter as TWO."""
     b, _, _ = board
     assert b.duplicated(["fg_id", "role"]).sum() == 0
     dup_fg_id = b[b["fg_id"].duplicated(keep=False)]
     assert set(dup_fg_id["name"].unique()) <= C.TWO_WAY_SPLIT_NAMES
-
-
-def test_only_real_two_way_players_are_tagged_two(board):
-    """The FanGraphs hitter export carries a zero-PA row for every pitcher.
-    Left in, it tagged every starter as a two-way player."""
-    b, _, _ = board
     assert (b["role"] == "TWO").sum() <= 2
     assert (b["role"] == "PIT").sum() > 50
 
 
 def test_name_matching_coverage():
-    """671 of 677 auction purchases resolve. The 6 that don't are genuine
-    zero-production buys (Bauer suspended, Painter/Buehler on TJ)."""
+    """671 of 677 auction purchases resolve; the rest are genuine
+    zero-production buys."""
     d = match_drafts(verbose=False)
     assert d["fg_id"].notna().sum() >= 670
     assert len(d) == 677
 
 
-def test_values_never_negative(board):
-    """A player cannot be a negative asset -- a bad arm gets benched and the
-    roster spot reverts to a waiver pickup."""
+def test_values_never_negative_and_full_time_never_below_expected(board):
+    """A player cannot be a negative asset, and scaling playing time up
+    cannot make him worth less."""
     b, _, _ = board
     assert (b["redraft_value"] >= 0).all()
     assert (b["keep_value"] >= 0).all()
+    assert (b["redraft_value_ft"] >= b["redraft_value"] - 1e-6).all()
 
 
 def test_keeper_sets_respect_league_limits(board):
@@ -154,24 +227,13 @@ def test_keeper_sets_respect_league_limits(board):
     assert (counts <= C.MAX_KEEPERS).all()
 
 
-def test_full_time_value_never_below_expected(board):
-    """Scaling playing time up cannot make a player worth less."""
-    b, _, _ = board
-    assert (b["redraft_value_ft"] >= b["redraft_value"] - 1e-6).all()
-
-
 # --- golden file: ten players across the value spectrum ---------------------
 #
-# Not exact equality -- the model is meant to change. These are loose bounds
-# that encode domain knowledge, so a refactor that silently breaks the
-# valuation fails here rather than in a trade discussion.
+# Loose bounds that encode domain knowledge, not exact equality -- the model
+# is meant to change.
 
 GOLDEN = [
-    # Ohtani prices as two separate 2027 auction assets from
-    # config.TWO_WAY_SPLIT_NAMES on -- one golden entry per role, not the
-    # old single combined-$78 figure. Bounds are loose, same philosophy as
-    # every other row here, not pinned to today's exact $49.98 / $0.00.
-    ("Shohei Ohtani", "HIT", 30, 70),    # hitter side alone
+    ("Shohei Ohtani", "HIT", 30, 70),    # priced as two 2027 assets (TWO_WAY_SPLIT_NAMES)
     ("Shohei Ohtani", "PIT",  0, 30),    # pitcher side: cautious 2027 IP ramp
     ("Tarik Skubal",  None, 35,  70),   # elite starter
     ("Paul Skenes",   None, 25,  60),
@@ -198,35 +260,21 @@ def test_golden_player_values(board, name, role, lo, hi):
 
 # --- free agents and the public API ----------------------------------------
 
-def test_free_agents_carry_their_draft_contract():
-    """A dropped player keeps his draft-year contract if re-added, so 2026
-    buys have two years of control and 2025 buys have one."""
-    from klab.freeagents import free_agent_board
-    fa = free_agent_board()
+def test_free_agent_board_invariants(board, fa):
+    """A dropped player keeps his draft-year contract if re-added (2026 buys
+    two years, 2025 one, older reverts to the FA price); no free agent is on a
+    roster; and out-year values come from the full projection (merging off
+    the rostered board silently zeroed every free agent's 2028)."""
+    b, _, _ = board
     live = fa[fa["acquisition"] == "draft contract"]
     assert len(live) > 20
     for yr, yrs in [(2026, 2), (2025, 1)]:
         sub = live[live["draft_year"] == yr]
         if len(sub):
             assert (sub["years_controlled"] == yrs).all()
-    # anything older has expired and reverts to the standard price
     stale = fa[fa["acquisition"] == "free agent price"]
     assert (stale["salary"] == C.FA_SALARY_POST_ASB).all()
-
-
-def test_free_agents_are_not_on_rosters(board):
-    from klab.freeagents import free_agent_board
-    b, _, _ = board
-    fa = free_agent_board()
     assert len(set(fa["fg_id"]) & set(b["fg_id"])) == 0
-
-
-def test_free_agents_have_out_year_values():
-    """Merging 2028 values off the rostered board silently zeroed every free
-    agent's out year and understated multi-year surplus."""
-    from klab.freeagents import free_agent_board
-    fa = free_agent_board()
-    live = fa[fa["acquisition"] == "draft contract"]
     assert (live["redraft_value_2028"] > 0).sum() > 5
 
 
@@ -239,107 +287,18 @@ def test_snapshot_is_self_consistent():
     assert len(s.standings) == C.N_TEAMS
 
 
-def test_multiyear_surplus_never_penalises_length():
-    """A contract is an option: an extra year of control cannot make a player
-    worth less than the same player with one year."""
-    from klab.keeper import multiyear_surplus
-    v27 = pd.Series([10.0, 10.0]); v28 = pd.Series([0.0, 0.0])
-    cost = pd.Series([11.0, 11.0]); yrs = pd.Series([1, 2])
-    out = multiyear_surplus(v27, v28, cost, yrs, pd.Series([11.0, 11.0]))
-    assert out["surplus_multiyear"].iloc[1] >= out["surplus_multiyear"].iloc[0] - 1e-9
-
-
-def test_category_sign_conventions_hold_every_season():
-    """Across all five seasons, a bigger counting total must earn more
-    standings points and a lower ERA/WHIP must too."""
-    from klab.io import load_standings_long
-    from scipy.stats import spearmanr
-    st = load_standings_long()
-    for y in st["season"].unique():
-        w = st[st["season"] == y].pivot(index="team", columns="category", values="total")
-        pts = standings_points(w[C.CATS])
-        for cat in C.CATS:
-            rho = spearmanr(w[cat], pts[cat]).statistic
-            want = -1.0 if cat in C.NEG_CATS else 1.0
-            assert abs(rho - want) < 0.01, f"{y} {cat}: rho={rho}"
-
-
-def test_final_year_player_can_buy_two_extension_years():
-    """Tests multiyear_surplus()'s raw math in isolation: IF an F player's
-    extension were live, a 2028 line clearing the extra $5 must be valued at
-    two years, not one. As of out/FINDINGS.md #39 this computation is never
-    actually applied on the real board -- klab.board.build_board marks every
-    F player unkeepable unconditionally, because the real extension window
-    closes before that player's own walk-year draft, not now. Kept as a math
-    check on the function itself; see
-    test_f_contract_players_are_never_keepable for the board-level behavior
-    that actually ships."""
-    from klab.keeper import multiyear_surplus
-    # Cheap star: $16 salary, worth $72 in 2027 and $62 in 2028.
-    v27, v28 = pd.Series([72.0]), pd.Series([62.0])
-    sal = pd.Series([16.0])
-    cost = sal + C.EXTENSION_COST          # keeper_cost for an `F` contract
-    out = multiyear_surplus(v27, v28, cost, pd.Series([1]), sal)
-    one_year = float(v27.iloc[0] - cost.iloc[0])
-    two_year = float((v27.iloc[0] - (sal.iloc[0] + 10))
-                     + (v28.iloc[0] - (sal.iloc[0] + 10)) * C.FUTURE_YEAR_DISCOUNT)
-    assert out["extension_years"].iloc[0] == 2
-    assert out["surplus_multiyear"].iloc[0] == pytest.approx(two_year)
-    assert out["surplus_multiyear"].iloc[0] > one_year
-
-    # ...and a player whose 2028 line does NOT clear it stays at one year.
-    out2 = multiyear_surplus(v27, pd.Series([18.0]), cost, pd.Series([1]), sal)
-    assert out2["extension_years"].iloc[0] == 1
-    assert out2["extension_option"].iloc[0] == pytest.approx(0.0)
-    assert out2["surplus_multiyear"].iloc[0] == pytest.approx(one_year)
-
-
-def test_extension_years_is_zero_where_the_option_is_worthless():
-    """A live contract whose extension is not worth exercising reports 0 years,
-    so the board never advises paying $5 for nothing."""
-    from klab.keeper import multiyear_surplus
-    sal = pd.Series([30.0])
-    out = multiyear_surplus(pd.Series([20.0]), pd.Series([5.0]), sal,
-                            pd.Series([2]), sal)
-    assert out["extension_years"].iloc[0] == 0
-    assert out["extension_option"].iloc[0] == pytest.approx(0.0)
-
-
-def test_extension_only_eligible_with_one_year_of_control_left():
-    """The constitution's only extension clause is for a player 'about to
-    enter the final year of his contract eligibility' -- code 1, one year of
-    control left. Codes 2 and 3 still have guaranteed seasons before that's
-    live, and must report zero extension option regardless of how good the
-    2028 line is (out/FINDINGS.md #33 -- 9 players carried a phantom
-    extension option here before this was fixed)."""
-    from klab.keeper import multiyear_surplus
-    sal = pd.Series([10.0, 10.0, 10.0])
-    v27 = pd.Series([30.0, 30.0, 30.0])
-    v28 = pd.Series([40.0, 40.0, 40.0])          # clearly clears any extension cost
-    years = pd.Series([1, 2, 3])
-    out = multiyear_surplus(v27, v28, sal, years, sal)
-    assert out["extension_option"].iloc[0] > 0, "code 1 should be extension-eligible"
-    assert out["extension_option"].iloc[1] == pytest.approx(0.0), "code 2 is not eligible yet"
-    assert out["extension_option"].iloc[2] == pytest.approx(0.0), "code 3 is not eligible yet"
-    assert out["extension_years"].iloc[1] == 0
-    assert out["extension_years"].iloc[2] == 0
-
-
 def test_app_payload_has_no_column_collisions_and_no_nans():
-    """The exported payload is what the browser sees. A silent column collision
-    (ros PA vs projected PA) shipped a null into the player card once."""
+    """The exported payload is what the browser sees. A silent column
+    collision (ros PA vs projected PA) shipped a null into the player card."""
     import sys
     sys.path.insert(0, str(C.DATA.parent / "scripts"))
-    from build_app import build_payload, PLAYER_COLS
+    from build_app import build_payload
     p = build_payload()
     assert len(p["cols"]) == len(set(p["cols"])), "duplicate column in payload"
     ix = {c: i for i, c in enumerate(p["cols"])}
     for col in ["PA", "AB", "IP", "redraft_value", "keeper_cost", "surplus_multiyear"]:
         assert col in ix
-    # Two rows from 2027 on -- hitter and pitcher, priced as separate
-    # auction assets (config.TWO_WAY_SPLIT_NAMES). The PA>0 check belongs
-    # on his hitter row specifically; his pitcher row has PA==0 by
-    # construction, same as any other pitcher.
+    # A two-way player ships as HIT and PIT rows; the PA>0 check is on his hitter row.
     ohtani = [r for r in p["board"] if r[ix["name"]] == "Shohei Ohtani"]
     assert {r[ix["role"]] for r in ohtani} == {"HIT", "PIT"}
     hit_row = next(r for r in ohtani if r[ix["role"]] == "HIT")
@@ -352,13 +311,9 @@ def test_app_payload_has_no_column_collisions_and_no_nans():
 
 
 def test_reliability_weights_match_a_fresh_refit():
-    """klab.project.RELIABILITY is a hard-coded fit, not something recomputed
-    at runtime. It quietly drifted: BB and H were both set to WHIP's r=0.237
-    (WHIP is never looked up through rel_weight -- it's inert -- so this was
-    a copy-paste into the two keys that ARE live), rather than their own
-    correlations. Refitting directly gave BB=0.463, H=0.359. This test
-    reruns the same fit the dict is supposed to represent and would have
-    caught that a value in the dict came from the wrong stat."""
+    """klab.project.RELIABILITY is a hard-coded fit. BB and H once carried
+    WHIP's r=0.237 by copy-paste (docs/FINDINGS.md #28); this reruns the fit
+    the dict represents."""
     from klab.project import RELIABILITY
 
     def yoy_r(df, id_col, pt_col, pt_min, num_a, num_b, denom_a, denom_b, pairs):
@@ -393,157 +348,24 @@ def test_reliability_weights_match_a_fresh_refit():
             f"drifted from the fit it's supposed to represent")
 
 
-# --- evaluate_trade: had zero coverage until out/FINDINGS.md #32.1 --------
+# --- evaluate_trade: had zero coverage until docs/FINDINGS.md #32.1 --------
 
-def test_evaluate_trade_requires_usd_per_point(board):
-    """usd_per_point used to default to a hardcoded, silently-stale 7.6 that
-    every real caller forgot to override (out/FINDINGS.md #32.1). It's now a
-    required argument specifically so a caller who forgets it fails loudly,
-    at call time, instead of shipping a quietly-wrong verdict_score."""
-    b, exch, meta = board
-    teams = b["team"].unique()
-    a_name = b[b["team"] == teams[0]]["name"].iloc[0]
-    b_name = b[b["team"] == teams[1]]["name"].iloc[0]
+def test_evaluate_trade_usd_per_point_is_required_and_live(board, trade_pair):
+    """usd_per_point used to default to a silently-stale constant every
+    caller forgot to override (docs/FINDINGS.md #32.1): it must be required,
+    and verdict_score must actually move when it changes."""
+    b, _, _ = board
+    team_a, team_b, a_name, b_name = trade_pair
     with pytest.raises(TypeError):
-        evaluate_trade(b, teams[0], teams[1], [a_name], [b_name])
-
-
-def test_evaluate_trade_verdict_responds_to_usd_per_point(board):
-    """The win-now term is contention_weight * delta_points * usd_per_point.
-    If usd_per_point weren't actually wired through, verdict_score wouldn't
-    move when it changes -- which is exactly the bug #32.1 found (the JS side
-    was live-wired to the wrong constant, not a dead one, so this alone
-    wouldn't have caught that specific mistake, but it does guard against the
-    parameter being ignored entirely)."""
-    b, exch, meta = board
-    teams = b["team"].unique()
-    a_name = b[b["team"] == teams[0]]["name"].iloc[0]
-    b_name = b[b["team"] == teams[1]]["name"].iloc[0]
-    low = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name], usd_per_point=1.0)
-    high = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name], usd_per_point=100.0)
+        evaluate_trade(b, team_a, team_b, [a_name], [b_name])
+    low = evaluate_trade(b, team_a, team_b, [a_name], [b_name], usd_per_point=1.0)
+    high = evaluate_trade(b, team_a, team_b, [a_name], [b_name], usd_per_point=100.0)
     if abs(low["a"]["d_standings_points_2026"]) > 0.01:
         assert low["a"]["verdict_score"] != pytest.approx(high["a"]["verdict_score"])
 
 
-# --- ros_value_over_replacement: rest-of-season value, not a full year ----
-
-def test_ros_value_over_replacement_scales_with_remaining_playing_time():
-    """A player projected for twice the remaining PA of an otherwise-identical
-    player should be worth roughly twice the counting-stat roto points, and
-    the replacement baseline he's compared against should scale the same way
-    -- the whole point of this metric is that it's a fair per-player
-    comparison regardless of how much season each individually has left."""
-    from klab.board import build_2027_scorer
-    scorer, D, base, sigma = build_2027_scorer()
-
-    def make(pa_frac):
-        pa = C.KEEPER_PA_FLOOR * pa_frac
-        return pd.DataFrame([{
-            "fg_id": 1, "role": "HIT", "PA": pa, "AB": pa * 0.9,
-            "H": pa * 0.9 * 0.27, "HR": pa * 0.04, "R": pa * 0.13,
-            "RBI": pa * 0.13, "SB": pa * 0.02,
-            "IP": 0.0, "W": 0.0, "SV": 0.0, "K": 0.0, "ER": 0.0, "BB": 0.0,
-            "H_allowed": 0.0,
-        }])
-
-    half = ros_value_over_replacement(make(0.5), D, base, 4.78)
-    full = ros_value_over_replacement(make(1.0), D, base, 4.78)
-    assert half["remaining_frac"].iloc[0] == pytest.approx(0.5, abs=0.01)
-    assert full["remaining_frac"].iloc[0] == pytest.approx(1.0, abs=0.01)
-    # same per-PA rate, half the PA -> roughly half the value over replacement
-    ratio = half["ros_value_over_replacement"].iloc[0] / full["ros_value_over_replacement"].iloc[0]
-    assert 0.4 < ratio < 0.6
-
-
-def test_ros_value_over_replacement_ranks_better_rates_higher():
-    """Holding remaining playing time equal, a better rate line must score
-    higher -- the specific thing this metric exists to compare across
-    players with different amounts of season left is not supposed to also
-    scramble the ranking of players with the SAME amount left."""
-    from klab.board import build_2027_scorer
-    scorer, D, base, sigma = build_2027_scorer()
-    pa = C.KEEPER_PA_FLOOR * 0.3
-
-    good = pd.DataFrame([{
-        "fg_id": 1, "role": "HIT", "PA": pa, "AB": pa * 0.9,
-        "H": pa * 0.9 * 0.31, "HR": pa * 0.06, "R": pa * 0.16, "RBI": pa * 0.16,
-        "SB": pa * 0.03, "IP": 0.0, "W": 0.0, "SV": 0.0, "K": 0.0, "ER": 0.0,
-        "BB": 0.0, "H_allowed": 0.0,
-    }])
-    bad = good.copy()
-    bad[["H", "HR", "R", "RBI", "SB"]] *= 0.5
-
-    g = ros_value_over_replacement(good, D, base, 4.78)
-    b = ros_value_over_replacement(bad, D, base, 4.78)
-    assert g["ros_value_over_replacement"].iloc[0] > b["ros_value_over_replacement"].iloc[0]
-
-
-# --- ros_lines_for_basis: blended 2026 rest-of-season signal (FINDINGS #45) -
-
-def test_prorated_to_date_lines_matches_ros_lines_schema():
-    """Must be a drop-in alternative to ros_lines() -- same columns, since
-    win_now_delta() and ros_value_over_replacement() both consume whichever
-    one ros_lines_for_basis() hands back without knowing which it got."""
-    from klab.trade import prorated_to_date_lines, ros_lines
-    p = prorated_to_date_lines()
-    r = ros_lines()
-    assert set(p.columns) == set(r.columns)
-    assert (p.drop(columns="fg_id") >= 0).all().all(), "prorated counting stats must be non-negative"
-
-
-def test_prorated_to_date_lines_remaining_games_is_plausible():
-    """Mid-season, this should land somewhere between 'season just started'
-    and 'season is over' -- a wildly out-of-range value would mean the
-    games-played percentile estimate broke, not that the season did."""
-    from klab.trade import prorated_to_date_lines
-    p = prorated_to_date_lines()
-    assert 0.0 < p.attrs["remaining_games"] < C.SEASON_GAMES
-
-
-def test_prorated_to_date_lines_does_not_inflate_a_starters_innings():
-    """Real bug, caught before shipping (out/LAB_NOTEBOOK.md #24): dividing
-    a starting pitcher's to-date innings by his own G (which counts STARTS,
-    not team games) and multiplying by team games remaining projected Tarik
-    Skubal for 256 more innings. No individual pitcher's remaining-innings
-    projection should ever exceed a full season's IP -- the specific,
-    per-player sanity check the original bug would have failed and the
-    aggregate "non-negative" / "plausible total remaining games" checks did
-    not catch."""
-    from klab.io import load_pitchers_history
-    from klab.trade import prorated_to_date_lines
-    p26 = load_pitchers_history().query("season == 2026")
-    starters = p26[(p26["GS"] > 10) & (p26["IP"] > 50)]
-    assert len(starters) > 0, "test needs at least one qualifying starter"
-    prorated = prorated_to_date_lines().set_index("fg_id")
-    for fid in starters["fg_id"]:
-        if fid in prorated.index:
-            assert prorated.loc[fid, "IP"] < C.SEASON_GAMES, \
-                f"fg_id {fid} projected for an implausible {prorated.loc[fid, 'IP']:.0f} more innings"
-
-
-def test_ros_lines_for_basis_blend_is_the_average_of_its_two_inputs():
-    from klab.trade import ros_lines_for_basis, ros_lines, prorated_to_date_lines
-    blend = ros_lines_for_basis("blend").set_index("fg_id")
-    a = ros_lines().set_index("fg_id")
-    b = prorated_to_date_lines().set_index("fg_id")
-    # pick a player present in both source tables
-    common = a.index.intersection(b.index)
-    assert len(common) > 0, "test needs at least one player in both ROS sources"
-    fid = common[0]
-    for col in ["PA", "IP"]:
-        expected = (a.loc[fid, col] + b.loc[fid, col]) / 2.0
-        assert blend.loc[fid, col] == pytest.approx(expected, abs=1e-6)
-
-
-def test_ros_lines_for_basis_rejects_unknown_basis():
-    from klab.trade import ros_lines_for_basis
-    with pytest.raises(ValueError):
-        ros_lines_for_basis("preseason")
-
-
 def test_evaluate_trade_ros_basis_changes_win_now_numbers(board):
-    """Not just 'doesn't crash' -- the win-now standings delta must actually
-    respond to ros_basis, or the parameter is decorative."""
+    """The win-now standings delta must actually respond to ros_basis."""
     b, exch, meta = board
     teams = b["team"].unique()
     t = b[b["team"] == teams[0]]
@@ -554,127 +376,125 @@ def test_evaluate_trade_ros_basis_changes_win_now_numbers(board):
                         usd_per_point=100.0, ros_basis="ros")
     r2 = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name],
                         usd_per_point=100.0, ros_basis="blend")
-    # the two ROS signals are different data, so at least one side's win-now
-    # points should differ between bases for a randomly-picked real trade
     assert (r1["a"]["d_standings_points_2026"] != pytest.approx(r2["a"]["d_standings_points_2026"])
            or r1["b"]["d_standings_points_2026"] != pytest.approx(r2["b"]["d_standings_points_2026"]))
 
 
-def test_f_contract_players_are_never_keepable(board):
-    """out/FINDINGS.md #39: the extension window closes before a player's OWN
-    walk-year draft, not now -- so any player observed as F in
-    contracts_parsed.csv already missed it and is confirmed for free agency,
-    regardless of whether he's ever used a prior extension or how good his
-    projection is. keepable must be False, extension_option/surplus_multiyear
-    must be exactly 0, and he must never be flagged keep_2027, for EVERY F
-    player on the board -- not just the ones already_extended() catches."""
-    b, _, _ = board
-    f_players = b[b["contract"].astype(str).str.upper() == "F"]
-    assert len(f_players) > 0, "test needs at least one F-contract player to exist"
-    assert not f_players["keepable"].any()
-    assert not f_players["keep_2027"].any()
-    assert (f_players["extension_option"] == 0).all()
-    assert (f_players["surplus_multiyear"] == 0).all()
+# --- ros_value_over_replacement: rest-of-season value, not a full year ----
+
+def _hitter_line(pa, avg=0.27, hr=0.04, r=0.13, rbi=0.13, sb=0.02):
+    return pd.DataFrame([{
+        "fg_id": 1, "role": "HIT", "PA": pa, "AB": pa * 0.9,
+        "H": pa * 0.9 * avg, "HR": pa * hr, "R": pa * r, "RBI": pa * rbi, "SB": pa * sb,
+        "IP": 0.0, "W": 0.0, "SV": 0.0, "K": 0.0, "ER": 0.0, "BB": 0.0, "H_allowed": 0.0,
+    }])
 
 
-def test_f_contract_status_label_does_not_claim_an_extension_exists(board):
-    """Real bug, caught in a 2026-08-13 UI audit, not by any prior test:
-    board.py's `keepable` logic was fixed for #39, but `keeper_status()`
-    (klab/board.py) still returned the literal string "extension +$5" for
-    every F-contract player -- exactly the pre-#39 claim the rest of the
-    board had already stopped believing. Anyone reading the app's player
-    card (which displays this string directly) would see a live extension
-    price next to a player the model had already zeroed out. See
-    out/FINDINGS.md #44."""
-    b, _, _ = board
-    f_players = b[b["contract"].astype(str).str.upper() == "F"]
-    assert len(f_players) > 0, "test needs at least one F-contract player to exist"
-    assert not f_players["keeper_status"].str.contains(r"\$", regex=True).any()
-    assert f_players["keeper_status"].eq("free agent after 2026 (not extendable)").all()
+def test_ros_value_over_replacement_scales_with_pt_and_ranks_rates():
+    """Half the remaining PA at the same rates is roughly half the value over
+    replacement (the baseline scales too); at equal PT a better rate line
+    scores higher."""
+    from klab.board import build_2027_scorer
+    _, D, base, _ = build_2027_scorer()
+
+    half = ros_value_over_replacement(_hitter_line(C.KEEPER_PA_FLOOR * 0.5), D, base, 4.78)
+    full = ros_value_over_replacement(_hitter_line(C.KEEPER_PA_FLOOR), D, base, 4.78)
+    assert half["remaining_frac"].iloc[0] == pytest.approx(0.5, abs=0.01)
+    assert full["remaining_frac"].iloc[0] == pytest.approx(1.0, abs=0.01)
+    ratio = half["ros_value_over_replacement"].iloc[0] / full["ros_value_over_replacement"].iloc[0]
+    assert 0.4 < ratio < 0.6
+
+    pa = C.KEEPER_PA_FLOOR * 0.3
+    good = _hitter_line(pa, avg=0.31, hr=0.06, r=0.16, rbi=0.16, sb=0.03)
+    bad = good.copy()
+    bad[["H", "HR", "R", "RBI", "SB"]] *= 0.5
+    g = ros_value_over_replacement(good, D, base, 4.78)
+    b = ros_value_over_replacement(bad, D, base, 4.78)
+    assert g["ros_value_over_replacement"].iloc[0] > b["ros_value_over_replacement"].iloc[0]
 
 
-# --- playing-time / rate decoupling (out/FINDINGS.md #51) -------------------
+# --- ros_lines_for_basis: blended 2026 rest-of-season signal (FINDINGS #45) -
 
-def test_playing_time_weight_capped_lower_than_rate_weight_for_pitchers():
-    """The whole point of the fix: for the same 2026 innings sample, the
-    PLAYING TIME weight must be capped well below the RATE weight for
-    pitchers specifically -- that gap is what stops a shortened,
-    injury-affected season from docking a healthy pitcher's projected 2027
-    innings the way it silently did for Hunter Brown before this fix."""
+def test_prorated_to_date_lines_invariants():
+    """Drop-in for ros_lines() (same columns, non-negative), a plausible
+    remaining-games estimate, and no starter projected past a full season's
+    IP -- dividing by his own G (starts, not team games) once projected 256
+    more innings for an ace (LAB_NOTEBOOK.md (git history, commit 8353172) #24)."""
+    from klab.trade import prorated_to_date_lines, ros_lines
+    p = prorated_to_date_lines()
+    r = ros_lines()
+    assert set(p.columns) == set(r.columns)
+    assert (p.drop(columns="fg_id") >= 0).all().all(), "prorated counting stats must be non-negative"
+    assert 0.0 < p.attrs["remaining_games"] < C.SEASON_GAMES
+
+    p26 = load_pitchers_history().query("season == 2026")
+    starters = p26[(p26["GS"] > 10) & (p26["IP"] > 50)]
+    assert len(starters) > 0, "test needs at least one qualifying starter"
+    prorated = p.set_index("fg_id")
+    for fid in starters["fg_id"]:
+        if fid in prorated.index:
+            assert prorated.loc[fid, "IP"] < C.SEASON_GAMES, \
+                f"fg_id {fid} projected for an implausible {prorated.loc[fid, 'IP']:.0f} more innings"
+
+
+def test_ros_lines_for_basis_blend_and_rejects_unknown():
+    from klab.trade import ros_lines_for_basis, ros_lines, prorated_to_date_lines
+    blend = ros_lines_for_basis("blend").set_index("fg_id")
+    a = ros_lines().set_index("fg_id")
+    b = prorated_to_date_lines().set_index("fg_id")
+    common = a.index.intersection(b.index)
+    assert len(common) > 0, "test needs at least one player in both ROS sources"
+    fid = common[0]
+    for col in ["PA", "IP"]:
+        expected = (a.loc[fid, col] + b.loc[fid, col]) / 2.0
+        assert blend.loc[fid, col] == pytest.approx(expected, abs=1e-6)
+    with pytest.raises(ValueError):
+        ros_lines_for_basis("preseason")
+
+
+# --- playing-time / rate decoupling (docs/FINDINGS.md #51, #53) ---------------
+
+def test_playing_time_caps_and_blend_weight():
+    """PT weight is capped below the rate weight (pitchers especially, so an
+    injury-shortened 2026 doesn't dock 2027 IP -- #51); pitcher cap < hitter
+    cap; the exceeded-workload cap sits between them and 1.0 (#53); and
+    _blend_weight accepts a per-player cap Series (elementwise clip)."""
     ip_a = pd.Series([200.0])   # a large sample, so both weights hit their cap
     rate_w = _blend_weight(ip_a, 70.0, cap=C.BLEND_W_2026)
     pt_w = _blend_weight(ip_a, 70.0, cap=C.PT_BLEND_CAP_PITCHER)
     assert pt_w.iloc[0] < rate_w.iloc[0]
     assert pt_w.iloc[0] == pytest.approx(C.PT_BLEND_CAP_PITCHER)
-
-
-def test_pitcher_playing_time_cap_is_lower_than_hitter_cap():
-    """Josh's explicit reasoning: a shortened pitcher-season skews
-    injury-driven (expected to be fine next year); a shortened hitter
-    season is more often role/platoon-driven, which IS informative about
-    2027. Pitchers should trust ZiPS's own playing-time opinion more."""
     assert C.PT_BLEND_CAP_PITCHER < C.PT_BLEND_CAP_HITTER
+    assert C.PT_BLEND_CAP_PITCHER < C.PT_BLEND_CAP_PITCHER_EXCEEDED < 1.0
+
+    cap = pd.Series([C.PT_BLEND_CAP_PITCHER, C.PT_BLEND_CAP_PITCHER_EXCEEDED])
+    w = _blend_weight(pd.Series([200.0, 200.0]), 70.0, cap=cap)
+    assert w.iloc[0] == pytest.approx(C.PT_BLEND_CAP_PITCHER)
+    assert w.iloc[1] == pytest.approx(C.PT_BLEND_CAP_PITCHER_EXCEEDED)
 
 
-def test_short_season_pitcher_projected_innings_lean_toward_zips(board):
-    """End-to-end version of the same check, on real data: a pitcher whose
-    2026 (actual + rest-of-season) innings project well short of a normal
-    workload should land, in the final 2027 blend, closer to ZiPS's own
-    healthy innings total than to the 50/50 midpoint the old shared-weight
-    blend would have produced. Doesn't hardcode Hunter Brown by name --
-    finds whichever qualifying short-season starter exists in the current
-    data, so this keeps working as rosters change."""
+def test_short_season_pitcher_projected_innings_lean_toward_zips():
+    """End-to-end on real data: a starter whose 2026 innings fell well short
+    of ZiPS's healthy total must land close to ZiPS's IP, not the 50/50
+    midpoint. Finds whichever qualifying starter exists rather than naming one."""
     from klab.project import project_pitchers
     from klab.io import load_zips27_pitchers
     p = project_pitchers()
     z = load_zips27_pitchers().groupby("fg_id", as_index=False)["IP"].sum()
     m = p.merge(z, on="fg_id", suffixes=("", "_zips"))
-    # a starter ZiPS expects to throw a full workload, but whose blended IP
-    # implies real 2026 shortfall was priced in at all (w_2026 < 1, i.e. some
-    # 2026 evidence exists) and who isn't a reliever
     candidates = m[(~m["reliever"]) & (m["IP_zips"] > 140) & (m["w_2026"] < 0.99)
                   & (m["w_2026"] > 0.01) & (m["IP"] < m["IP_zips"] * 0.9)]
     assert len(candidates) > 0, "test needs at least one short-season qualifying starter"
     r = candidates.iloc[0]
-    # the actual invariant: a lower PT cap must keep the blended IP close to
-    # ZiPS's own total, not dragged down toward a shortened 2026 sample
     assert abs(r["IP"] - r["IP_zips"]) < r["IP_zips"] * 0.35, \
         f"{r['name']}: blended IP {r['IP']:.1f} strayed too far from ZiPS's {r['IP_zips']:.1f}"
 
 
-# --- direction-aware pitcher playing-time trust (out/FINDINGS.md #53) ------
-
-def test_exceeded_pitcher_cap_is_higher_than_default_cap():
-    """Josh's approved fix: a pitcher whose real 2026 (actual + ROS) innings
-    already exceed ZiPS's own 2027 opinion for him has direct proof he can
-    carry that workload -- stronger evidence than a system's generic
-    caution about ramping a young arm's innings -- so he gets a higher cap
-    than the injury-shortfall default. Still below full trust: a team's
-    actual workload-management plan is real information too."""
-    assert C.PT_BLEND_CAP_PITCHER < C.PT_BLEND_CAP_PITCHER_EXCEEDED < 1.0
-
-
-def test_blend_weight_accepts_a_per_player_cap_series():
-    """_blend_weight()'s cap can now vary player-to-player (out/FINDINGS.md
-    #53) -- pandas' elementwise clip, not one scalar bound applied to
-    everyone alike, which is what lets project_pitchers() give only the
-    players who exceeded ZiPS's number the higher cap."""
-    ip_a = pd.Series([200.0, 200.0])   # same sample size for both
-    cap = pd.Series([C.PT_BLEND_CAP_PITCHER, C.PT_BLEND_CAP_PITCHER_EXCEEDED])
-    w = _blend_weight(ip_a, 70.0, cap=cap)
-    assert w.iloc[0] == pytest.approx(C.PT_BLEND_CAP_PITCHER)
-    assert w.iloc[1] == pytest.approx(C.PT_BLEND_CAP_PITCHER_EXCEEDED)
-
-
 def test_pitcher_who_exceeded_zips_leans_more_on_his_own_workload():
-    """End-to-end: for a pitcher whose real 2026 workload already exceeds
-    ZiPS's own 2027 IP opinion for him, the shipped blend must land closer
-    to his own total than the pre-#53 formula (a single PT_BLEND_CAP_PITCHER
-    for everyone) would have. Doesn't hardcode Cam Schlittler (187 actual vs.
-    128 ZiPS 2027 -- the case that motivated this) by name, so it keeps
-    working as rosters and projections change. Reimplements the same IP_a/
-    IP_b merge project_pitchers() does internally, since those columns
-    don't survive onto its returned frame."""
+    """End-to-end: a pitcher whose real 2026 IP exceeds ZiPS's 2027 IP must
+    ship with more IP than the single-cap pre-#53 formula would give.
+    Reimplements project_pitchers()'s IP_a/IP_b merge, which doesn't survive
+    onto its returned frame."""
     from klab.io import load_ros_pitchers, load_zips27_pitchers
     from klab.project import SHRINK_IP
 
@@ -712,132 +532,66 @@ def test_pitcher_who_exceeded_zips_leans_more_on_his_own_workload():
         f"pre-#53 formula's {ip_old_formula:.1f} once the higher cap applies")
 
 
-# --- C/SS positional adjustment (out/FINDINGS.md #52) -----------------------
+# --- C/SS positional adjustment (docs/FINDINGS.md #52) -----------------------
 
-def test_positional_adjustment_actually_changes_values():
-    """Real bug, caught testing this directly before it shipped: the first
-    version took min(pooled, position-specific) to break a tie for a player
-    eligible at multiple adjusted positions, but that same "min" also
-    silently compared against the pooled default -- and since both catcher
-    and shortstop replacement come out ABOVE the pooled level on this
-    league's real 2026 data, positional=True produced byte-identical
-    output to positional=False with no error. A change that does nothing
-    is worse than one that's visibly wrong: nothing would have caught this
-    in the UI either, since the toggle would have looked like it worked."""
-    from klab.board import value_players
+def test_positional_adjustment_changes_only_catcher_and_shortstop_bars():
+    """positional=True must actually change values -- min(pooled, pos)
+    silently no-op'd since C/SS sit above pooled -- and a non-C/SS player's
+    rp_above_repl must be identical on vs off (only the $/point rescale moves
+    his dollars). Merge on (fg_id, role): a two-way player has two rows."""
+    from klab.io import load_position_eligibility
     off, _, _ = value_players(None, positional=False)
     on, _, _ = value_players(None, positional=True)
-    m = off[["fg_id", "redraft_value"]].merge(
-        on[["fg_id", "redraft_value"]], on="fg_id", suffixes=("_off", "_on"))
+    m = off[["fg_id", "role", "redraft_value", "rp_above_repl"]].merge(
+        on[["fg_id", "role", "redraft_value", "rp_above_repl"]],
+        on=["fg_id", "role"], suffixes=("_off", "_on"))
     changed = (m["redraft_value_off"] != m["redraft_value_on"]).sum()
     assert changed > 50, f"only {changed} players changed -- adjustment is probably a no-op"
+    elig = load_position_eligibility()
+    unaffected = m[~m["fg_id"].isin(elig["C"] | elig["SS"])]
+    assert (unaffected["rp_above_repl_off"] == unaffected["rp_above_repl_on"]).all()
 
 
-def test_positional_adjustment_leaves_default_path_untouched():
-    """positional=False (every existing caller) must be byte-identical to
-    before this feature existed -- the shared value_players()/build_board()
-    functions were restructured to support the new parameter, and a
-    regression here would silently change every dollar figure in the app,
-    not just catcher/shortstop ones."""
-    from klab.board import build_board
-    b1, _, m1 = build_board()             # default, positional not passed
-    b2, _, m2 = build_board(positional=False)   # explicit False
+def test_positional_adjustment_budget_identity_both_settings():
+    """positional=False must equal the default path exactly with the $2,600
+    identity exact; positional=True keeps it within ~5% (a top-230 player
+    can sit below his own position's bar -- see value_players())."""
+    b1, _, m1 = build_board()
+    b2, _, m2 = build_board(positional=False)
     assert (b1["redraft_value"] == b2["redraft_value"]).all()
     assert m1["budget_check_top230"] == pytest.approx(2600.0, abs=0.01)
-
-
-def test_positional_adjustment_budget_check_stays_close(board):
-    """The $2,600 top-230 identity is exact under pooled replacement (every
-    top-230 player is above the pooled bar by construction) but only
-    approximate under positional adjustment (a player can rank in the
-    overall top 230 while sitting below his OWN position's higher bar,
-    breaking the clean linear calibration -- see the long comment in
-    value_players()). Approximate is fine for a documented sanity-check
-    number; miscalibrated by a lot would mean the recalibration math itself
-    is wrong."""
-    from klab.board import build_board
     _, _, meta = build_board(positional=True)
     assert meta["budget_check_top230"] == pytest.approx(2600.0, rel=0.05)
 
 
-def test_positional_adjustment_only_touches_catchers_and_shortstops():
-    """A player who isn't C/SS-eligible should see his `rp_above_repl`
-    change ONLY through the recalibrated $/point scale's effect on
-    redraft_value, never through a different replacement level being
-    subtracted -- his own rp_above_repl (roto_points minus replacement)
-    must be identical on vs off, even though his dollar value can move."""
-    from klab.board import value_players
-    from klab.io import load_position_eligibility
-    off, _, _ = value_players(None, positional=False)
-    on, _, _ = value_players(None, positional=True)
-    elig = load_position_eligibility()
-    adjusted_ids = elig["C"] | elig["SS"]
-    # Merge on (fg_id, role), not fg_id alone -- a true two-way player
-    # (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id in both
-    # `off` and `on`, and a plain fg_id merge cartesian-joins his 2x2 rows
-    # into 4, comparing e.g. his HIT row's off-value against his PIT row's
-    # on-value and reporting a bogus mismatch. Everyone else still has one
-    # role per fg_id, so this is a no-op widening for them.
-    m = off[["fg_id", "role", "rp_above_repl"]].merge(
-        on[["fg_id", "role", "rp_above_repl"]], on=["fg_id", "role"],
-        suffixes=("_off", "_on"))
-    unaffected = m[~m["fg_id"].isin(adjusted_ids)]
-    assert (unaffected["rp_above_repl_off"] == unaffected["rp_above_repl_on"]).all()
-
-
 def test_positional_adjustment_2028_actually_uses_the_position_specific_bar():
-    """The SAME min()-based no-op bug #52 found in value_players() was still
-    live in value_2028() -- caught by reverse-solving the replacement level
-    implied by a shortstop's 2028 dollar figure and finding it equal to the
-    pooled number, not his own position's. A shortstop's 2028 value must
-    actually move by the gap between the pooled and position-specific
-    replacement level, not only by the leaguewide $/point rescale every
-    player rides regardless of position."""
-    from klab.board import build_board, value_players, value_2028
+    """The same min()-based no-op bug was live in value_2028(): a shortstop's
+    2028 value must move by the pooled-vs-SS replacement gap, not only by the
+    leaguewide $/point rescale."""
+    from klab.board import value_2028
+    from klab.io import load_position_eligibility
     _, exch_on, meta_on = build_board(positional=True)
-
     players_on, _, _ = value_players(exch_on, positional=True)
-    # .groupby(...).max(), not .set_index(...) -- a true two-way player
-    # (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one fg_id, and a
-    # duplicate-keyed Series breaks the .map() lookup inside
-    # project_saves(). Same fix as klab.board.build_board() /
-    # klab.freeagents.free_agent_board().
+    # groupby().max(), not set_index(): a two-way player has two rows per fg_id.
     sv27 = players_on.groupby("fg_id")["SV"].max() if "SV" in players_on else None
-    # Same exch/meta (same $/point scale, same pooled replacement_rp) for
-    # both calls -- positional=False here just skips the override block, so
-    # this isolates the replacement-level effect from the scale-rescale
-    # effect every player rides regardless of position.
+    # Same exch/meta for both calls isolates the replacement-level effect.
     v28_pooled_repl = value_2028(exch_on, meta_on, sv27, positional=False)
     v28_position_repl = value_2028(exch_on, meta_on, sv27, positional=True)
 
-    from klab.io import load_position_eligibility
-    elig = load_position_eligibility()
-    ss_ids = elig["SS"]
+    ss_ids = load_position_eligibility()["SS"]
     m = v28_pooled_repl[["fg_id", "redraft_value_2028"]].merge(
         v28_position_repl[["fg_id", "redraft_value_2028"]],
         on="fg_id", suffixes=("_pooled", "_position"))
     ss_rows = m[m["fg_id"].isin(ss_ids) & (m["redraft_value_2028_pooled"] > 1.0)]
     assert len(ss_rows) > 0, "test needs at least one non-floored rostered-caliber shortstop"
-    # SS replacement (6.76) sits above pooled (~4.8), so applying it must
-    # strictly lower every affected shortstop's 2028 value, not leave it
-    # identical to the pooled-replacement run.
+    # SS replacement sits above pooled, so it must strictly lower every affected SS.
     assert (ss_rows["redraft_value_2028_position"]
            < ss_rows["redraft_value_2028_pooled"]).all()
 
 
-# --- Monte Carlo standings simulator (out/ROADMAP.md Phase 5) --------------
+# --- Monte Carlo standings simulator (docs/SESSION-LOG.md Phase 5) --------------
 
-def test_money_probabilities_are_internally_consistent(board):
-    """p_money must equal the sum of p_finish_1..p_finish_PAYOUT_SPOTS
-    exactly (it's computed that way, but this catches a future refactor
-    breaking the identity), every probability must be a valid [0,1] value,
-    and across all ten teams each p_finish_N column must sum to ~1.0 --
-    exactly one team finishes in each place in every draw, so summing "how
-    often was team X in place N" across every team must recover the total
-    draw count, within Monte Carlo noise."""
-    b, _, _ = board
-    out = simulate_finish_odds(b, B=500, seed=0)
-    assert len(out) == C.N_TEAMS
+def _check_finish_odds_identities(out):
     finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
     assert out["p_money"].to_numpy() == pytest.approx(out[finish_cols].sum(axis=1).to_numpy())
     assert ((out[finish_cols + ["p_money"]] >= 0).all().all())
@@ -846,52 +600,36 @@ def test_money_probabilities_are_internally_consistent(board):
         assert out[col].sum() == pytest.approx(1.0, abs=1e-9)
 
 
-def test_current_standings_leader_favored_over_last_place(board):
-    """A team that's already well ahead in the real, already-accumulated
-    2026 standings must come out with materially higher odds of finishing
-    in the money than the team that's well behind -- the simulator only
-    jitters what's LEFT to play, so a big enough real head start should
-    dominate simulated rest-of-season noise, not get washed out by it."""
+def test_finish_odds_identities_and_leader_favored(board):
+    """p_money == sum of per-place columns, every probability in [0,1], each
+    place column sums to 1 across teams; and the real standings leader must
+    beat the last-place team (a real head start dominates ROS noise)."""
     b, _, _ = board
     out = simulate_finish_odds(b, B=500, seed=0)
+    assert len(out) == C.N_TEAMS
+    _check_finish_odds_identities(out)
     leader = out.loc[out["current_points"].idxmax()]
     last = out.loc[out["current_points"].idxmin()]
     assert leader["p_money"] > last["p_money"]
 
 
-def test_same_seed_is_reproducible(board):
-    """A fixed seed must give byte-identical results run to run -- both so a
-    single build is reproducible, and because the JS port's verification
-    check needs a stable Python reference to compare against, not a moving
-    target."""
+def test_finish_odds_seed_and_zero_shock_are_deterministic(board):
+    """A fixed seed is byte-identical run to run (the JS port's reference
+    must be stable), and shock_scale=0 puts the same team in each place in
+    literally every draw."""
     b, _, _ = board
     a = simulate_finish_odds(b, B=300, seed=7)
     c = simulate_finish_odds(b, B=300, seed=7)
     assert a["p_money"].equals(c["p_money"])
-
-
-def test_zero_shock_scale_is_fully_deterministic(board):
-    """With shock_scale=0 every draw jitters nothing, so the same team must
-    finish in each payout place in literally every draw -- the most direct
-    confirmation that the jitter mechanism, not something else, is what's
-    producing variance in the normal (shock_scale>0) case."""
-    b, _, _ = board
     out = simulate_finish_odds(b, B=50, seed=0, shock_scale=0.0)
     assert (out["p_finish_1"].isin([0.0, 1.0])).all()
     assert out["p_finish_1"].sum() == pytest.approx(1.0)
 
 
 def test_swap_changes_the_odds_in_the_expected_direction(board):
-    """Moving a real, valuable player from one team to another must raise
-    the acquiring team's odds of finishing in the money and lower the
-    sending team's -- the same `swap` mechanism `win_now_delta()` uses,
-    exercised through the simulator instead. Picks the two teams with the
-    most genuine uncertainty (p_money closest to 0.5) rather than hardcoding
-    which teams -- with PAYOUT_SPOTS=4 (a much easier bar than the original
-    top-2-only build), the current standings' 2nd/3rd place teams are
-    already near a 100% ceiling with no room left to move; the real
-    uncertainty sits lower in the standings, around whichever teams are
-    fighting for the last payout spot, which changes as rosters do."""
+    """Moving a valuable player raises the acquiring team's odds and lowers
+    the sender's. Uses the two teams with p_money closest to 0.5 -- with
+    PAYOUT_SPOTS=4 the top teams are already at a ceiling."""
     b, _, _ = board
     before = simulate_finish_odds(b, B=800, seed=3)
     by_uncertainty = before.assign(dist=(before["p_money"] - 0.5).abs()).sort_values("dist")
@@ -907,42 +645,20 @@ def test_swap_changes_the_odds_in_the_expected_direction(board):
     assert p_after[donor_team] < p_before[donor_team]
 
 
-# --- Stage 3: 2027 keeper-core finish odds (out/ROADMAP.md Phase 5) --------
+# --- Stage 3: 2027 keeper-core finish odds (docs/SESSION-LOG.md Phase 5) --------
 
-def test_keeper_finish_odds_probabilities_are_internally_consistent(board):
-    """Same identity check as the rest-of-2026 simulator, for the 2027
-    keeper-core version: p_money must equal the sum of the per-place
-    columns, every probability must be valid, and each place column must
-    sum to ~1.0 across teams."""
+def test_keeper_finish_odds_identities_and_reassignment(board, fa):
+    """Same identity checks for the 2027 keeper-core simulator, and moving a
+    keeper via `keeper_override` must raise the receiving team's odds and
+    lower the sending team's."""
     from klab.standings_sim import simulate_keeper_finish_odds
-    from klab.freeagents import free_agent_board
     b, _, meta = board
-    fa = free_agent_board()
-    out = simulate_keeper_finish_odds(b, fa, meta["replacement_rp"], B=300, seed=0)
-    finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
-    assert out["p_money"].to_numpy() == pytest.approx(out[finish_cols].sum(axis=1).to_numpy())
-    assert ((out[finish_cols + ["p_money"]] >= 0).all().all())
-    assert ((out[finish_cols + ["p_money"]] <= 1).all().all())
-    for col in finish_cols:
-        assert out[col].sum() == pytest.approx(1.0, abs=1e-9)
-
-
-def test_keeper_finish_odds_reassignment_moves_the_odds(board):
-    """Moving a real keeper from one team's keeper set to another's (the
-    `keeper_override` mechanism) must raise the receiving team's odds and
-    lower the sending team's -- mirrors the rest-of-2026 simulator's own
-    swap-direction test, using whichever two teams have the closest to 50%
-    baseline odds so neither is already at a ceiling or floor with no room
-    to move."""
-    from klab.standings_sim import simulate_keeper_finish_odds
-    from klab.freeagents import free_agent_board
-    b, _, meta = board
-    fa = free_agent_board()
     repl = meta["replacement_rp"]
     before = simulate_keeper_finish_odds(b, fa, repl, B=600, seed=5)
+    _check_finish_odds_identities(before)
+
     by_uncertainty = before.assign(dist=(before["p_money"] - 0.5).abs()).sort_values("dist")
     recipient, donor_team = by_uncertainty["team"].iloc[0], by_uncertainty["team"].iloc[1]
-
     kept = b[b["keep_2027"] & (b["team"] == donor_team)]
     assert len(kept) > 0, "test needs a donor team with at least one keeper"
     donor = kept.nlargest(1, "roto_points").iloc[0]

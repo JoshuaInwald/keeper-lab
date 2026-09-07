@@ -9,17 +9,17 @@ import argparse
 
 import pandas as pd
 
-import klab.config as C
 from klab.auction_estimator import estimate_auction_price
+from klab.board import build_board, value_players
 
 
 def load_players() -> pd.DataFrame:
-    board = pd.read_csv(C.OUT / "keeper_board_2027.csv")
-    p = pd.read_csv(C.OUT / "player_values_2027.csv")
-    p = p.copy()
-    p["name"] = p["fg_id"].map(board.set_index("fg_id")["name"])
-    p["role"] = p["fg_id"].map(board.set_index("fg_id")["role"])
-    return p.dropna(subset=["name", "role"])
+    """Every valued player who is currently rostered, as (fg_id, role) pairs
+    -- a two-way player has two rows sharing one fg_id."""
+    board, exch, _ = build_board()
+    players, _, _ = value_players(exch)
+    rostered = board[["fg_id", "role"]].drop_duplicates()
+    return players.merge(rostered, on=["fg_id", "role"], how="inner")
 
 
 def main():

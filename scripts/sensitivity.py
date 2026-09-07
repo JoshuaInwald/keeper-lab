@@ -10,7 +10,6 @@ decisions flip, which is the only thing that reaches a decision.
 """
 from contextlib import contextmanager
 
-import numpy as np
 import pandas as pd
 
 import klab.auction

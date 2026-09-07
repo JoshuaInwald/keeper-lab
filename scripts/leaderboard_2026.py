@@ -15,9 +15,7 @@ import pandas as pd
 import klab.config as C
 from klab.auction import match_drafts
 from klab.board import build_2027_scorer
-from klab.io import load_contracts, load_rosters
-from klab.trade import ros_lines
-from klab.project import project_hitters, project_pitchers, fit_save_model
+from klab.io import load_rosters
 
 pd.set_option("display.width", 320)
 pd.set_option("display.max_columns", 60)
@@ -58,7 +56,8 @@ def full_2026():
     return H, P
 
 
-def main():
+def build_leaderboard() -> tuple[pd.DataFrame, float, float]:
+    """The full leaderboard frame plus (replacement rp, $ per rp)."""
     scorer, D, base, _ = build_2027_scorer()
     H, P = full_2026()
     Hs = H.join(scorer.hitters(H)[["roto_points"]])
@@ -101,6 +100,11 @@ def main():
 
     d = d.sort_values("roto_points", ascending=False).reset_index(drop=True)
     d.insert(0, "rank", d.index + 1)
+    return d, repl, usd
+
+
+def main():
+    d, repl, usd = build_leaderboard()
     d.to_csv(C.OUT / "leaderboard_2026.csv", index=False)
 
     print(f"replacement level (230th player): {repl:.2f} roto pts | "

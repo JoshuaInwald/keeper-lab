@@ -16,8 +16,6 @@ Two corrections that materially change the board:
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -26,24 +24,12 @@ from .io import _read_fg_projection, cached
 from .config import DATA
 
 
-_UPLOADS = Path("/mnt/user-data/uploads/Fantasy Baseball")
-
-
-def _find(fname: str) -> Path:
-    """Look in the project data dir first, then the staged uploads dir."""
-    for base in (DATA, _UPLOADS):
-        p = Path(base) / fname
-        if p.exists():
-            return p
-    raise FileNotFoundError(fname)
-
-
 def load_zips28_hitters():
-    return _read_fg_projection(_find(C.PROJ_2028_HITTERS))
+    return _read_fg_projection(DATA / C.PROJ_2028_HITTERS)
 
 
 def load_zips28_pitchers():
-    return _read_fg_projection(_find(C.PROJ_2028_PITCHERS))
+    return _read_fg_projection(DATA / C.PROJ_2028_PITCHERS)
 
 
 def project_2028(saves_2027: pd.Series | None = None) -> pd.DataFrame:
@@ -71,8 +57,7 @@ def project_2028(saves_2027: pd.Series | None = None) -> pd.DataFrame:
     if saves_2027 is not None:
         m = fit_save_model()
         sv = P["fg_id"].map(saves_2027).fillna(0.0)
-        # pass the real reliever flag: passing True for everyone handed each
-        # starter the 0.51-save intercept
+        # real reliever flag: True-for-all handed every starter the SV intercept
         P["SV"] = project_saves(sv, m, P["reliever"])
     else:
         P["SV"] = 0.0
@@ -112,18 +97,10 @@ def pt_scale(df: pd.DataFrame) -> pd.Series:
 
 
 def pt_scale_kind(df: pd.DataFrame) -> pd.Series:
-    """Which floor `pt_scale()` actually applied, for the SAME masks in the
-    SAME order -- out/FINDINGS.md #53's second half. Everyone but one group
-    gets scaled to a full HEALTHY workload at their existing role (hitter PA
-    floor, starter IP floor, two-way bat, and a low/zero-save reliever's own
-    IP floor): "health" -- what he's worth if nothing keeps him off the
-    field. A reliever already sitting on 5+ saves gets scaled to
-    `KEEPER_SV_FLOOR` instead, which assumes he is HANDED the closer job
-    outright: "role" -- a bet on a bullpen decision, not on his health, and
-    a materially less grounded kind of upside. Conflating the two under one
-    `upside_ft` number was the thing Josh's board-review turned up (Griffin
-    Jax and Grant Taylor's huge `upside_ft` figures are both "if he becomes
-    the closer," not "if he stays healthy")."""
+    """Which floor `pt_scale()` applied, using the SAME masks in the SAME
+    order (docs/FINDINGS.md #53): "health" = scaled to a full healthy workload
+    at the existing role; "role" = a 5+ save reliever scaled to KEEPER_SV_FLOOR,
+    i.e. a bet on being handed the closer job, a less grounded upside."""
     pa = df.get("PA", pd.Series(0.0, index=df.index)).fillna(0.0)
     ip = df.get("IP", pd.Series(0.0, index=df.index)).fillna(0.0)
     sv = df.get("SV", pd.Series(0.0, index=df.index)).fillna(0.0)
@@ -193,18 +170,9 @@ def already_extended() -> set:
     c = load_contracts()
     c["draft_salary"] = c["fg_id"].map(last)
     raised = c["draft_salary"].notna() & (c["salary"] > c["draft_salary"])
-    # A salary sitting exactly on a free-agent price is a re-add, not an
-    # extension: a $3 draftee who was dropped and claimed back after the
-    # break carries $20, which is "above his draft price" for a reason that
-    # has nothing to do with extending him.
-    #
-    # KNOWN GAP (out/FINDINGS.md #32.3): this guard is not always correct.
-    # A $5 draft price + a legal +$5 extension also lands on exactly $10; a
-    # $15 draft price + $5 lands on $20; a $10 draft price + $10 lands on
-    # $20. Those genuine extensions would be wrongly read as re-adds. No
-    # current player hits this (checked directly), and there's no data-
-    # driven fix without a transaction date, which this project does not
-    # have. Left as a documented dormant edge case rather than guessed at.
+    # A salary exactly on a FA price ($10/$20) is a re-add, not an extension.
+    # KNOWN GAP (FINDINGS #32.3): draft+$5/+$10 can also land there; no
+    # current player does, and no transaction date exists to resolve it.
     fa_price = c["salary"].isin([C.FA_SALARY_PRE_ASB, C.FA_SALARY_POST_ASB])
     # A legal extension adds exactly $5 or $10 (one or two years).
     legal = (c["salary"] - c["draft_salary"]).isin(
@@ -226,31 +194,14 @@ def multiyear_surplus(value_2027: pd.Series, value_2028: pd.Series,
                       salary: pd.Series | None = None) -> pd.DataFrame:
     """Discounted surplus over the remaining contract, plus the extension.
 
-    Year 1 is the 2027 valuation. Later years use the ZiPS 2028 valuation --
-    projecting three years out adds noise, not information. Each year past the
-    first is discounted.
-
-    **The extension is an option, and it was previously ignored for everyone
-    except `F` players.** Any contract reaching its final year can be extended
-    at salary + $5, so a code-1 player is not a one-year rental: he is one year
-    at salary plus a call option on a second at salary + $5. Leaving it out
-    understated cheap young stars badly -- Jhoan Duran at $4 lost roughly $34
-    of surplus. The option is only exercised when it is worth exercising, hence
-    the clip at zero.
-
-    Returns `extension_years` alongside the dollar figure: 0, 1 or 2, i.e. how
-    many years to actually buy. That is the decision, and it is not always the
-    maximum -- the second year costs $5 in 2027 money and only pays off if the
-    2028 line clears it.
+    Year 1 is the 2027 valuation; later years use the ZiPS 2028 valuation,
+    discounted. The extension is a call option (salary + $5/yr, 1 or 2
+    years) exercised only when worth it; ignoring it once cost cheap young
+    stars ~$34 of surplus. Returns `extension_years` (0/1/2) as the decision.
     """
-    # A contract is an OPTION to retain, not an obligation. You decide again
-    # every winter, so a year you would not exercise costs nothing. The
-    # decision under evaluation is 2027, so year one carries its sign; later
-    # years clip at zero.
-    #
-    # As an obligation this charged Kazuma Okamoto -$9.35 for a 2028 season
-    # nobody would keep him for, turning a -$3.5 contract into a -$12.8 one.
-    # Every multi-year deal was being penalised for its own length.
+    # A contract is an OPTION to retain, not an obligation: year one carries
+    # its sign, later years clip at zero (an obligation penalised every
+    # multi-year deal for its own length, e.g. -$9.35 for an unkept 2028).
     y1 = value_2027 - cost
     y2 = ((value_2028 - cost) * C.FUTURE_YEAR_DISCOUNT).clip(lower=0.0)
     y3 = ((value_2028 - cost) * C.FUTURE_YEAR_DISCOUNT ** 2).clip(lower=0.0)
@@ -260,21 +211,10 @@ def multiyear_surplus(value_2027: pd.Series, value_2028: pd.Series,
         ext = pd.Series(0.0, index=total.index)
         ext_yrs = pd.Series(0, index=total.index)
     else:
-        # The constitution allows +$5 PER YEAR for one or two years, chosen
-        # once. Two cases, and they are not the same problem.
-        #
-        # (a) LIVE CONTRACT (codes 1-3). The extension is a call option on
-        #     seasons *after* the deal expires, exercised at expiry.
-        #
-        # (b) FINAL YEAR (`F`). The extension IS the keep decision, and
-        #     `keeper_cost` already carries the one-year price. But the owner
-        #     may instead buy TWO years at +$10, and that alternative was never
-        #     priced -- the old code zeroed the option for `F` players on the
-        #     grounds that it was "already inside keeper_cost", which is true
-        #     of one year and false of two. It forced every final-year star
-        #     into a one-year deal. Ohtani: $51 surplus at 1 year, $77 at 2.
-        #     The rule is simple once written down -- take the second year iff
-        #     the discounted 2028 surplus at salary+$10 clears the extra $5.
+        # +$5 PER YEAR for one or two years, chosen once. (a) live contract:
+        # a call option on seasons after expiry. (b) final year `F`: the
+        # 2-year alternative at +$10 must be priced too, not just the 1-year
+        # already inside keeper_cost (zeroing it forced every F star to 1 yr).
         is_final = cost.eq(salary + C.EXTENSION_COST)
 
         def _best(cands):
@@ -297,22 +237,9 @@ def multiyear_surplus(value_2027: pd.Series, value_2028: pd.Series,
             live.append((v.clip(lower=0.0), n_yrs))
         live_val, live_yrs = _best(live)
 
-        # For `F`, express the choice as an increment over the y1 baseline so
-        # `surplus_multiyear = total + ext` stays the identity everywhere.
-        #
-        # CORRECTED 2026-08-13 (out/FINDINGS.md #39): this branch is now
-        # informational only, never applied. The extension window is "about
-        # to enter the final year" -- it closes before that season's OWN
-        # draft. Any player observed as `F` in `contracts_parsed.csv` (a
-        # mid-season-or-later snapshot) already missed that window and is
-        # confirmed for free agency, not offering a live extension choice
-        # right now. `klab/board.py::build_board` marks every `F` player
-        # `keepable=False` unconditionally and zeroes `extension_option`/
-        # `surplus_multiyear` downstream regardless of what this branch
-        # computes. Left in place rather than deleted because it's still a
-        # correct answer to a real question -- "what WOULD extending him
-        # have been worth, if that window were still open" -- which is
-        # useful context even though it's never the number that ships.
+        # `F` choice expressed as an increment over y1 so surplus_multiyear =
+        # total + ext holds. Informational only (FINDINGS #39): every `F`
+        # player is unkeepable in build_board, which zeroes this downstream.
         final = [(pd.Series(0.0, index=total.index), 1)]
         for n_yrs in range(2, C.EXTENSION_MAX_YEARS + 1):
             cost_n = salary + C.EXTENSION_COST * n_yrs
@@ -323,14 +250,8 @@ def multiyear_surplus(value_2027: pd.Series, value_2028: pd.Series,
             final.append((v - y1, n_yrs))
         final_val, final_yrs = _best(final)
 
-        # CORRECTED 2026-08-13 (out/FINDINGS.md #33): the constitution grants
-        # the extension only to a player "about to enter the final year of
-        # his contract eligibility" -- i.e. code "1" (one year of guaranteed
-        # control left), not codes "2" or "3", which still have a season or
-        # two of guaranteed control before the extension question is even
-        # live. This used to apply `live_val` to every non-F contract
-        # uniformly, handing a phantom extension option to players two or
-        # three years from needing one.
+        # Only code "1" (about to enter his final year) may extend; applying
+        # live_val to codes 2/3 handed them a phantom option (FINDINGS #33).
         extend_eligible = (~is_final) & years.eq(1)
         ext = pd.Series(0.0, index=total.index).mask(is_final, final_val).mask(extend_eligible, live_val)
         ext_yrs = pd.Series(0, index=total.index).mask(is_final, final_yrs).mask(extend_eligible, live_yrs)
@@ -355,61 +276,11 @@ def position_map() -> pd.Series:
     return d[d["pos"].notna()].sort_values("season").groupby("fg_id")["pos"].last()
 
 
-def positional_replacement(players: pd.DataFrame) -> pd.Series:
-    """Replacement level computed within each position group.
-
-    OFF by default (config.POSITIONAL_ADJUSTMENT). Two reasons, one empirical
-    and one practical.
-
-    Empirical: the published evidence is against it. FanGraphs' 13-system test
-    found the variants with the largest positional adjustments finished last,
-    and Razzball -- who tested four stances -- measured "very close to zero
-    impact". The theoretical appeal is much stronger than the measured effect.
-
-    Practical: **this league did not have the data** as of 2026-08-13 --
-    positions came only from the auction files, which cover 51% of rostered
-    players and identify just 6 catchers where there must be at least 10.
-    Computing a catcher replacement level off 6 observations, most of a
-    roster unlabelled, would manufacture precision rather than find it.
-
-    Still true for the FULL position spectrum this function covers (C
-    through P). For catcher and shortstop specifically, that's since been
-    resolved with real position-eligibility exports -- see
-    `two_position_replacement()` below, which is the one actually wired
-    into the app (out/FINDINGS.md #52). This function is left as-is,
-    unused but not deleted: a real, more general implementation for the day
-    a full position export (all spots, not just two) shows up.
-    """
-    pos = position_map()
-    covered = players["fg_id"].map(pos).notna().mean()
-    if covered < 0.9:
-        raise RuntimeError(
-            f"positional adjustment needs position data for ~all players; "
-            f"have {covered:.0%}. See the docstring -- get a roster export "
-            f"with positions before enabling POSITIONAL_ADJUSTMENT."
-        )
-    grp = players.assign(pos=players["fg_id"].map(pos))
-    out = {}
-    for g, slots in C.POSITION_SLOTS.items():
-        sub = grp[grp["pos"] == g].nlargest(slots * C.N_TEAMS, "roto_points")
-        if len(sub):
-            out[g] = float(sub["roto_points"].min())
-    return pd.Series(out)
-
-
 def two_position_replacement(players: pd.DataFrame, elig: dict) -> dict:
     """Replacement level for catcher and shortstop only, from real
-    eligibility data (`klab.io.load_position_eligibility()`) -- Josh's
-    scoping call, 2026-08-14, out/FINDINGS.md #52: those are the only two
-    spots this league's roster construction makes genuinely scarce; every
-    other position stays on the pooled replacement level regardless.
-
-    Same mechanism as `positional_replacement()` (Nth-best-at-the-position
-    by roto_points, N = slots x N_TEAMS), just scoped to two groups with an
-    explicit fg_id set instead of a position_map() lookup, so it doesn't
-    need the ~90% coverage `positional_replacement()` requires -- eligible
-    players not currently rostered simply don't affect the replacement
-    calc, same as any other unrostered player.
+    eligibility data (`klab.io.load_position_eligibility()`, docs/FINDINGS.md
+    #52): Nth-best-at-the-position by roto_points, N = slots x N_TEAMS.
+    Every other position stays on the pooled replacement level.
     """
     out = {}
     for g in C.TWO_POS_ADJUST:

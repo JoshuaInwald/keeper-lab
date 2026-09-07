@@ -12,8 +12,7 @@ import numpy as np
 import pandas as pd
 
 import klab.config as C
-from klab.board import build_board, fit_exchange_rate, value_players
-from klab.io import load_drafts
+from klab.board import build_board
 
 pd.set_option("display.width", 320)
 pd.set_option("display.max_columns", 60)
@@ -51,7 +50,8 @@ def acquisition_channels(board):
     is overstated to the extent teams traded for or claimed producing players.
     """
     from klab.auction import match_drafts
-    lb = pd.read_csv(C.OUT / "leaderboard_2026.csv")
+    from leaderboard_2026 import build_leaderboard
+    lb, _, _ = build_leaderboard()
     dr = match_drafts(verbose=False)
     dr = dr[(dr["season"] == 2026) & dr["fg_id"].notna()]
     d26 = set(dr["fg_id"].astype(int))
@@ -95,8 +95,6 @@ def acquisition_channels(board):
 
 
 if __name__ == "__main__":
-    exch, _ = fit_exchange_rate()
-    _, _, meta = value_players(exch)
     board, exch, meta2 = build_board()
 
     print("MODEL CONSTANTS USED")
@@ -105,7 +103,7 @@ if __name__ == "__main__":
     print(f"  replacement   : {meta2['replacement_rp']:.3f} roto points (230th projection)")
     print(f"  redraft scale : ${meta2['usd_per_rp_redraft']:.3f} per roto point above replacement")
     print(f"  budget check  : top-230 redraft values sum to ${meta2['budget_check_top230']:,.0f}")
-    print(f"  denominators  : " + ", ".join(
+    print("  denominators  : " + ", ".join(
         f"{k} {v:.4g}" for k, v in meta2["denominators"].items()))
 
     teams = sys.argv[1:] or sorted(board["team"].unique())

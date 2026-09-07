@@ -1,11 +1,9 @@
 """Build everything and write the output files."""
 import json
 
-import pandas as pd
-
 import klab.config as C
 from klab.auction import auction_sample, spec_battery
-from klab.board import build_board, fit_exchange_rate
+from klab.board import build_board
 from klab.denoms import (denominator_table, pooled_relative_dispersion,
                          season_levels)
 from klab.project import fit_save_model

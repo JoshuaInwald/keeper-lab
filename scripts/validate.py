@@ -4,14 +4,10 @@
 2. Do the ten hand-checked players land where domain knowledge says?
 3. Does the auction sample reconcile with the league's actual cap?
 """
-import numpy as np
 import pandas as pd
 
 import klab.config as C
-from klab.board import build_board, fit_exchange_rate
-from klab.denoms import (RotoScorer, denominators_for_level,
-                         pooled_relative_dispersion, season_levels,
-                         team_baselines)
+from klab.board import build_board
 from klab.io import load_hitters_history, load_pitchers_history, load_standings_long
 from klab.trade import standings_points
 

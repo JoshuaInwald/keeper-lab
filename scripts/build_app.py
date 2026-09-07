@@ -33,10 +33,8 @@ from klab.io import load_standings_long
 from klab.trade import ros_lines, standings_points
 from klab.project import RELIABILITY, REL_MAX
 
-# The three forks PROJECTION_BASIS can take (klab/config.py). Shipped as
-# three parallel payloads rather than one, so the app can let a user flip
-# between them instead of hiding the model's biggest fork behind a rebuild.
-# See out/ROADMAP.md 2.2, out/FINDINGS.md #42.
+# PROJECTION_BASIS forks, shipped as three parallel payloads so the app can
+# flip between them (docs/SESSION-LOG.md 2.2, docs/FINDINGS.md #42).
 BASES = ["blend", "projection", "actuals"]
 
 # Columns carried into the payload, in order. Kept explicit rather than
@@ -60,12 +58,8 @@ ROS_COLS = ["AB", "H", "HR", "R", "RBI", "SB",
 
 BOOTSTRAP_DRAWS = 1000      # ~11s; the bands are stable well below this
 FINISH_SIM_DRAWS = 2000     # ~10s per ROS basis, x3 bases -- klab/standings_sim.py
-KEEPER_FINISH_SIM_DRAWS = 800   # ~15-20s per PROJECTION_BASIS, x3 bases -- higher
-                                # per-draw cost than FINISH_SIM_DRAWS (see
-                                # _keeper_finish_odds()), so fewer draws
-FINISH_SHOCK_SCALE = 0.35   # klab.standings_sim.DEFAULT_SHOCK_SCALE, made explicit here
-                            # so the payload's "finish_sim" metadata can't drift from
-                            # what was actually run
+KEEPER_FINISH_SIM_DRAWS = 800   # ~15-20s per PROJECTION_BASIS, x3; costlier per draw
+FINISH_SHOCK_SCALE = 0.35   # explicit so the payload's "finish_sim" metadata can't drift
 
 
 def _round(v):
@@ -90,28 +84,16 @@ ROS_BASES = ["ros", "prorated", "blend"]
 
 def _keeper_standings_2027(board: pd.DataFrame, fa: pd.DataFrame,
                            replacement_rp: float) -> list[dict]:
-    """2027 standings projected from each team's CURRENT keeper set alone,
-    with every roster slot NOT yet occupied by a keeper filled at
-    replacement level. Answers "how strong is my keeper core on its own,"
-    not "who will actually win the 2027 auction" -- this deliberately does
-    not attempt to forecast what any team will do with its remaining
-    budget, which differs team to team and isn't something this model
-    predicts anywhere else either.
+    """2027 standings from each team's CURRENT keeper set alone, with every
+    open slot filled at replacement level -- keeper-core strength, not an
+    auction forecast.
 
-    Replacement line is a 15-player band average around `replacement_rp`
-    (roto points), not the single nearest player: the first version used
-    the single closest match and it happened to land on a closer, whose
-    ~25 saves then got added to EVERY team's empty pitcher slots -- saves
-    are valuable enough that a mediocre closer clears replacement level
-    easily on overall roto_points even though he's a poor stand-in for a
-    generic replacement-level pitcher. Averaging a band smooths that out.
+    The replacement line is a 15-player band average around `replacement_rp`,
+    never the single nearest player: that once landed on a closer and added
+    ~25 saves to every team's empty pitcher slots.
     """
-    from klab.trade import standings_points
     hit_cols = ["AB", "H", "HR", "R", "RBI", "SB"]
-    # "H" for a pitcher IS hits allowed on the full-season board's own
-    # native columns (unlike ros_lines()'s merged schema, which renames to
-    # H_allowed to dodge a join collision -- no such collision here).
-    pit_cols = ["IP", "W", "SV", "K", "ER", "BB", "H"]
+    pit_cols = ["IP", "W", "SV", "K", "ER", "BB", "H"]   # "H" IS hits allowed here
 
     pool = pd.concat([board, fa], ignore_index=True)
 
@@ -157,17 +139,9 @@ def _keeper_standings_2027(board: pd.DataFrame, fa: pd.DataFrame,
 
 
 def _historical_standings() -> dict:
-    """Final standings for every completed season on record (2022-2025;
-    2026 is still live and already has its own payload section), keyed by
-    season. Basis-invariant -- history doesn't change with either toggle --
-    so computed once, not nested in _variant_payload().
-
-    Team names are normalised to the CURRENT franchise name via
-    data/franchise_map.csv, not shown under whatever name a franchise was
-    playing under that year: this league has renamed teams five times
-    (e.g. "Moben" -> "Orange and Black Attack"), and the point of a
-    history view is seeing one franchise's arc across that, not making a
-    viewer mentally track name changes themselves."""
+    """Final standings for every completed season (2022-2025), keyed by
+    season; basis-invariant, so computed once. Team names are normalised to
+    the CURRENT franchise name via data/franchise_map.csv."""
     fm = pd.read_csv(C.DATA / "franchise_map.csv")
     current_name = fm[fm["last_season"] == 2026].set_index("franchise_id")["team_name"]
     name_map = {row["team_name"]: current_name.get(row["franchise_id"], row["team_name"])
@@ -192,14 +166,9 @@ def _historical_standings() -> dict:
 
 
 def _ros_variants(fg_ids) -> dict:
-    """Alternates to the default 2026 rest-of-season signal
-    (klab.trade.ros_lines()), for the Standings-tab / Trade-tab win-now
-    toggle. Computed ONCE, not per PROJECTION_BASIS variant -- unlike
-    `_auction_estimates()`, nothing here touches a dollar value, so there's
-    no basis-consistency hazard to guard against (see out/FINDINGS.md #45).
-    Keyed by fg_id (string) then column, so the browser can overwrite a
-    board row's `ros_*` fields in place when the toggle switches, the same
-    pattern setBasis() already uses for the projection-basis payload."""
+    """Alternate rest-of-2026 signals for the win-now toggle. Computed ONCE:
+    nothing here touches a dollar value (docs/FINDINGS.md #45). Keyed by
+    fg_id (string) then column so the browser can overwrite ros_* in place."""
     from klab.trade import ros_lines_for_basis
     out = {}
     for basis in ROS_BASES:
@@ -216,19 +185,10 @@ def _ros_variants(fg_ids) -> dict:
 
 def _ros_values(board: pd.DataFrame, fa: pd.DataFrame, D: dict, base: dict,
                 replacement_rp: float) -> dict:
-    """ros_value_over_replacement (out/FINDINGS.md #34) for every player,
-    under each of the three ROS bases -- for the Keeper Board tab's
-    rest-of-2026 value column.
-
-    Computed inside THIS process's D/base/replacement_rp on purpose:
-    `ros_value_over_replacement` mixes a ROS-basis-dependent input (which
-    ros_* line -- see #45) with a PROJECTION_BASIS-dependent one (the
-    denominators/baseline/replacement level that price it). Getting a
-    number that's consistent under an arbitrary combination of BOTH
-    toggles means nesting this inside each per-PROJECTION_BASIS subprocess
-    (see `_variant_payload()`), not computing it once and reusing it --
-    the same reasoning `_auction_estimates()` already applies for a
-    different pair of toggles."""
+    """ros_value_over_replacement (docs/FINDINGS.md #34) for every player
+    under each ROS basis. Computed inside each PROJECTION_BASIS subprocess,
+    not once: it mixes a ROS-basis input (#45) with basis-dependent
+    denominators/replacement, so both toggles must agree."""
     from klab.trade import ros_lines_for_basis, ros_value_over_replacement
     id_role = pd.concat([board[["fg_id", "role"]], fa[["fg_id", "role"]]],
                         ignore_index=True).drop_duplicates("fg_id")
@@ -246,20 +206,10 @@ def _ros_values(board: pd.DataFrame, fa: pd.DataFrame, D: dict, base: dict,
 
 def _finish_odds(board: pd.DataFrame, B: int = FINISH_SIM_DRAWS,
                  shock_scale: float = FINISH_SHOCK_SCALE) -> dict:
-    """Monte Carlo in-the-money-finish odds (klab.standings_sim,
-    out/ROADMAP.md Phase 5), one run per ROS basis, for the Contention
-    tab's precomputed current-roster view. Payout structure is
-    50%/25%/15%/breakeven for 1st-4th (C.PAYOUT_SPOTS/C.PAYOUT_SHARE) --
-    corrected 2026-08-14 from an earlier, wrong top-2-only build.
-
-    Computed ONCE, not nested per PROJECTION_BASIS the way `_ros_values()`
-    is: the simulator only touches rest-of-season stat lines and the
-    already-realized 2026 standings, neither of which PROJECTION_BASIS
-    affects -- that toggle is strictly about 2027 dollar valuation, and
-    this feature has nothing to do with 2027. Any of the positional/basis
-    board variants works as the roster source (team/fg_id don't change
-    across those toggles, only dollar VALUES do), so the ambient snapshot's
-    board is fine."""
+    """Monte Carlo in-the-money odds (klab.standings_sim, docs/SESSION-LOG.md
+    Phase 5), one run per ROS basis. Payout is 50/25/15/breakeven for 1st-4th
+    (C.PAYOUT_SPOTS/C.PAYOUT_SHARE; once wrongly top-2-only). Computed ONCE:
+    PROJECTION_BASIS affects nothing the rest-of-2026 simulator touches."""
     from klab.standings_sim import simulate_finish_odds
     out = {}
     for basis in ROS_BASES:
@@ -275,21 +225,10 @@ def _finish_odds(board: pd.DataFrame, B: int = FINISH_SIM_DRAWS,
 def _keeper_finish_odds(board: pd.DataFrame, fa: pd.DataFrame,
                         replacement_rp: float, B: int = KEEPER_FINISH_SIM_DRAWS,
                         shock_scale: float = FINISH_SHOCK_SCALE) -> dict:
-    """Monte Carlo in-the-money-finish odds for each team's CURRENT KEEPER
-    SET in a hypothetical 2027 season (klab.standings_sim's Stage 3, out/
-    ROADMAP.md Phase 5) -- the Contention tab's "2027 (keeper core)" view.
-
-    Computed INSIDE the per-PROJECTION_BASIS subprocess, same as
-    `_keeper_standings_2027()` right above it and unlike `_finish_odds()`
-    above: which players are flagged `keep_2027` depends on PROJECTION_BASIS
-    (~17% of keep/cut calls move with it, out/FINDINGS.md #42), so this
-    feature -- unlike the rest-of-2026 simulator, which only touches
-    already-realized standings and rest-of-season lines neither of which
-    PROJECTION_BASIS affects -- genuinely needs one run per basis, x3 total.
-    Fewer draws than `_finish_odds()`'s (`KEEPER_FINISH_SIM_DRAWS` <
-    `FINISH_SIM_DRAWS`): this one's per-draw cost is ~4x higher (a
-    DataFrame rebuild + groupby every draw, not a single merge), and three
-    basis-subprocess runs of it already add real build time."""
+    """Monte Carlo in-the-money odds for each team's CURRENT KEEPER SET in a
+    hypothetical 2027 (klab.standings_sim Stage 3). Computed INSIDE each
+    PROJECTION_BASIS subprocess: keep_2027 flags depend on the basis (~17%
+    move, docs/FINDINGS.md #42). Fewer draws: ~4x the per-draw cost."""
     from klab.standings_sim import simulate_keeper_finish_odds
     odds = simulate_keeper_finish_odds(board, fa, replacement_rp, B=B, shock_scale=shock_scale)
     finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
@@ -300,30 +239,11 @@ def _keeper_finish_odds(board: pd.DataFrame, fa: pd.DataFrame,
 
 
 def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
-    """Comp-based next-auction price estimate for every player with a
-    projection, keyed by "{fg_id}_{role}" (fg_id as an int -- JSON object
-    keys are always strings). Computed per-basis, not once and reused:
-    `regression_fair_value` inside `estimate_auction_price()` is the
-    player's own `redraft_value`, which is exactly the number the basis
-    selector changes -- pinning this panel to one basis while the rest of
-    the page follows the selector would reproduce the same inconsistency
-    out/FINDINGS.md #42 already found and fixed for team/constant
-    aggregates.
-
-    Keyed on role as well as fg_id (not fg_id alone) because a true
-    two-way player (config.TWO_WAY_SPLIT_NAMES) has two rows sharing one
-    fg_id from 2027 on -- a fg_id-only key would let his second row
-    silently overwrite the first with an identical (wrong-role) estimate,
-    since `estimate_auction_price()` used to always resolve a name to its
-    first matching row. Passing `role` through fixes that at the source;
-    the key change here keeps both estimates addressable in the payload.
-    Everyone else still has exactly one role per fg_id, so this is a
-    no-op widening for them.
-
-    Deliberately still a separate, non-integrated tool per
-    klab/auction_estimator.py's own docstring -- this only *displays* its
-    output next to the regression fair value, it does not feed back into
-    redraft_value or any keep/cut decision anywhere in klab/."""
+    """Comp-based next-auction estimate for every projected player, keyed
+    "{fg_id}_{role}". Per-basis, since regression_fair_value IS the basis-
+    dependent redraft_value (docs/FINDINGS.md #42). Keyed on role too: a
+    two-way player's second row would otherwise overwrite the first.
+    Display only -- never feeds back into redraft_value or keep/cut."""
     from klab.auction_estimator import estimate_auction_price
     players = pd.concat([board, fa], ignore_index=True)
     players = players[players["roto_points"] > 0]
@@ -342,12 +262,8 @@ def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
             "n_comps": est["n_comps"],
             "fallback": est["fallback_to_full_role"],
             "n_same_pos": est["n_same_position_available"],
-            # _round() on every field, not just the numeric ones: a handful
-            # of historical auction_sample.csv rows have a missing `pos`,
-            # which pandas represents as float('nan') -- not a string, and
-            # not caught unless it goes through the same NaN-safe helper
-            # everything else does. json.dumps(allow_nan=False) surfaced it
-            # immediately (673 players, several dozen with a NaN comp `pos`).
+            # _round() on every field: a missing comp `pos` is float('nan')
+            # and json.dumps(allow_nan=False) rejects it.
             "first_timer": bool(est["target_is_first_timer"]),
             "tenure_filtered": bool(est["tenure_filtered"]),
             "comps": [{"season": _round(c["season"]), "player": _round(c["player"]),
@@ -361,23 +277,15 @@ def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
 
 def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: list,
                               pos_map: pd.Series, team_map: pd.Series) -> dict:
-    """Board, free agents, team summaries and constants for one
-    `positional` setting (out/FINDINGS.md #52), within the PROJECTION_BASIS
-    ambient in this process. Factored out of `_variant_payload()` so it can
-    be called twice -- once per positional-adjustment setting -- without
-    duplicating the ros/position merge logic."""
+    """Board, free agents, team summaries and constants for one `positional`
+    setting (docs/FINDINGS.md #52) under the ambient PROJECTION_BASIS."""
     s = snapshot(positional=positional)
     board = s.board.merge(ros, on="fg_id", how="left")
     board[ros_cols] = board[ros_cols].fillna(0.0)
     board["position"] = board["fg_id"].map(pos_map).fillna("?")
     board["mlb_team"] = board["fg_id"].map(team_map).fillna("?")
-    # Bands come from resampling the team-seasons the denominators are fit on,
-    # so every dollar figure can be shown as a range instead of a point.
-    # NOT positional-aware (a documented scope limit, not an oversight): the
-    # bootstrap describes denominator uncertainty, which doesn't change with
-    # replacement level, and threading `positional` through it for exactness
-    # would double an already-expensive 1000-draw resample for a band that
-    # wouldn't move much anyway.
+    # Bootstrap bands are NOT positional-aware (documented scope limit):
+    # denominator uncertainty doesn't change with replacement level.
     from klab.uncertainty import bootstrap_bands
     board = board.merge(bootstrap_bands(B=BOOTSTRAP_DRAWS).reset_index(),
                         on=["fg_id", "role"], how="left")
@@ -408,51 +316,27 @@ def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: lis
 
 
 def _variant_payload() -> dict:
-    """Everything for whichever PROJECTION_BASIS is ambient in THIS process
-    (klab/config.py's PROJECTION_BASIS, overridable via the
-    KLAB_PROJECTION_BASIS env var), under BOTH positional-adjustment
-    settings (out/FINDINGS.md #52).
+    """Everything for the PROJECTION_BASIS ambient in THIS process (env var
+    KLAB_PROJECTION_BASIS), under BOTH positional settings (docs/FINDINGS.md #52).
 
-    Deliberately does not try to flip C.PROJECTION_BASIS mid-process to get
-    all three bases from one run: `klab.io.cached()` memoises every loader
-    on its function arguments only, not on this global, so a second basis
-    computed in the same process would silently return the first basis's
-    cached intermediate results. See `_basis_variants()`, which runs this
-    function in three separate fresh processes instead, and
-    out/FINDINGS.md #42 for the version of this bug that was actually
-    shipped and caught (klab/trade_finder.py, a different memoisation
-    hazard, same root cause: process-global state and per-arg caching don't
-    mix). `positional` doesn't have that hazard (`snapshot()`/`build_board()`
-    take it as a real argument, correctly cached per-value), so both
-    settings are computed in-process here rather than needing their own
-    subprocess split too.
-
-    Auction estimates, ROS values, and the 2027 keeper-standings projection
-    are NOT positional-aware -- a deliberate scope limit, not an oversight.
-    They're built once, off the positional=False board/fa only, same as
-    every other feature this session that's stayed pinned to the pooled
-    board for cost reasons (#43, #47, #49 all note the same tradeoff for
-    their own second toggle)."""
+    Never flip C.PROJECTION_BASIS mid-process: klab.io.cached() keys on args,
+    not this global, so a second basis would return the first's cached
+    results (docs/FINDINGS.md #42) -- `_basis_variants()` uses subprocesses.
+    `positional` is a real argument, so both settings run in-process.
+    Auction estimates, ROS values and the 2027 keeper standings are NOT
+    positional-aware (scope limit, same tradeoff as #43, #47, #49)."""
     from klab.board import build_board as _build_board_raw
     _, _, _meta = _build_board_raw()   # positional=False; _ros_values()/_keeper_standings_2027() stay pooled
-    # Prefix EVERY ros column, not just the ones the win-now maths uses.
-    # `ros_lines()` also carries PA, which silently collided with the board's
-    # projected PA and turned it into PA_x/PA_y -- the drawer showed a dash.
+    # Prefix EVERY ros column: ros PA once collided with projected PA (PA_x/PA_y).
     ros = ros_lines()
     ros = ros.rename(columns={c: f"ros_{c}" for c in ros.columns if c != "fg_id"})
     ros_cols = [f"ros_{c}" for c in ROS_COLS]
     assert not (set(ros.columns) - {"fg_id"}) & set(PLAYER_COLS), "column collision"
 
-    # Defensive position, for the Intuition tab's player tooltips (#50) --
-    # NOT the same thing as the C/SS eligibility driving positional
-    # adjustment (that's load_position_eligibility(), used inside
-    # value_players() itself). This is the broader, sparser auction-history
-    # lookup, still just for display; "?" where there's no draft record.
+    # Display-only position (auction history, #50) -- NOT the C/SS
+    # eligibility driving positional adjustment -- and real MLB team.
     from klab.keeper import position_map
     pos_map = position_map()
-    # Real MLB team, display only, never used in valuation (klab/io.py's
-    # mlb_team_map()) -- distinct from `board["team"]`, which is the CBS
-    # fantasy roster.
     from klab.io import mlb_team_map
     team_map = mlb_team_map()
 
@@ -460,10 +344,7 @@ def _variant_payload() -> dict:
                for pos in (False, True)}
     default = variants[False]
 
-    # _auction_estimates()/_ros_values()/_keeper_standings_2027() need the
-    # actual DataFrames, not the already-serialised row arrays -- rebuild
-    # the positional=False board/fa once more rather than threading the
-    # pre-serialisation DataFrames out of _board_fa_teams_constants().
+    # The pooled-board features below need DataFrames, not serialised rows.
     s = snapshot(positional=False)
     board_raw = s.board.merge(ros, on="fg_id", how="left")
     board_raw[ros_cols] = board_raw[ros_cols].fillna(0.0)
@@ -490,12 +371,9 @@ def _variant_payload() -> dict:
 
 
 def _basis_variants() -> dict:
-    """_variant_payload() under all three PROJECTION_BASIS settings. The
-    ambient process computes its own basis in-process (typically "blend",
-    the default); the other two run in fresh `python3 build_app.py
-    --variant` subprocesses via an env-var override, each with its own
-    empty caches, so there's no risk of one basis's cached loaders leaking
-    into another's numbers."""
+    """_variant_payload() under all three PROJECTION_BASIS settings: the
+    ambient basis in-process, the other two in fresh `--variant` subprocesses
+    so no basis's cached loaders leak into another's numbers."""
     out = {}
     for basis in BASES:
         if basis == C.PROJECTION_BASIS:
@@ -516,11 +394,8 @@ def build_payload() -> dict:
                       # vary by basis, so one snapshot covers all three
     pts_2026 = s.standings["points_2026"].to_dict()
     for v in variants.values():
-        # teams_raw (positional=False) and positional_variants["off"]["teams_raw"]
-        # are the same list object (see _variant_payload()), so this loop
-        # already covers "off" once -- but positional_variants["on"] is a
-        # separate dict and needs its own pass, or its League tab would show
-        # blank points_2026 whenever positional adjustment is toggled on.
+        # teams_raw IS positional_variants["off"]["teams_raw"]; "on" is a
+        # separate dict and needs its own pass or its League tab goes blank.
         for t in v["teams_raw"]:
             t["points_2026"] = pts_2026.get(t["team"])
         for t in v["positional_variants"]["on"]["teams_raw"]:
@@ -531,10 +406,7 @@ def build_payload() -> dict:
                                          values="total")
     b26 = team_baselines([2026]).iloc[0]
 
-    # Precomputed separately (scripts/build_trade_suggestions.py) -- a real
-    # search across 45 team pairs is a couple minutes, not a build-step cost.
-    # Missing file -> empty list rather than a crash, so a normal build_app
-    # run still works if suggestions haven't been (re)generated yet.
+    # Precomputed by scripts/build_trade_suggestions.py; missing file -> [].
     sugg_path = C.OUT / "trade_suggestions.json"
     trade_suggestions = json.loads(sugg_path.read_text()) if sugg_path.exists() else []
 
@@ -545,11 +417,8 @@ def build_payload() -> dict:
     return {
         "built": date.today().isoformat(),
         "projection_basis": default,
-        # Everything below marked (default basis) is a straight alias into
-        # basis_variants[default] -- kept as top-level keys so every screen
-        # that predates the selector keeps working unchanged; the selector
-        # itself (app/template.html's setBasis()) is the only thing that
-        # reads basis_variants directly.
+        # Keys marked (default basis) alias basis_variants[default] for the
+        # screens that predate the selector (template.html's setBasis()).
         "basis_variants": {b: {"cols": v["cols"], "board": v["board"], "fa": v["fa"],
                                "teams": v["teams_raw"], "constants": v["constants"],
                                "auction_estimates": v["auction_estimates"],
@@ -580,10 +449,8 @@ def build_payload() -> dict:
         "finish_sim": {"draws": FINISH_SIM_DRAWS, "shock_scale": FINISH_SHOCK_SCALE,
                       "payout_spots": C.PAYOUT_SPOTS, "payout_share": C.PAYOUT_SHARE},
         "keeper_finish_sim": {"draws": KEEPER_FINISH_SIM_DRAWS, "shock_scale": FINISH_SHOCK_SCALE},
-        # For the client-side port of klab.standings_sim's jitter (out/
-        # ROADMAP.md Phase 5) -- ships the same numbers the Python
-        # reference uses rather than hand-duplicating them in JS, so the
-        # two can't silently drift on a future RELIABILITY refit.
+        # For the JS port of klab.standings_sim's jitter: ship RELIABILITY
+        # rather than hand-duplicate it, so the two can't drift.
         "reliability": {k: _round(v) for k, v in RELIABILITY.items()},
         "reliability_max": _round(REL_MAX),
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
@@ -670,10 +537,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     if "--variant" in sys.argv:
-        # Worker mode for _basis_variants(): print ONLY the JSON payload to
-        # stdout, so the parent process's subprocess.run(capture_output=True)
-        # can parse it directly. KLAB_PROJECTION_BASIS is read by
-        # klab/config.py at import time.
+        # Worker mode for _basis_variants(): ONLY the JSON payload on stdout.
         print(json.dumps(_variant_payload(), separators=(",", ":"), allow_nan=False))
     else:
         main()
