@@ -96,17 +96,20 @@ tbody tr.sel{background:var(--sel)}
    surplus figures. Indices track BOARD_COLS and must be re-counted whenever a
    column is added -- the list had drifted and was hiding Production $, the one
    number the comment above it names. Hidden: team, role, roto pts, contract,
-   likely range, Sure?, Worth '28, if full-time. */
+   likely range, Sure?, Worth '28, if full-time. Re-counted when Replace $ was
+   added at position 11 (docs/FINDINGS.md #70), which shifted everything from
+   likely range onward by one. Replace $ stays VISIBLE on a phone: it is the
+   number the keep decision is made on. */
 @media(max-width:700px){
   main{padding:14px 10px 60px}
   #tbl th:nth-child(2),#tbl td:nth-child(2),
   #tbl th:nth-child(3),#tbl td:nth-child(3),
   #tbl th:nth-child(5),#tbl td:nth-child(5),
   #tbl th:nth-child(7),#tbl td:nth-child(7),
-  #tbl th:nth-child(11),#tbl td:nth-child(11),
-  #tbl th:nth-child(14),#tbl td:nth-child(14),
+  #tbl th:nth-child(12),#tbl td:nth-child(12),
   #tbl th:nth-child(15),#tbl td:nth-child(15),
-  #tbl th:nth-child(16),#tbl td:nth-child(16){display:none}
+  #tbl th:nth-child(16),#tbl td:nth-child(16),
+  #tbl th:nth-child(17),#tbl td:nth-child(17){display:none}
   .wrap{max-height:none}
   input[type=search]{min-width:0;flex:1 1 100%}
 }
@@ -477,6 +480,11 @@ const BOARD_COLS=[
   // ship in the payload; market_price stays hidden until Step 3 calibrates its
   // level (showing it needs the nth-child list in the phone CSS reindexed).
   ["production_value","Production $"],["market_price","Market $"],
+  // Replace $ is keep_value, the scale the KEEP DECISION runs on since
+  // KEEP_BASIS = "replacement" (docs/FINDINGS.md #70). Without it on the board
+  // the surplus columns had no visible arithmetic: a player showing $20 of
+  // Production $ and a $41 surplus looked like a bug and is not one.
+  ["keep_value","Replace $"],
   ["value_lo","likely range"],
   ["surplus_y2027","Surplus '27"],["surplus_multiyear","Surplus, all yrs"],
   ["p_surplus_positive","Sure?"],
@@ -514,9 +522,19 @@ const COL_HELP = {
     +"in the room. Production $ minus Market $ is the buy/sell signal: positive means he produces more "
     +"than he costs. Hover a cell for his likely price range.",
   value_lo:"80% of bootstrap draws landed inside this range.",
-  surplus_y2027:"Production $ minus cost -- the surplus value you get by keeping him for 2027.",
+  keep_value:"REPLACE $ -- what it would cost you at THIS league's 2027 auction to buy his "
+    +"production if you threw him back. Higher than Production $ on purpose, and not a "
+    +"contradiction: your league withholds ~100 keepers, so the real auction sells about 126 "
+    +"lots for about $1,765 and a roto point costs roughly $10.00 there, against $6.21 on the "
+    +"full-redraft scale Production $ uses. Keeping him is worth Replace $ minus his cost, "
+    +"because that is the auction money you no longer have to spend.",
+  surplus_y2027:"Replace $ minus cost -- the auction money you save by keeping him for 2027. "
+    +"This runs off Replace $, NOT Production $, because throwing him back returns his salary "
+    +"to your budget and that budget buys players at auction prices (docs/FINDINGS.md #70).",
   surplus_multiyear:"The same surplus summed over every year you control him, "
-    +"later years discounted 15%/yr and floored at zero, plus the extension option.",
+    +"later years discounted 15%/yr and floored at zero, plus the extension option. "
+    +"It can far exceed one season's value: a cheap multi-year contract with an extension "
+    +"available is several years of saved auction money, not one.",
   p_surplus_positive:"How often the surplus stayed positive across the draws. "
     +"Under 80% means the keep is a coin flip, not a decision.",
   redraft_value_2028:"Same dollar value, one year further out.",
@@ -812,6 +830,12 @@ function showPlayer(id){
   const yrs = [["2027","surplus_y2027"],["2028","surplus_y2028"],["2029","surplus_y2029"]]
     .filter(([y,k])=>g(r,k)!==0)
     .map(([y,k])=>`<div class="k">${y} surplus</div><div class="v">${sgn(adj(g(r,k)),1,"$")}</div>`).join("");
+  // Spell the keep arithmetic out. The two dollar scales sitting side by side
+  // with no stated relationship is what made a $20 player with a $41 surplus
+  // read as a bug (docs/FINDINGS.md #70).
+  const keepMath = g(r,"keepable")===false ? "" :
+    `<div class="k">Replace $</div><div class="v">${nf(adj(g(r,"keep_value")),1,"$")}</div>`
+    + `<div class="k">minus cost</div><div class="v">${nf(adj(g(r,"keeper_cost")),1,"$")}</div>`;
   // Same KEEP/IL/LOCKED tags as the board table (playerRow()) -- the
   // drawer had no way to tell a viewer a player was hurt except by closing
   // it and checking the table row instead. Caught in a 2026-08-13 UI audit.
@@ -864,6 +888,7 @@ function showPlayer(id){
         <div class="k">value, 2028</div><div class="v">${money(g(r,"redraft_value_2028"))}</div>
         <div class="k">full-time upside${g(r,"upside_kind")==="role"?" · if he's the closer":""}</div>
         <div class="v">${upsideCell(r)}</div>
+        ${keepMath}
         ${yrs}
         <div class="k">extension: ${extLabel(r)}</div>
         <div class="v">${sgn(adj(g(r,"extension_option")),1,"$")}</div>
