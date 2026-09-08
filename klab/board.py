@@ -18,6 +18,18 @@ Two dollar scales, because "what is he worth" is two different questions:
 They differ by a lot, and the gap is the point: keep_value totals far more
 than $2,600 across the league. That excess *is* the aggregate keeper discount
 -- it is why keeping is profitable and why the auction has thinned out.
+
+Two further columns split "worth" from "cost" (docs/ROADMAP.md item 1 Step 0):
+
+  production_value  Alias of `redraft_value`, byte-identical by construction.
+                It is what a player is worth TO A ROSTER on a budget scale, a
+                production quantity, not a price anyone will pay.
+
+  market_price  What he will actually COST at this league's auction. Fitted by
+                `scripts/price_model.py` from 677 revealed purchases; NaN here
+                until ROADMAP item 1 Step 3 calibrates the level to the 2027
+                budget. The gap `production_value - market_price` is the
+                buy/sell signal. Never blend the two (CONSTRAINTS.md).
 """
 
 from __future__ import annotations
@@ -225,6 +237,11 @@ def value_players(exch: dict | None = None, positional: bool = False
     players = base_players.copy()
     players["rp_above_repl"] = players["roto_points"] - repl_series
     players["redraft_value"] = dollars(players["roto_points"], repl_series)
+    # production_value is redraft_value under the name that says what it is:
+    # worth to a roster, not a price. market_price (the auction cost) is a
+    # separate quantity and stays NaN until Step 3 calibrates its level.
+    players["production_value"] = players["redraft_value"]
+    players["market_price"] = np.nan
     # A player cannot be worth less than nothing (bench him, use the wire).
     players["keep_value"] = (
         (players["roto_points"] - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
@@ -328,6 +345,9 @@ def build_board(exch: dict | None = None, positional: bool = False
     b["roto_points"] = b["roto_points"].fillna(0.0)
     b["keep_value"] = b["keep_value"].fillna(0.0)
     b["redraft_value"] = b["redraft_value"].fillna(0.0)
+    # Alias, so it must survive the same fillna; market_price must NOT be
+    # filled -- NaN means "no fitted price", which is not the same as $0.
+    b["production_value"] = b["redraft_value"]
     b["pt_scale"] = b["pt_scale"].fillna(1.0)
     for c in ("roto_points_ft", "redraft_value_ft", "upside_ft"):
         b[c] = b[c].fillna(0.0)

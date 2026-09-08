@@ -469,7 +469,11 @@ const BOARD_COLS=[
   ["name","Player","l"],["team","Team","l"],["role","",""],
   ["PA","Playing time"],["roto_points","Roto pts"],
   ["salary","Sal"],["contract","Yr"],["keeper_cost","Cost"],
-  ["redraft_value","Worth '27"],
+  // "Worth '27" was one label doing two jobs (docs/ROADMAP.md item 1 Step 0):
+  // production_value is worth-to-a-roster, market_price is auction cost. Both
+  // ship in the payload; market_price stays hidden until Step 3 calibrates its
+  // level (showing it needs the nth-child list in the phone CSS reindexed).
+  ["production_value","Production $"],
   ["value_lo","likely range"],
   ["surplus_y2027","Surplus '27"],["surplus_multiyear","Surplus, all yrs"],
   ["p_surplus_positive","Sure?"],
@@ -497,9 +501,11 @@ const COL_HELP = {
     +"for whether that's a health bet (nothing keeps him off the field) or a role bet "
     +"(handed the closer job outright).",
   roto_points:"Projected 2027 standings points he adds, all ten categories.",
-  redraft_value:"What he'd be worth in a 2027 auction, in dollars.",
+  production_value:"What he is worth to a roster in 2027, in dollars: roto points above "
+    +"replacement on the league's $2,600 budget scale. This is NOT a forecast of his auction "
+    +"price -- the market pays for youth, name and last year's contract too.",
   value_lo:"80% of bootstrap draws landed inside this range.",
-  surplus_y2027:"Worth '27 minus cost -- the surplus value you get by keeping him for 2027.",
+  surplus_y2027:"Production $ minus cost -- the surplus value you get by keeping him for 2027.",
   surplus_multiyear:"The same surplus summed over every year you control him, "
     +"later years discounted 15%/yr and floored at zero, plus the extension option.",
   p_surplus_positive:"How often the surplus stayed positive across the draws. "
@@ -570,7 +576,7 @@ function refilter(){
 }
 function money(v){ return usd(adj(v)); }
 
-// Per-category breakdown for the board's Roto pts / Worth '27 cells --
+// Per-category breakdown for the board's Roto pts / Production $ cells --
 // native title tooltips (no custom hover component in this app), but
 // multi-line via \n works fine, same trick playerTooltip() already uses.
 function valueBreakdownTooltip(r){
@@ -585,7 +591,7 @@ function valueBreakdownTooltip(r){
   lines.push(`(everyone's price also has −${nf(D.constants.replacement_roto_points,2)} pts of `
     + `replacement level folded in, ${replAdj>=0?"+":"-"}$${Math.abs(replAdj).toFixed(0)} -- `
     + `not shown per row since it isn't a category)`);
-  return `Where Worth '27 comes from (same $/pt rate every category -- click the name for the full table):\n`
+  return `Where Production $ comes from (same $/pt rate every category -- click the name for the full table):\n`
     + lines.join("\n");
 }
 
@@ -609,7 +615,7 @@ function playerRow(r){
   <td>${usd(g(r,"salary"))}</td>
   <td class="dim">${esc(g(r,"contract"))}</td>
   <td>${usd(g(r,"keeper_cost"))}</td>
-  <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"redraft_value"))}</td>
+  <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"production_value"))}</td>
   <td>${band(r,"value_lo","value_hi")}</td>
   <td>${sgn(adj(g(r,"surplus_y2027")),0,"$")}</td>
   <td>${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</td>
@@ -754,7 +760,7 @@ function showPlayer(id){
   };
   // dollars() is (roto_points - replacement)*rate + $1, not roto_points*rate --
   // so a per-category rp*rate split undercounts the subtraction and looks
-  // like it doesn't add up to Worth '27. This row makes the table actually
+  // like it doesn't add up to Production $. This row makes the table actually
   // reconcile: category rows sum to roto_points*rate; this one folds in the
   // -replacement*rate and the +$1 floor everyone's price is anchored to.
   const replAdj = -D.constants.replacement_roto_points*rpRate + 1;
@@ -794,14 +800,14 @@ function showPlayer(id){
       <h3 style="margin-top:12px">Roto points by category</h3>
       <div class="note">How much of his 2027 dollar value each category is carrying -- same $/point
         rate for every category, so a below-average one (shown in red) is a real drag on his price,
-        not just a weak spot on the stat line. Rows sum exactly to Worth '27, except for a player
+        not just a weak spot on the stat line. Rows sum exactly to Production $, except for a player
         priced at the $0 floor, where the real figure is clipped higher than this table's raw sum.</div>
       <table style="margin-top:6px"><thead><tr>
         <th class="l">Cat</th>
         <th title="Standings points this category alone contributes, positive or negative.">Roto pts</th>
-        <th title="Roto points × this league's $/point rate -- the same rate for every category.">$ of Worth '27</th>
+        <th title="Roto points × this league's $/point rate -- the same rate for every category.">$ of Production</th>
       </tr></thead><tbody>${cats.map(catRow).join("")}
-        <tr><td class="l dim" title="Every player's price is anchored the same way: subtract what a free replacement player would produce, then floor at a $1 minimum bid. This isn't a category -- it's the same fixed adjustment for everyone, folded in here so this table's own numbers add up to Worth '27 exactly.">− replacement level, + $1 floor</td>
+        <tr><td class="l dim" title="Every player's price is anchored the same way: subtract what a free replacement player would produce, then floor at a $1 minimum bid. This isn't a category -- it's the same fixed adjustment for everyone, folded in here so this table's own numbers add up to Production $ exactly.">− replacement level, + $1 floor</td>
           <td class="dim">−${nf(D.constants.replacement_roto_points,2)}</td>
           <td class="dim">${sgn(replAdj,0,"$")}</td></tr>
       </tbody></table>
@@ -1359,7 +1365,7 @@ function playerTooltip(r){
     +`Contract: ${g(r,"contract")}${lockNote}\n`
     +`2027 roto pts: ${nf(g(r,"roto_points"),2)} (${catLine})\n`
     +rosLine+`\n`
-    +`Worth '27: ${money(g(r,"redraft_value"))} · Surplus, all yrs: ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}`;
+    +`Production $: ${money(g(r,"production_value"))} · Surplus, all yrs: ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}`;
 }
 
 function addShadedPlayer(id){
@@ -1443,7 +1449,7 @@ function intuitionView(){
         <div class="note">Linear scaling of the already-computed dollar value, NOT a re-run of the
           model. Treat this as a rough feel for direction and magnitude, not a new official number.</div>
         <table style="margin-top:8px"><thead><tr>
-          <th class="l">Player</th><th>Worth '27 before</th><th>Worth '27 after</th>
+          <th class="l">Player</th><th>Production $ before</th><th>Production $ after</th>
           <th>Surplus, all yrs before</th><th>Surplus, all yrs after</th>
         </tr></thead><tbody>${dollarRows.map(x=>`<tr>
           <td class="l">${esc(g(x.r,'name'))}</td><td>${money(g(x.r,'redraft_value'))}</td>
