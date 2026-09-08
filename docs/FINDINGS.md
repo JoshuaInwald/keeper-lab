@@ -826,3 +826,42 @@ It happened on `Replace $` (#70) and again on the `Roto '26` / `Move` pair (#74)
 **The rule.** Adding a board column means four edits, not one: `BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS`, a `<td>` in `playerRow` at the same index, and the phone CSS `nth-child` hide-list. Three of the four are silent when forgotten. #70 and #74 each forgot the third.
 
 **Standing back.** Three of the four defects a reader found in this app today were in the presentation layer rather than the model: a tooltip describing arithmetic the model no longer used (#71), two tabs that were distinct but looked identical (#71), and this. The engine has 64 tests and a 25-quantity JS/pandas cross-check; the layer that decides what a number MEANS to the person reading it had almost none. That is the coverage gap worth closing next, not another valuation refinement.
+
+### 76. The tooltip pass: a contract, a decomposition, and the first tests this layer has had
+Josh's ask after four reader-found defects in two sessions, three of them in the presentation layer rather than the model. Prose rewrite plus one real feature. No valuation changed.
+
+**What was wrong, measured rather than asserted.** 46 user-facing strings were extracted and scanned. Four carried internal references into the UI (`docs/FINDINGS.md #26` twice, `docs/METHODS.md section 2.1`, `klab/standings_sim.py`), which is a leak of the repo's own bookkeeping into a product surface. Undefined jargon included "bootstrap draws", "replacement level", "denominator", "walk-year", "dispersion estimate" and "roto points" itself, which was used throughout without ever being glossed. Several entries ran 85 words or more.
+
+**A contract, written into the code above `COL_HELP` so it survives the next edit.**
+1. First sentence says what the number IS, in words a person who has never read a baseball stats site would understand, under about 15 words.
+2. At most two more sentences: how to read it, or the one caveat that would mislead. Not the derivation.
+3. No unglossed jargon. "Roto points" is always "places in the standings". Never "replacement level", "bootstrap", "denominator", or a bare "ZiPS".
+4. Never a file or finding reference.
+5. If a number needs a breakdown to be believed, the CELL carries the evidence and the HEADER carries the explanation.
+
+**The feature, which is the part that matters: value decomposition.** The board showed totals and could not answer "is this coming from homers or steals". It can now, because the per-category split for 2026 was being computed and discarded. `roto_2026_lines()` keeps `rp_<cat>_26` alongside the total; naming them with the `rp_` prefix means `project_all_players` sums them for two-way players automatically. Hovering a value cell gives the split, sorted biggest-first, with the categories spelled out and zero rows dropped:
+
+```
+His 2026 season, 7.6 points, comes from:
+  strikeouts   +3.0  ████████
+  wins         +2.8  ████████
+  ERA          +0.9  ██
+  WHIP         +0.9  ██
+```
+
+**The `Move` tooltip is the one that pays.** It shows both seasons side by side, sorted by the size of the change, and it answers the question that started this whole thread (#72, #73, #74) in four lines:
+
+```
+What the 2027 projection changes:
+              2026    2027   change
+  ERA           0.9    -1.7     -2.6
+  WHIP          0.9    -0.9     -1.7
+  strikeouts    3.0     2.4     -0.6
+  wins          2.8     2.7     -0.1
+```
+
+Wacha's whole -5.07 is ERA and WHIP. A reader can now see that in a hover instead of asking whether the ERA formula is broken.
+
+**Three tests, because this layer had none.** `app/verify.mjs` gains a check that every board column has non-empty help, that no element's `title` contains an internal reference, and that the per-category breakdown SUMS to the total it claims to explain (within the slack from 1dp rounding and dropped near-zero rows). Confirmed to fail on a deliberately reintroduced blank tooltip and a deliberately reintroduced `docs/` reference before being accepted. The suite is now 17 checks, up from 15 at the start of the day.
+
+**What is deliberately not done.** Native `title` tooltips render in a proportional font, so the bars are a rough magnitude cue rather than an aligned chart, and they do not exist at all on a phone. A real hover card would fix both and is a bigger change; the drawer already carries the same information for touch, so the gap is cosmetic on desktop and covered on mobile. Flagged rather than built.

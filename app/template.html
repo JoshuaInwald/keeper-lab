@@ -503,65 +503,67 @@ function rosVal(r){
   return m ? m[g(r,"fg_id")] : null;
 }
 // Plain-English gloss for every column header, shown on hover.
+// Plain-English gloss for every column header, shown on hover.
+//
+// THE CONTRACT, because these drifted into essays and into jargon (#76):
+//   1. First sentence says WHAT THE NUMBER IS, in words a person who has never
+//      read a baseball stats site would understand. Under about 15 words.
+//   2. At most two more sentences: how to read it, or the one caveat that
+//      would otherwise mislead. Not the derivation.
+//   3. No unglossed jargon. "Roto points" is always "places in the standings".
+//      Never "replacement level", "bootstrap", "denominator", or a bare "ZiPS".
+//   4. NEVER a file or finding reference. Those are for the code, not the user.
+//      A `docs/FINDINGS.md #70` shipped inside a tooltip once; do not repeat it.
+//   5. If the number needs a breakdown to be believed, the CELL gets a hover
+//      with the per-category split. The header explains, the cell evidences.
 const COL_HELP = {
-  name:"Click for the full arithmetic.",
-  team:"Current fantasy roster.",
-  role:"H hitter · P pitcher · H/P two-way.",
-  salary:"What his owner pays in 2026.",
-  contract:"Seasons left AFTER 2026. F = confirmed free agent after 2026, not extendable — "
-    +"the extension window closes before his own walk-year draft, and it already has.",
-  keeper_cost:"What it costs to roster him in 2027, extension included. Blank means he cannot "
-    +"be kept at any price -- a confirmed free agent after 2026, tagged LOCKED.",
-  PA:"Projected 2027 PA (hitters) or IP (pitchers), the workload his roto points assume. "
-    +"A ×N.NN tag means it's been scaled up from a shorter observed season -- hover the tag "
-    +"for whether that's a health bet (nothing keeps him off the field) or a role bet "
-    +"(handed the closer job outright).",
-  roto_2026:"What he is PRODUCING in 2026, in 2026 roto points: the season he is actually "
-    +"having (banked stats plus the ZiPS projection for the weeks still to play). Scored on "
-    +"2026's OWN scale, projected to a full season -- about 88% of 2026 is in the books, so "
-    +"the counting denominators are scaled up to a whole year before he is measured against "
-    +"them. A roto point is a standings place in either season, which is why this and Roto '27 "
-    +"can be read straight across.",
-  roto_points:"Projected 2027 standings points he adds, all ten categories, on 2027's own "
-    +"scale. Read it against Roto '26 to its left: the gap is the projection's opinion, not "
-    +"a fact.",
-  roto_move:"Roto '27 minus Roto '26: what the projection does to him. Negative means it "
-    +"expects decline, or thinks this season overstated him. Sort by this column to find every "
-    +"player the model most disagrees with the present about -- the big movers are where a "
-    +"projection is worth arguing with, and the number to argue with is this one, not the "
-    +"2027 figure on its own.",
-  market_price:"What he will COST at the 2027 auction, not what he is worth. Fitted on 677 real "
-    +"purchases from what a bidder could see on auction day (last two seasons, age, tenure, his last "
-    +"contract), then scaled so the lots this auction actually sells add up to the money that will be "
-    +"in the room. Production $ minus Market $ is the buy/sell signal: positive means he produces more "
+  name:"Click for the full arithmetic behind every number in this row.",
+  team:"Which fantasy team rosters him right now.",
+  role:"H hitter · P pitcher · H/P both.",
+  salary:"What his owner is paying him this season.",
+  contract:"How many more seasons after 2026 his owner controls him. "
+    +"F means he leaves as a free agent and cannot be kept at any price.",
+  keeper_cost:"What you would pay to keep him for 2027, extension included. "
+    +"Blank means he cannot be kept.",
+  PA:"How much he is projected to play in 2027: plate appearances for hitters, "
+    +"innings for pitchers. A ×N tag means a short season was scaled up to a "
+    +"full one; hover the tag for whether that assumes health or a job change.",
+  roto_2026:"The season he is ACTUALLY having, measured in places in the final "
+    +"standings. Counts what he has already done plus a projection of the last "
+    +"few weeks. Hover any number for which categories it comes from.",
+  roto_points:"What he is projected to add in 2027, in places in the final "
+    +"standings, across all ten categories. Hover for which categories.",
+  roto_move:"How far the 2027 projection sits from the season he is having. "
+    +"Negative means it expects him to fall off. Hover to see which categories "
+    +"move; sort to find the players the model most disagrees with.",
+  production_value:"What his 2027 production is worth to a roster, in dollars. "
+    +"This is worth, not price: see Market $ for what he will actually cost.",
+  market_price:"What he is likely to COST at the 2027 auction. Production $ "
+    +"minus Market $ is the bargain signal: positive means he produces more "
     +"than he costs. Hover a cell for his likely price range.",
-  value_lo:"80% of bootstrap draws landed inside this range.",
-  keep_value:"REPLACE $ -- what it would cost you at THIS league's 2027 auction to buy his "
-    +"production if you threw him back. Higher than Production $ on purpose, and not a "
-    +"contradiction: your league withholds ~100 keepers, so the real auction sells about 126 "
-    +"lots for about $1,765 and a roto point costs roughly $10.00 there, against $6.21 on the "
-    +"full-redraft scale Production $ uses. Keeping him is worth Replace $ minus his cost, "
-    +"because that is the auction money you no longer have to spend.",
-  surplus_y2027:"Replace $ minus cost -- the auction money you save by keeping him for 2027. "
-    +"This runs off Replace $, NOT Production $, because throwing him back returns his salary "
-    +"to your budget and that budget buys players at auction prices (docs/FINDINGS.md #70).",
-  surplus_multiyear:"The same surplus summed over every year you control him, "
-    +"later years discounted 15%/yr and floored at zero, plus the extension option. "
-    +"It can far exceed one season's value: a cheap multi-year contract with an extension "
-    +"available is several years of saved auction money, not one.",
-  p_surplus_positive:"How often the surplus stayed positive across the draws. "
-    +"Under 80% means the keep is a coin flip, not a decision.",
-  redraft_value_2028:"Same dollar value, one year further out.",
-  upside_ft:"Extra value if he plays a full season rather than his projected workload. "
-    +"For a hitter or starter this means \"if nothing keeps him off the field\" -- a health "
-    +"question. For a reliever already sitting on some saves, a \"role\" tag means it instead "
-    +"means \"if he's handed the closer job outright\" -- a bullpen-decision bet, a different "
-    +"and less grounded kind of upside. Click to sort by the biggest gaps either way.",
-  ros_value:"How much better than a free replacement player he is for the REST of 2026 only "
-    +"(not the 2027 numbers everything else in this row uses) -- same scale as a keeper "
-    +"decision, but answers a different question: not \"keep him,\" \"is he worth a rental "
-    +"right now.\" Controlled by the \"rest-of-2026 basis\" dropdown above.",
+  keep_value:"What it would cost at your 2027 auction to buy his production "
+    +"again if you let him go. Higher than Production $ because your league "
+    +"holds back about 100 players, so the auction is small and prices run "
+    +"high. Keeping him saves you this much.",
+  value_lo:"The range his value landed in 80% of the time when the season was "
+    +"re-run thousands of times with the luck shuffled.",
+  surplus_y2027:"Replace $ minus what he costs you: the auction money you save "
+    +"by keeping him for 2027 instead of buying that production again.",
+  surplus_multiyear:"The same saving added up over every year you control him, "
+    +"later years discounted and never counted as a negative, plus the value of "
+    +"extending him. A cheap long contract can be worth several single seasons.",
+  p_surplus_positive:"How often keeping him still came out ahead when the "
+    +"season was re-run with the luck shuffled. Under 80% is close to a coin "
+    +"flip, however good the dollar figure looks.",
+  redraft_value_2028:"The same dollar value, one year further out.",
+  upside_ft:"Extra value if he plays a full season rather than his projected "
+    +"workload. For most players that is a health question. A \"role\" tag means "
+    +"it assumes a reliever is handed the closer job, which is a shakier bet.",
+  ros_value:"How much better than a freely available player he is for the rest "
+    +"of THIS season only. Answers \"is he worth picking up now\", not \"should "
+    +"I keep him\". Controlled by the rest-of-2026 dropdown above.",
 };
+
 // How often the multi-year surplus stayed positive across the bootstrap draws.
 // This is the column to read for a marginal keeper: $2 of surplus at 55%
 // confidence is a coin flip, $2 at 99% is a decision.
@@ -623,7 +625,7 @@ function money(v){ return usd(adj(v)); }
 // an explicit false: free-agent rows carry keepable = true and are unaffected.
 function costCell(r){
   if(g(r,"keepable")===false)
-    return '<span class="dim" title="Not keepable at any price: he is a confirmed free agent after 2026, and the extension window closed before his own walk-year draft.">—</span>';
+    return '<span class="dim" title="Cannot be kept at any price. He becomes a free agent after 2026, and the window to extend him has already closed.">—</span>';
   return usd(g(r,"keeper_cost"));
 }
 // Market price is a different quantity from every other dollar figure here, so
@@ -640,20 +642,61 @@ function marketTooltip(r){
 // Per-category breakdown for the board's Roto pts / Production $ cells --
 // native title tooltips (no custom hover component in this app), but
 // multi-line via \n works fine, same trick playerTooltip() already uses.
-function valueBreakdownTooltip(r){
+// ---------- value decomposition -------------------------------------------
+// "Where is the value coming from, home runs or steals?" is the question this
+// board gets asked most and could not answer: it showed a total and nothing
+// else. These build the per-category split as plain text for a native tooltip,
+// sorted biggest-first so the story is the first line read rather than
+// something the reader has to find. Category names are spelled out, because
+// "SB" and "WHIP" are only obvious to someone who already knows the answer.
+const CAT_WORD = {R:"runs", HR:"homers", RBI:"RBI", SB:"steals", AVG:"batting avg",
+                  W:"wins", SV:"saves", K:"strikeouts", ERA:"ERA", WHIP:"WHIP"};
+function catsFor(r){
   const role = g(r,"role");
-  const cats = role==="HIT" ? D.hit_cats : role==="PIT" ? D.pit_cats : CATS;
-  const rate = D.constants.usd_per_roto_point_redraft;
-  const lines = cats.map(c=>{
-    const rp = g(r,"rp_"+c) || 0;
-    return `${c}: ${rp>=0?"+":""}${rp.toFixed(2)} pts  →  ${rp>=0?"+":"-"}$${Math.abs(rp*rate).toFixed(0)}`;
-  });
-  const replAdj = -D.constants.replacement_roto_points*rate + 1;
-  lines.push(`(everyone's price also has −${nf(D.constants.replacement_roto_points,2)} pts of `
-    + `replacement level folded in, ${replAdj>=0?"+":"-"}$${Math.abs(replAdj).toFixed(0)} -- `
-    + `not shown per row since it isn't a category)`);
-  return `Where Production $ comes from (same $/pt rate every category -- click the name for the full table):\n`
-    + lines.join("\n");
+  return role==="HIT" ? D.hit_cats : role==="PIT" ? D.pit_cats : CATS;
+}
+function catBar(v, max){
+  const n = max>0 ? Math.round(8*Math.abs(v)/max) : 0;
+  return "█".repeat(Math.max(v!==0 ? 1 : 0, n));
+}
+// Categories a player does not participate in (a starter's saves, a hitter's
+// ERA) are dropped rather than printed as "+0.0": a row of zeroes is noise
+// competing with the two lines that carry the answer.
+const signed = v => (v>=0 ? "+" : "-") + Math.abs(v).toFixed(1);
+function decompTooltip(r, suffix, total, label){
+  const rows = catsFor(r).map(c=>({c, v: g(r,"rp_"+c+suffix) || 0}))
+    .filter(x=>Math.abs(x.v) >= 0.05)
+    .sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+  if(!rows.length) return `${label}: no category contributes anything measurable.`;
+  const max = Math.max(...rows.map(x=>Math.abs(x.v)), 0.001);
+  const body = rows.map(x=>
+    `  ${(CAT_WORD[x.c]||x.c).padEnd(12)}${signed(x.v).padStart(5)}  ${catBar(x.v,max)}`
+  ).join("\n");
+  return `${label}, ${nf(total)} points, comes from:\n${body}\n\n`
+    + `One point is one place in the final standings.`;
+}
+function valueBreakdownTooltip(r){
+  return decompTooltip(r, "", g(r,"roto_points"), "His projected 2027");
+}
+function value2026Tooltip(r){
+  return decompTooltip(r, "_26", g(r,"roto_2026"), "His 2026 season");
+}
+// The Move column's tooltip answers "why did he drop", so it shows both years
+// side by side and sorts by the size of the CHANGE rather than the level.
+function moveTooltip(r){
+  const rows = catsFor(r).map(c=>{
+    const a = g(r,"rp_"+c+"_26") || 0, b = g(r,"rp_"+c) || 0;
+    return {c, a, b, d: b-a};
+  }).sort((x,y)=>Math.abs(y.d)-Math.abs(x.d));
+  const shown = rows.filter(x=>Math.abs(x.d) >= 0.05);
+  if(!shown.length) return "The 2027 projection leaves every category roughly where it is.";
+  const body = shown.map(x=>
+    `  ${(CAT_WORD[x.c]||x.c).padEnd(12)}${x.a.toFixed(1).padStart(5)}${x.b.toFixed(1).padStart(8)}`
+    + `${signed(x.d).padStart(9)}`
+  ).join("\n");
+  return `What the 2027 projection changes:\n`
+    + `              2026    2027   change\n${body}\n\n`
+    + `Biggest change first. This is the part worth arguing with.`;
 }
 
 // playerRow emits its cells POSITIONALLY while BOARD_COLS declares the headers,
@@ -680,7 +723,7 @@ function playerRow(r){
   <td class="l"><span class="name" onclick="showPlayer(${g(r,"fg_id")})">${esc(g(r,"name"))}</span>`
   + (keep?'<span class="tag keep" title="in the recommended keeper set">KEEP</span>':"")
   + (il?'<span class="tag il" title="on the injured list">IL</span>':"")
-  + (block?'<span class="tag il" title="confirmed free agent after 2026 -- the extension window closes before this player\'s own walk-year draft, and it already has">LOCKED</span>':"")
+  + (block?'<span class="tag il" title="becomes a free agent after 2026 and cannot be kept: the window to extend him has already closed">LOCKED</span>':"")
   + (opt?`<span class="tag ext" title="${esc(extLabel(r))} — worth ${usd(adj(g(r,"extension_option")))}">`
         + (String(g(r,"contract")).toUpperCase()==="F"?"EXT×2":"OPT") + `</span>`:"")
   + (used&&!block?'<span class="tag" title="extension already used on this contract">USED</span>':"")
@@ -688,9 +731,9 @@ function playerRow(r){
   <td class="l dim">${esc(g(r,"team"))} <span class="mlbteam">${esc(g(r,"mlb_team"))}</span></td>
   <td class="dim">${g(r,"role")==="PIT"?"P":g(r,"role")==="TWO"?"H/P":"H"}</td>
   <td class="dim">${ptCell(r)}</td>
-  <td class="dim">${nf(g(r,"roto_2026"))}</td>
+  <td class="dim" title="${esc(value2026Tooltip(r))}">${nf(g(r,"roto_2026"))}</td>
   <td title="${esc(valueBreakdownTooltip(r))}">${nf(g(r,"roto_points"))}</td>
-  <td>${sgn(g(r,"roto_move"))}</td>
+  <td title="${esc(moveTooltip(r))}">${sgn(g(r,"roto_move"))}</td>
   <td>${usd(g(r,"salary"))}</td>
   <td class="dim">${esc(g(r,"contract"))}</td>
   <td>${costCell(r)}</td>
@@ -881,7 +924,7 @@ function showPlayer(id){
   // it and checking the table row instead. Caught in a 2026-08-13 UI audit.
   const tags = (g(r,"keep_2027")?'<span class="tag keep" title="in the recommended keeper set">KEEP</span>':"")
     + (g(r,"il")?'<span class="tag il" title="on the injured list">IL</span>':"")
-    + (g(r,"keepable")===false?'<span class="tag il" title="confirmed free agent after 2026 -- the extension window closes before this player\'s own walk-year draft, and it already has">LOCKED</span>':"");
+    + (g(r,"keepable")===false?'<span class="tag il" title="becomes a free agent after 2026 and cannot be kept: the window to extend him has already closed">LOCKED</span>':"");
   $("dbody").innerHTML=`
     <h2>${esc(g(r,"name"))}${tags}</h2>
     <div class="sub dim">${esc(g(r,"team"))} <span class="mlbteam">${esc(g(r,"mlb_team"))}</span> · ${esc(g(r,"keeper_status"))}
@@ -898,8 +941,8 @@ function showPlayer(id){
         priced at the $0 floor, where the real figure is clipped higher than this table's raw sum.</div>
       <table style="margin-top:6px"><thead><tr>
         <th class="l">Cat</th>
-        <th title="Standings points this category alone contributes, positive or negative.">Roto pts</th>
-        <th title="Roto points × this league's $/point rate -- the same rate for every category.">$ of Production</th>
+        <th title="Places in the standings this one category adds, or costs.">Roto pts</th>
+        <th title="Those standings places turned into dollars, at the same rate for every category.">$ of Production</th>
       </tr></thead><tbody>${cats.map(catRow).join("")}
         <tr><td class="l dim" title="Every player's price is anchored the same way: subtract what a free replacement player would produce, then floor at a $1 minimum bid. This isn't a category -- it's the same fixed adjustment for everyone, folded in here so this table's own numbers add up to Production $ exactly.">− replacement level, + $1 floor</td>
           <td class="dim">−${nf(D.constants.replacement_roto_points,2)}</td>
@@ -1348,7 +1391,7 @@ function tradeResult(){
         <div class="k">Δ surplus, 2027</div><div class="v">${sgn(adj(dS),1,"$")}</div>
         <div class="k">Δ surplus, multi-year</div><div class="v">${sgn(adj(dMY),1,"$")}</div>
         <div class="k">Δ 2026 standings points</div><div class="v">${sgn(dP,1)}</div>
-        <div class="k" title="This league pays the top ${D.finish_sim.payout_spots} places -- this is the trade's effect on how OFTEN this team actually lands there, not just its point total. Simulated live for this specific swap (klab/standings_sim.py, docs/SESSION-LOG.md Phase 5).">Δ P(money), this trade</div>
+        <div class="k" title="This league pays the top ${D.finish_sim.payout_spots} places -- this is the trade's effect on how OFTEN this team actually lands there, not just its point total. Simulated fresh for this exact swap.">Δ P(money), this trade</div>
         <div class="v">${sgn(dMoney*100,1)}pp <span class="dim" style="font-size:11px">(${nf(pMoneyBefore*100,0)}%→${nf(pMoneyAfter*100,0)}%)</span></div>
       </div>
       <div class="bars" style="margin-top:8px">${cats}</div>
@@ -1641,7 +1684,7 @@ function modelView(){
     const d=den[x], se=denSe[x];
     const dp = d<1?4:2;
     return `<tr><td class="l">${x}</td>
-      <td title="1 standard error, propagated from this category's dispersion estimate (docs/FINDINGS.md #26) through the same units-per-point conversion. Roughly a 68% interval; double it for something closer to 95%.">${nf(d,dp)} <span class="dim">± ${nf(se,dp)}</span></td>
+      <td title="How uncertain this figure is. The true number is inside plus-or-minus this about two thirds of the time; double it for near-certainty.">${nf(d,dp)} <span class="dim">± ${nf(se,dp)}</span></td>
       <td class="l dim">${kind(x)}</td></tr>`;}).join("");
   // PROJECTION_BASIS is overridden with the live S.basis, not the
   // build-time D.settings value -- the selector in the header can change
@@ -1662,8 +1705,8 @@ function modelView(){
     <div class="panel"><h3>Denominators — units per standings point</h3>
       <table><thead><tr>
         <th class="l" title="Roto category.">Cat</th>
-        <th title="How many units of this stat buy one standings point, pooled from this league's own history — see docs/FINDINGS.md #26.">Units / pt</th>
-        <th class="l" title="Counting stats sum directly; rate stats (AVG/ERA/WHIP) are computed as a marginal shift against a league-average team, not the player's raw rate — docs/METHODS.md section 2.1.">Kind</th>
+        <th title="How much of this stat it takes to climb one place in the standings, measured from this league's own past seasons.">Units / pt</th>
+        <th class="l" title="Home runs and the like just add up. Batting average, ERA and WHIP cannot: what matters is how much a player moves an average team's rate, not his own.">Kind</th>
       </tr></thead>
       <tbody>${rows}</tbody></table>
       <div class="note">Estimated from pooled relative dispersion across

@@ -2,6 +2,17 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (tooltip pass: contract, decomposition, first tests)
+
+| type | item |
+|---|---|
+| built | Value decomposition on every roto cell: hovering shows the per-category split, sorted biggest-first, categories spelled out, zero rows dropped. The 2026 split was already computed and discarded; `roto_2026_lines()` now keeps `rp_<cat>_26` (the `rp_` prefix makes two-way aggregation automatic) (FINDINGS #76) |
+| built | The `Move` tooltip shows both seasons side by side sorted by size of change, answering #72-#74 in four lines: Wacha's -5.07 is ERA -2.6 and WHIP -1.7, visible in a hover |
+| bug | Four internal references had leaked into user-facing tooltips (`docs/FINDINGS.md #26` twice, `docs/METHODS.md section 2.1`, `klab/standings_sim.py`). All removed; a test now fails if one returns |
+| built | Rewrote every `COL_HELP` entry to a stated contract (what it is in under ~15 words, then at most two sentences, no unglossed jargon, never a file reference), written above the block so it survives the next edit. Removed "bootstrap draws", "replacement level", "denominator", "walk-year", "dispersion estimate" |
+| built | Three tooltip tests, the first this layer has had: every column explains itself, no `title` leaks an internal reference, and the category breakdown sums to the total it explains. Verified to FAIL on deliberately reintroduced defects. Suite now 17 checks, up from 15 |
+| declined | A custom hover card. Native tooltips use a proportional font so the bars are a rough cue, and there is no hover on a phone; the drawer already covers touch, so the gap is cosmetic |
+
 ## 2026-09-08 (board rendering bug: headers and cells drifted apart)
 
 | type | item |

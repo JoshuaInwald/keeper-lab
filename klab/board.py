@@ -161,10 +161,20 @@ def roto_2026_lines() -> pd.DataFrame:
     P = lines_2026_pitchers()
     H = H[H["PA"].fillna(0) > 0].copy()
     P = P[P["IP"].fillna(0) > 0].copy()
+    sh, sp = scorer.hitters(H), scorer.pitchers(P)
+    # Keep the per-category split, not just the total. "Where does his value
+    # come from, and what is the projection taking away" is the question the
+    # board is asked most, and it cannot be answered from a single number.
+    # The `rp_..._26` naming matters: project_all_players sums every column
+    # starting with "rp_", so two-way players aggregate correctly for free.
     h = pd.DataFrame({"fg_id": H["fg_id"].to_numpy(), "role": "HIT",
-                      "roto_2026": scorer.hitters(H)["roto_points"].to_numpy()})
+                      "roto_2026": sh["roto_points"].to_numpy()})
     p = pd.DataFrame({"fg_id": P["fg_id"].to_numpy(), "role": "PIT",
-                      "roto_2026": scorer.pitchers(P)["roto_points"].to_numpy()})
+                      "roto_2026": sp["roto_points"].to_numpy()})
+    for c in C.HIT_CATS:
+        h[f"rp_{c}_26"] = sh[f"rp_{c}"].to_numpy()
+    for c in C.PIT_CATS:
+        p[f"rp_{c}_26"] = sp[f"rp_{c}"].to_numpy()
     return pd.concat([h, p], ignore_index=True)
 
 
@@ -196,11 +206,13 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
     # Attached after to_full_time so the counterfactual PT scaling cannot touch
     # it: roto_2026 is what actually happened, never a scaled-up version of it.
     r26 = roto_2026_lines()
-    Hs = Hs.merge(r26[r26["role"] == "HIT"].drop(columns=["role"]), on="fg_id", how="left")
-    Ps = Ps.merge(r26[r26["role"] == "PIT"].drop(columns=["role"]), on="fg_id", how="left")
+    h26 = r26[r26["role"] == "HIT"].drop(columns=["role"]).dropna(axis=1, how="all")
+    p26 = r26[r26["role"] == "PIT"].drop(columns=["role"]).dropna(axis=1, how="all")
+    Hs = Hs.merge(h26, on="fg_id", how="left")
+    Ps = Ps.merge(p26, on="fg_id", how="left")
     keep = ["fg_id", "name", "role", "w_2026", "pt_scale", "pt_scale_kind",
             "roto_points", "roto_2026"] + \
-           [f"rp_{c}" for c in C.CATS]
+           [f"rp_{c}" for c in C.CATS] + [f"rp_{c}_26" for c in C.CATS]
     for df in (Hs, Ps):
         for c in keep:
             if c not in df:

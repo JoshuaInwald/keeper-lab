@@ -131,6 +131,9 @@ Phase B is complete. #68 and #69 diagnosed, #70 shipped. This is a fresh-context
 
 **4. The projection-source toggle.** Build last. `PROJECTION_BASIS` is the precedent. **Marcel 2027 does not exist** (Baseball-Reference publishes after a season ends), so the toggle is backward-facing only and the 2027 board stays ZiPS.
 
+### The tooltip contract (#76)
+Written above `COL_HELP` in `app/template.html` and enforced by three checks in `app/verify.mjs`. First sentence says what the number is, plainly, under ~15 words; at most two more sentences; no unglossed jargon ("roto points" is always "places in the standings", never "replacement level" / "bootstrap" / "denominator"); **never a file or finding reference** in user-facing text. If a number needs a breakdown to be believed, the cell carries the evidence via a hover and the header carries the explanation.
+
 ### Adding a board column takes FOUR edits (#75)
 `BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS` in `app/template.html`, a `<td>` in `playerRow()` **at the same index**, and the phone CSS `nth-child` hide-list. Three of the four fail silently. Forgetting the `<td>` shifts every column to its right under the wrong heading, which shipped twice (#70, #74). `assertBoardRowShape()` now throws on render and `app/verify.mjs` compares rendered cell text against the payload, but the four-edit rule is still the thing to remember.
 

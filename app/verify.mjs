@@ -332,6 +332,36 @@ const keeper2027Result = await page.evaluate(() => {
 const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
+// The tooltip layer had no coverage at all, which is how a `docs/FINDINGS.md`
+// reference and several undefined jargon terms reached users (FINDINGS #76).
+// Three cheap invariants: every column explains itself, no internal reference
+// escapes into user-facing text, and the per-category breakdown actually adds
+// up to the number it claims to explain.
+const tipResult = await page.evaluate(() => {
+  go('board'); S.q = ''; S.team = ''; render();
+  const missing = BOARD_COLS.filter(([k, l]) => l && !(COL_HELP[k] || '').trim()).map(([k]) => k);
+
+  const leakRe = /docs\/|FINDINGS|SESSION-LOG|METHODS\.md|ROADMAP|klab\/|scripts\//;
+  const leaks = [...document.querySelectorAll('[title]')]
+    .map(e => e.getAttribute('title')).filter(t => leakRe.test(t)).slice(0, 3);
+
+  // the decomposition must reconcile with the total it is explaining
+  const rec = BOARD.find(r => g(r, 'role') === 'HIT' && g(r, 'roto_points') > 5);
+  const tip = valueBreakdownTooltip(rec);
+  const nums = (tip.match(/[+-]\d+\.\d/g) || []).map(Number);
+  const summed = nums.reduce((a, b) => a + b, 0);
+  const total = g(rec, 'roto_points');
+  // the printed lines round to 1dp and drop |v| < 0.05, so allow a little slack
+  const reconciles = Math.abs(summed - total) < 0.35;
+
+  return { missing, leaks, who: g(rec, 'name'), summed: +summed.toFixed(2),
+           total: +total.toFixed(2), reconciles,
+           hasBreakdown: /comes from/.test(tip) };
+});
+const tipBad = tipResult.missing.length > 0 || tipResult.leaks.length > 0
+  || !tipResult.reconciles || !tipResult.hasBreakdown;
+if (tipBad) console.log('  TOOLTIP CHECK:', JSON.stringify(tipResult));
+
 // The board's headers (BOARD_COLS) and its cells (playerRow) are two
 // hand-maintained lists with nothing linking them, so inserting a column has
 // twice shifted every cell right of it under the wrong header (FINDINGS #70,
@@ -491,6 +521,8 @@ console.log(historyBad ? 'FAIL  historical standings did not render or did not r
                        : 'PASS  historical standings render and return to the live view cleanly');
 console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignores projection basis'
                           : 'PASS  2027 keeper standings render all 10 teams and track projection basis');
+console.log(tipBad ? 'FAIL  Tooltips: missing help, an internal reference leaked, or a breakdown does not add up'
+                   : 'PASS  Every column explains itself, no internal refs leak, category breakdown reconciles');
 console.log(boardCellBad ? 'FAIL  Board cells do not line up with their headers'
                          : 'PASS  Board cells match their headers and the payload, column by column');
 console.log(contention2027Bad ? 'FAIL  Standings/odds merge: missing teams, odds not leading, or basis ignored'
