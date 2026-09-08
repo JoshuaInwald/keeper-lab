@@ -2,10 +2,15 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
-## 2026-09-08
+## 2026-09-08 (assessment phase, Phase A)
 
 | type | item |
 |---|---|
+| declined | The hitter/pitcher budget split, the brief's strongest lead and its Phase B item 1: REFUTED, not deferred. The league pays $2.092 per realised roto point for hitters and $2.114 for pitchers (ratio 0.99, 668 purchases, stable every season); hitters take 63.9% of the dollars because they deliver 64.1% of the points. One scale is correct (FINDINGS #64) |
+| bug | Found underneath it and deliberately NOT fixed: the calibration pool is the top 230 by roto points regardless of role, which on the 2027 projection is 183 hitters and 47 pitchers, a set no ten teams could field. Allocates 73.7% to hitters against the league's 63-64%. Completed seasons give 129/101 to 139/91, so it is latent in the code and activated by the projection. The obvious repair overshoots to 54.2% because the projected pitcher pool is smeared (223 arms over 100 IP against 118-127 real). Blocked on projection archives (FINDINGS #65) |
+| built | Decision audit interpreted, Josh's named question answered: owners' keeps look ten times better than their throw-backs when made (ex-ante surplus $13.17 against $1.21) and are worth the same afterwards ($6.75 against $6.39). Keeps 73.0% right ex ante fall to 55.4% realised; throw-backs 61.7% rise to 73.3% (FINDINGS #66) |
+| built | `scripts/validate.py` CHECK 5: tracks the role split of the calibration pool against the league's revealed 63.4% so the known gap cannot drift silently |
+| declined | One reconciliation route for `WAIVER_VALUE` tested and refuted: the 106 free agents above 4.381 are 99 hitters and 7 pitchers, so the smeared pitcher pool does not explain the internal-consistency count. Tie stands, still at "low" (FINDINGS #62) |
 | built | `scripts/decision_audit.py`: scores the owners rather than the model on 336 past keeper decisions, ex-ante and realised verdicts kept separate. 2026 owners' throw-backs vindicated 73.3% against keeps at 55.4% |
 | built | Sourced comparison against published fantasy-valuation practice in the brief. Lead finding: the model pools hitters and pitchers on one scale (73.7/26.3) where the league spends 64/36 and standard SGP practice splits the budget |
 | built | `docs/ASSESSMENT-BRIEF.md`: the chain link by link with a confidence claim and what would move each, Josh's questions mapped to evidence, the outside-analyst objections, and a scoped decision-quality audit. Next phase is assessment, not building |

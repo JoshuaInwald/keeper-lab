@@ -147,6 +147,9 @@ Two keeper bases ship. `keep_2027` is production surplus and is the recommendati
 | current rosters rolled over 2026 actuals vs 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale); league leader predicted 1st | `scripts/validate.py` |
 | replacement level, four routes, none fitted to agree | 4.733 (230th projection, used) vs 3.978 (auction intercept) vs 4.381 (300th) vs 4.12-4.39 (observed waiver churn, FINDINGS #62) | `out/model_params.json`, `scripts/waiver_value.py` |
 | budget identity | top-230 `redraft_value` sums to exactly $2,600 (caught a $3,854 build) | `scripts/audit.py`, pytest |
+| budget identity, role split | FAILS by +10.3 points: the top-230 pool is 183 hitters / 47 pitchers and allocates 73.7% to hitters where the league's revealed share is 63-64%. Known open defect, blocked on projection archives (FINDINGS #65); do not fix with a budget split (#64) | `scripts/validate.py` CHECK 5 |
+| dollars per realised roto point, by role | hitters $2.092, pitchers $2.114 (ratio 0.99, 668 purchases, every season inside +/-15%): one dollar scale across roles is correct for this league | FINDINGS #64 |
+| owners' keeper decisions, 336 scored | 2026 keeps 73.0% right ex ante and 55.4% realised; throw-backs 61.7% and 73.3%. Realised surplus $6.75 against $6.39 | FINDINGS #66, `scripts/decision_audit.py` |
 | decision robustness | 92% of keep/cut calls hold across all variants (HANDOFF, 2026-08-14); recount of the committed `sensitivity_keep_flags.csv` gives 246/275 = 89% | `scripts/sensitivity.py` |
 | external: CBS roto rank | 0.893 (residual is CBS scoring OBP) | FINDINGS #21 |
 | external: FanGraphs ROS auction calculator | Spearman 0.68 to 0.84 on ordering; this scale runs flatter at the top | FINDINGS #54 |
@@ -204,7 +207,8 @@ Every published tool (FanGraphs Auction Calculator, RotoWire Custom Auction Valu
 | `scripts/run_all.py` | rebuild every output in `out/` including the app (excludes trade suggestions) |
 | `scripts/build_app.py` | inline three per-basis payloads plus standings, finish odds, comps into `app/template.html`; writes `out/app_reference.json` |
 | `scripts/build_trade_suggestions.py` | precompute `out/trade_suggestions.json` for all 45 team pairs (~135 s) |
-| `scripts/validate.py` | standings correlation, hand-checked players, budget identity |
+| `scripts/validate.py` | standings correlation, hand-checked players, budget identity, calibration-pool role split (CHECK 5) |
+| `scripts/decision_audit.py` | scores the OWNERS on 336 past keeper decisions, ex-ante and realised verdicts separate (`out/decision_audit.csv`) |
 | `scripts/audit.py` | roster accounting, salary cap, contract-code consistency, stats vs standings (`out/audit.txt`) |
 | `scripts/sensitivity.py` | rebuild under each contested knob; `out/sensitivity_constants.csv`, `out/sensitivity_keep_flags.csv` |
 | `scripts/eval_trade.py` | CLI: `"Team A" "Team B" "P1,P2" "P3,P4"` |

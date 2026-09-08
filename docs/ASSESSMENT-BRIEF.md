@@ -4,6 +4,37 @@ Written 2026-09-08 at the end of a build phase, for a fresh session that will do
 nothing but assess. Read `CONSTRAINTS.md`, then this, then `docs/METHODS.md`
 sections 4 and 5. Everything cited as `#nn` is `docs/FINDINGS.md`.
 
+## Phase A was run on 2026-09-08. Read this first.
+
+The brief below is preserved as written. Three of its claims are now settled and
+one of them is settled the opposite way, so do not act on the original text
+without reading `#64`, `#65` and `#66`.
+
+- **The hitter/pitcher budget split, this brief's strongest lead and its Phase B
+  item 1, is REFUTED. Do not build it.** This league pays $2.092 per realised
+  roto point for hitters and $2.114 for pitchers, a ratio of 0.99 on 668
+  purchases, stable every season. Hitters take 63.9% of the dollars because they
+  deliver 64.1% of the points. One scale is correct. `#64`.
+- **A real defect was found underneath it, and it is not the one this brief
+  named.** The calibration pool is the top 230 by roto points regardless of role,
+  which on the 2027 projection is 183 hitters and 47 pitchers, a set no ten teams
+  could field. It allocates 73.7% of the budget to hitters against the league's
+  63-64%. Completed seasons do not show this (129/101, 125/105, 131/99, 139/91,
+  130/100), so it is latent in the code and activated by the projection. The
+  obvious repair overshoots to 54.2% and was rejected. `#65`. **Nothing shipped:
+  it is blocked on projection archives, the same blocker as Link 1.**
+- **The decision audit is interpreted.** Owners' keeps look ten times better than
+  their throw-backs when made and are worth the same afterwards. `#66`.
+- **`WAIVER_VALUE` is still open.** One reconciliation route was tested and
+  refuted: the 106 free agents above 4.381 are 99 hitters and 7 pitchers, so the
+  smeared pitcher pool does not explain the internal-consistency count. `#62`.
+
+The one thing that would unblock the most: **two seasons of historical ZiPS or
+Steamer archives.** It is now the binding constraint on the blend weights
+(Link 1), on the pool rule (`#65`), and on the only out-of-sample test of the
+keep/cut advice itself (`#66`). Worth asking FanGraphs, or checking for a saved
+export, before anything else is attempted.
+
 ## What this phase is for
 
 Twelve months of building produced a chain: a stat line becomes roto points,

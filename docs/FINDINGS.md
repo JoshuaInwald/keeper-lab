@@ -391,6 +391,8 @@ The likely reconciliation, untested: deep free-agent projections are optimistic 
 
 **Left at `WAIVER_VALUE = "low"`.** The change is one line and reversible; the evidence does not currently support making it.
 
+**One reconciliation route tested and refuted (assessment phase, see #65).** The projected pitcher pool is demonstrably smeared: 1,151 pitchers, 223 above 100 IP against 118-127 in real seasons. If the 106 free agents above 4.381 were mostly part-time arms the projection invented, the internal-consistency objection would dissolve and the churn margin would win. They are not. The 106 split **99 hitters and 7 pitchers**, and only 4 of those 7 clear 100 IP. The count is a hitter phenomenon and the pitcher-pool distortion does not explain it. The tie stands, and the "deep free-agent projections are optimistic" half of the reconciliation above still needs testing on the hitter side.
+
 ### 62.5 The role cap survives a third challenger
 Closes the "role cap is still a patch" item from #57.2 and #57.8. The uncapped price model predicts $55.38 for a hitter against a $45 league ceiling, and two designed-in fixes had already lost on leave-one-season-out (concave predictor transforms, monotone GBM). Tried a third with a different mechanism: bound the RESPONSE rather than the predictor, fitting `logit(price / CAP)` so predictions asymptote to CAP by construction and no clipping is possible.
 
@@ -419,3 +421,94 @@ The point estimate is untouched (MAE 5.76, Spearman 0.482). The conformal wideni
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).
+
+### 64. One dollar scale across hitters and pitchers is correct for this league
+Assessment phase, Phase A. `docs/ASSESSMENT-BRIEF.md` carried this as its strongest lead and queued a hitter/pitcher budget split as Phase B item 1. The measurement refutes it. No constant was changed.
+
+The brief's case was that standard SGP practice splits the budget 65/35 or 70/30 before converting to dollars, that Smart Fantasy Baseball argues hitter and pitcher SGP are not directly comparable, and that this project pools them. The test that settles it uses realised prices and realised production only, so no projection, no regression inversion and no replacement level enters it: what does this league pay per roto point actually delivered, by role?
+
+| | dollars | roto points delivered | $ per realised roto point |
+|---|---|---|---|
+| hitters | 4,862 | 2,324.6 | **2.092** |
+| pitchers | 2,752 | 1,301.6 | **2.114** |
+
+A ratio of 0.99 on 668 purchases across 2022-2026. Per season the ratio is 0.909, 0.938, 1.150, 0.934, 0.988: no trend, no season outside +/-15%. The league prices a hitter roto point and a pitcher roto point the same.
+
+That also explains the split that looked like a divergence. Hitters take 63.86% of auction dollars because they deliver 64.11% of the roto points, not because the league applies a hitting-budget convention. Four independent measures of the league's hitter share agree:
+
+| measure | hitter share |
+|---|---|
+| realised roto points delivered, drafted pool 2022-2026 | 64.11% |
+| auction dollars spent, 2022-2026 | 63.86% |
+| current full rosters (276 players, salary) | 62.94% |
+| active-roster proxy (top 23 per team by salary) | 63.31% |
+
+**A budget split must not be built.** It would impose a convention the league's own behaviour does not use, on top of an exchange rate that is already right. This closes the brief's Phase B item 1 as refuted rather than deferred.
+
+Recorded for the record because it points the other way and is the weaker object: regressing roto points on salary separately by role does give different slopes (implied $6.35/rp for hitters against $4.18 for pitchers, interaction t = 2.82, p = 0.005). That is the same inverted, attenuated regression Link 3 already distrusts, and per season it is unusable: 2026 alone gives $15.34/rp for hitters against $5.25 for pitchers. The raw ratio above is the identified quantity; the regression slope is not.
+
+### 65. The calibration pool is not fieldable, and the obvious fix overshoots
+Same phase, same session as #64. A real defect, diagnosed but deliberately not fixed. No constant was changed.
+
+`board.value_players()` calibrates the budget identity on `base_players.nlargest(230, "roto_points")`, the top 230 by roto points regardless of role. On the 2027 projection that pool is **183 hitters and 47 pitchers**. The league fields 140 and 90 by rule and 134 and 96 in the observed active rosters. The pool that sets `usd_per_rp` is therefore a set of players no ten teams could legally roster, and pitchers are priced against 47 slots when 90 exist.
+
+The consequence is the 10-point split error #64 measured the target for: the model allocates **73.70%** of the $2,600 to hitters where every measure of the league says 63-64%.
+
+**The defect is latent in the code and activated by the projection.** Scoring each completed season on its own scale and taking the top 230 by realised roto points:
+
+| season | HIT | PIT |
+|---|---|---|
+| 2022 | 129 | 101 |
+| 2023 | 125 | 105 |
+| 2024 | 131 | 99 |
+| 2025 | 139 | 91 |
+| 2026 | 130 | 100 |
+| 2027 projection | **183** | **47** |
+
+Five completed seasons all land near the fieldable 140/90. Only the projection does not, so this is not a property of the roto scale, which is what #64 independently confirms.
+
+**The obvious fix was measured and rejected.** Constraining the pool to the top 140 hitters and top 90 pitchers with role-specific replacement moves `usd_per_rp` 6.5216 to 6.2130 and the hitter share to **54.21%**, which is as far below the league's 63-64% as the status quo is above it. Constraining the pool but keeping pooled replacement gives 71.55%. None of the three candidates is right, so no change ships.
+
+The reason the fix overshoots is a second distortion, in the projected pitcher pool rather than the dollar scale. ZiPS Depth Charts spreads innings across the full depth chart, so the projection carries 1,151 pitchers of whom 223 clear 100 IP and 33 clear 150 IP, against 118-127 and 39-71 in real seasons. The 90th-best projected pitcher therefore sits at **3.527** roto points where completed seasons put him at 4.95 to 7.22. Role-specific replacement built on that pool hands pitchers a bar that is too low, which is why their dollar share doubles.
+
+The pitcher shortfall is concentrated and measurable. Selecting the top 90 on the projection and evaluating the same 81 matched players on their 2026 actuals, so selection is identical on both sides:
+
+| | W | SV | K | ERA | WHIP | total |
+|---|---|---|---|---|---|---|
+| projected | 2.301 | 0.752 | 2.426 | 0.031 | 0.090 | 5.600 |
+| 2026 actual | 2.282 | 1.242 | 2.427 | 0.851 | 0.583 | 7.385 |
+
+W and K are calibrated to within 0.02. The entire 1.79-point gap is ERA, WHIP and SV. The same comparison for hitters gives 6.612 projected against 6.399 actual, every category within 0.19: the hitter side needs nothing. Pitchers carry two of the five rate categories and hitters one, so any rate-category level error hits pitchers about twice as hard.
+
+The clearest single symptom: the projected top-90 pitchers pool to a **3.597 ERA against a league baseline team ERA of 3.613**, while the actual top-90 pool to 2.97-3.08. The model believes the ninety best arms available are indistinguishable from an average fantasy staff.
+
+**What is not established, and why nothing shipped.** Part of that rate gap is legitimate. A projection regressed to the mean SHOULD show less rate spread than a realised season, and ERA is the least projectable category in the set, so a humble ERA projection may be the correct expectation rather than an error. Separating "correctly humble" from "wrongly compressed" needs a historical ZiPS or Steamer archive to backtest against, which `data/` does not have, and which Link 1 of the brief already names as the blocker on the blend weights. Acting on the 73.70% without that would mean trading a known 10-point error for an unknown one, which is how all four retractions in this file happened.
+
+Ranked next steps, in order: obtain two seasons of projection archives; then refit the blend and retest this; only then choose a pool rule.
+
+### 66. The decision audit: owners defend their throw-backs better than their keeps
+Josh's named unbuilt analysis, `scripts/decision_audit.py`, interpreted. Scores the owners, not the model. 336 decisions.
+
+**2026, clean labels, n = 134.**
+
+| | n | mean salary | right ex ante | right realised | mean surplus ex ante | mean surplus realised |
+|---|---|---|---|---|---|---|
+| kept | 74 | 11.45 | 73.0% | 55.4% | 13.17 | 6.75 |
+| thrown back | 60 | 15.40 | 61.7% | 73.3% | 1.21 | 6.39 |
+
+The pattern is the same in both directions and it is the headline. Keeps look strong when they are made and half their expected surplus evaporates: 73.0% right ex ante falls to 55.4% realised, and $13.17 of expected surplus becomes $6.75. Throw-backs look marginal and improve: 61.7% becomes 73.3%, and $1.21 becomes $6.39. By realised surplus the two decisions are worth the same, $6.75 against $6.39, despite the keeps looking ten times better at the time.
+
+**2023-2025, reconstructed labels, n = 202. Selection-biased, and the bias runs the same way as the finding.**
+
+| | n | right ex ante | right realised | mean surplus ex ante | mean surplus realised |
+|---|---|---|---|---|---|
+| kept | 65 | 50.8% | 43.1% | 8.64 | -0.29 |
+| thrown back | 137 | 60.6% | 72.3% | 1.98 | 4.49 |
+
+Kept players return negative mean realised surplus here. This cannot be read at face value: pre-2026 a keep is only detectable when the player was LATER thrown back (#56.5), so the reconstructed kept sample is enriched for players who went on to fail. The direction agrees with the clean 2026 sample; the magnitude does not survive the bias.
+
+**He said no, the room said yes.** Of the 60 players thrown back in 2026 at a mean declined salary of $15.40, the auction re-bought them at a mean of $13.73, and the room paid more than the owner had declined in 23 of 60. Owners' throw-backs are ratified by the market about five times in eight.
+
+**Luck against judgment.** The ex-ante and realised verdicts agree on 84 of 134 decisions in 2026 (63%) and 119 of 202 in 2023-2025 (59%). Roughly two decisions in five are scored differently by what was knowable and by what happened, which is the size of the noise any single-season verdict carries and the reason the two columns are reported separately.
+
+**What this does not answer, and it is the biggest gap in the project.** Whether the MODEL would have beaten the owners is still unmeasured. It needs the model's own keep/cut call as of each past deadline, which needs a projection built from data as of that date. The board is a 2027 object and cannot be rewound. This is the same missing artefact as #65 and Link 1: without projection archives the product's central claim has no out-of-sample test.

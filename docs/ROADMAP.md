@@ -1,6 +1,12 @@
 # Roadmap
 
-**Status 2026-09-08: the next phase is assessment, not building. See `docs/ASSESSMENT-BRIEF.md`.** Items 1, 2 and 4 are closed. Before more is built, the chain needs a confidence audit: how the errors compound from stat line to roto points to dollars to a keep/cut call, and which link is load-bearing. The items below stay ranked for after that.
+**Status 2026-09-08: assessment Phase A is complete (`docs/FINDINGS.md` #64, #65, #66; banner at the top of `docs/ASSESSMENT-BRIEF.md`).** Items 1, 2 and 4 are closed. Phase A shipped no valuation change and produced one new top item, above everything below.
+
+## 0. Obtain two seasons of historical ZiPS or Steamer projections (1 session, data errand)
+
+The binding constraint on three separate open questions, and cheap to try before any of them. Without it: the blend weights stay four unfitted judgment calls (`docs/METHODS.md` section 3 #9); the calibration pool keeps allocating 73.7% of the budget to hitters against the league's 63-64%, because the candidate repair overshoots to 54.2% and the projected pitcher pool is smeared (#65); and the keep/cut advice, the thing the project exists to give, still has no out-of-sample test (#66). Try FanGraphs' archives, a saved local export, or the Wayback Machine on the ZiPS leaderboard. If it cannot be had, say so in FINDINGS and the three items stay blocked on the record rather than being attempted blind.
+
+Two things are now closed as refuted and must not be built: a hitter/pitcher budget split (#64, the league pays 2.092 against 2.114 per realised roto point by role) and slot-constraining the calibration pool on its own (#65).
 
 Effort in focused sessions (~2 hours each). Built-and-validated inventory is in `docs/METHODS.md` section 4; history in `docs/SESSION-LOG.md`. This file is only what is next, ranked.
 

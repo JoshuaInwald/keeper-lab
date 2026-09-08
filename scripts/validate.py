@@ -3,6 +3,7 @@
 1. Does the roto-point scorer reproduce the 2026 standings from rosters?
 2. Do the ten hand-checked players land where domain knowledge says?
 3. Does the auction sample reconcile with the league's actual cap?
+5. Is the pool that sets the dollar scale one the league could actually field?
 """
 import pandas as pd
 
@@ -105,8 +106,49 @@ def check_budget(board, exch, meta):
     print(by_team.sort_values("surplus", ascending=False).round(0).to_string())
 
 
+LEAGUE_HITTER_SHARE = 0.634      # 4 independent measures span 0.629-0.641 (#64)
+
+
+def check_role_split():
+    """CHECK 5: is the pool that sets `usd_per_rp` one the league could field?
+
+    The budget identity is calibrated on the top 230 by roto points regardless of
+    role. On the 2027 projection that pool is 183 hitters and 47 pitchers, which
+    no ten teams could roster, and it allocates 73.7% of the $2,600 to hitters
+    where every measure of the league says 63-64% (FINDINGS #64, #65). Completed
+    seasons do not show this, so the defect is latent in the code and activated
+    by the projection. Tracked rather than fixed: the obvious repair overshoots
+    to 54.2%, because the projected pitcher pool is itself smeared (#65).
+    """
+    from klab.board import project_all_players
+
+    print("\n=== CHECK 5: role split of the calibration pool (FINDINGS #64, #65) ===")
+    base, _, _, _ = project_all_players(full_time=False)
+    n_rost = C.N_TEAMS * C.N_ACTIVE
+    rank = C.WAIVER_RANK.get(C.WAIVER_VALUE, n_rost)
+    repl = float(base.nlargest(rank, "roto_points")["roto_points"].min())
+    top = base.nlargest(n_rost, "roto_points")
+    usd = (C.N_TEAMS * C.BUDGET - n_rost) / (top["roto_points"] - repl).clip(lower=0).sum()
+    val = (top["roto_points"] - repl) * usd + 1.0
+    n_h = int((top["role"] == "HIT").sum())
+    share = float(val[top["role"] == "HIT"].sum() / val.sum())
+
+    print(f"pool composition:      {n_h} hitters / {n_rost - n_h} pitchers")
+    print(f"league fields:         {C.N_TEAMS*C.N_HIT_SLOTS} hitters / "
+          f"{C.N_TEAMS*C.N_PIT_SLOTS} pitchers (by rule)")
+    print(f"hitter share of $2,600: {share:6.1%}")
+    print(f"league's revealed share: {LEAGUE_HITTER_SHARE:6.1%}  "
+          f"(auction spend, roster salary, and roto points delivered all agree)")
+    print(f"gap:                    {share - LEAGUE_HITTER_SHARE:+6.1%}")
+    if abs(share - LEAGUE_HITTER_SHARE) > 0.03:
+        print("  KNOWN OPEN DEFECT (#65). Blocked on projection archives, not on a")
+        print("  decision. Do not 'fix' by splitting the budget: #64 refutes that.")
+    return {"n_hitters": n_h, "hitter_dollar_share": share}
+
+
 if __name__ == "__main__":
     board, exch, meta = build_board()
     check_2026_standings(board)
     check_players(board)
     check_budget(board, exch, meta)
+    check_role_split()
