@@ -135,7 +135,14 @@ def fit_price_model(train: pd.DataFrame, seasons: tuple[int, ...], transform: st
     smear = float(np.mean(np.exp(ols.resid)))
     q20 = sm.QuantReg(y, X).fit(q=0.20, max_iter=5000)
     q80 = sm.QuantReg(y, X).fit(q=0.80, max_iter=5000)
-    return {"ols": ols, "smear": smear, "q20": q20, "q80": q80,
+    # Hurdle for the $1 minimum bid. 19.6% of purchases go for exactly $1 in
+    # both the training seasons and 2026, and a continuous quantile regression
+    # cannot represent a point mass: it put P20 at $1.50 for players who were
+    # always going to cost $1, which was 19 of the 28 lower-tail misses. This is
+    # the "Tobit at the $1 floor" ROADMAP item 1 Step 2 offered as the
+    # alternative to log-price (docs/FINDINGS.md #63).
+    hurdle = sm.Logit((train["salary"] == 1).astype(int), X).fit(disp=0)
+    return {"ols": ols, "smear": smear, "q20": q20, "q80": q80, "hurdle": hurdle,
             "seasons": seasons, "transform": transform, "age_fill": age_fill,
             "fills": fills, "upside": upside, "conformal": (0.0, 0.0),
             # The league has never paid more than this for the role; a price
@@ -170,10 +177,14 @@ def conformal_width(train: pd.DataFrame, seasons: tuple[int, ...], transform: st
         Xtr = design(tr, fit_seasons, transform, age_fill, f, upside)
         lo = sm.QuantReg(tr["log_salary"], Xtr).fit(q=0.20, max_iter=5000)
         hi = sm.QuantReg(tr["log_salary"], Xtr).fit(q=0.80, max_iter=5000)
+        hd = sm.Logit((tr["salary"] == 1).astype(int), Xtr).fit(disp=0)
         Xte = design(te, fit_seasons, transform, age_fill, f, upside)
         y = te["log_salary"]
-        lo_scores.append(lo.predict(Xte) - y)      # > 0 when the truth fell below P20
-        hi_scores.append(y - hi.predict(Xte))      # > 0 when it fell above P80
+        # Score the band the model actually reports, hurdle included, or the
+        # widening is calibrated against a different object than it is applied to.
+        lo_pred = np.where(hd.predict(Xte) >= 0.20, 0.0, lo.predict(Xte))
+        lo_scores.append(pd.Series(lo_pred, index=te.index) - y)
+        hi_scores.append(y - hi.predict(Xte))
     q = 1.0 - miss
     return (max(0.0, float(np.quantile(np.concatenate([s.to_numpy() for s in lo_scores]), q))),
             max(0.0, float(np.quantile(np.concatenate([s.to_numpy() for s in hi_scores]), q))))
@@ -182,9 +193,16 @@ def conformal_width(train: pd.DataFrame, seasons: tuple[int, ...], transform: st
 def predict(m: dict, d: pd.DataFrame, cap: bool = True) -> pd.DataFrame:
     X = design(d, m["seasons"], m["transform"], m["age_fill"], m["fills"], m["upside"])
     w_lo, w_hi = m.get("conformal", (0.0, 0.0))
+    p20 = np.exp(m["q20"].predict(X) - w_lo)
+    if m.get("hurdle") is not None:
+        # If at least 20% of this player's probability mass sits on the $1
+        # minimum bid, his 20th percentile IS $1, whatever the continuous fit
+        # says above it.
+        q = m["hurdle"].predict(X)
+        p20 = np.where(q >= 0.20, 1.0, p20)
     out = pd.DataFrame({
         "pred": np.exp(m["ols"].predict(X)) * m["smear"],
-        "p20": np.exp(m["q20"].predict(X) - w_lo),
+        "p20": p20,
         "p80": np.exp(m["q80"].predict(X) + w_hi),
     }, index=d.index).clip(lower=1.0)
     if cap:

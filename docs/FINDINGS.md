@@ -391,6 +391,31 @@ The likely reconciliation, untested: deep free-agent projections are optimistic 
 
 **Left at `WAIVER_VALUE = "low"`.** The change is one line and reversible; the evidence does not currently support making it.
 
+### 62.5 The role cap survives a third challenger
+Closes the "role cap is still a patch" item from #57.2 and #57.8. The uncapped price model predicts $55.38 for a hitter against a $45 league ceiling, and two designed-in fixes had already lost on leave-one-season-out (concave predictor transforms, monotone GBM). Tried a third with a different mechanism: bound the RESPONSE rather than the predictor, fitting `logit(price / CAP)` so predictions asymptote to CAP by construction and no clipping is possible.
+
+It wins on LOSO at every cap tested (MAE 6.49-6.52 against 6.59 for log-price) and loses on the held-out season (6.17 against 5.76, bias -3.27). Its maximum 2026 prediction is $31.44 for a hitter when the realised maximum was $43. Same failure as the GBM: it buys top-end safety by declining to predict high at all.
+
+Three approaches, one conclusion. **The top-end overshoot and top-end accuracy are the same knob.** Any model that cannot predict $55 also cannot predict $43. The cap keeps the accuracy and bounds only the two players per season who breach, which is the right trade until there is a mechanism that distinguishes "this player is worth $50" from "this player is worth $30 and the model is extrapolating". Noted also: LOSO preferred the bounded model and the held-out season contradicted it, a reminder that leave-one-season-out on three seasons is itself noisy and the held-out test is the acceptance criterion (ROADMAP item 1 Step 2).
+
+### 63. The $1 minimum bid is a point mass, and the band could not see it
+Closes the lower-tail coverage failure left open in #57.3.
+
+**Diagnosis.** Held-out P20-P80 coverage was 55.4% against a nominal 60%, with the misses lopsided: 25.0% below P20 against 19.6% above P80. The upper end was calibrated, the lower was not. Listing the misses made the cause obvious: **19 of the 28 below-P20 misses sold for exactly $1**, and $1 purchases are 19.6% of the training seasons and 19.6% of 2026. A continuous quantile regression cannot represent a point mass. It put P20 at a median of $1.50 for players who were always going to cost the minimum bid; their actual $1 then fell below their own 20th percentile, by construction.
+
+**Fix.** A hurdle: a logistic on the same design matrix for `P(salary = $1)`, and P20 set to $1 wherever that probability reaches 0.20. If a fifth of a player's probability mass sits on the minimum bid, his twentieth percentile IS the minimum bid, whatever the continuous fit says above it. This is the "Tobit at the $1 floor" that ROADMAP item 1 Step 2 offered as the alternative to log-price; log-price was chosen for the point estimate and the floor was left unhandled, which is what showed up here.
+
+| | coverage | below P20 | above P80 | median width |
+|---|---|---|---|---|
+| before | 55.4% | **25.0%** | 19.6% | $13.74 |
+| after | 68.8% | **11.6%** | 19.6% | $14.17 |
+
+The point estimate is untouched (MAE 5.76, Spearman 0.482). The conformal widening is now calibrated with the hurdle active, so the widths are fitted against the band that actually ships rather than a different object.
+
+**The threshold is theory, not a tuned parameter, and that is deliberate.** Calibrating it on the training folds picks 0.50 (LOSO lower-tail miss 18.7%, closest to the 20% target), but 0.50 reproduces the old held-out result exactly (25.0% below) because at that threshold almost nobody gets the floor. The folds and the held-out season disagree, which on three seasons of about 130 purchases each is not surprising. 0.20 is what the definition of a twentieth percentile requires, so 0.20 is what ships. The cost is that the band now over-covers: 68.8% against a nominal 60%. Under-covering was a calibration failure; over-covering is conservative, and the lower tail is honest about the minimum bid.
+
+**Also fixed here: a duplicated model.** `klab/price.py` was extracted from `scripts/price_model.py` earlier in the same session, but the script kept its own copy of `design`/`fit_price_model`/`predict`. The script therefore reported the OLD band numbers after the hurdle went into the real model, which is how the duplication was caught. The script now imports the core it is meant to be testing.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).

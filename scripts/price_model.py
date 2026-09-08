@@ -58,6 +58,12 @@ from scipy.stats import spearmanr
 
 from klab import config as C
 from klab.auction_estimator import PROFILE_COLS
+# The model itself lives in klab/price.py, which is what board.py calls. This
+# script is the research harness on top of it. It used to carry its own copy of
+# design/fit/predict, which silently went stale the moment the $1 hurdle was
+# added to the real one (docs/FINDINGS.md #63).
+from klab.price import (TRANSFORMS, age_fills, conformal_width, design,
+                        fit_price_model, impute_age, predict)
 
 TRAIN = (2023, 2024, 2025)
 # Chosen by leave-one-season-out inside TRAIN; see main(). Named here so
@@ -69,166 +75,8 @@ PROFILE_PRIOR = [f"{c}_prior1" for c in PROFILE_COLS]
 
 # Candidate production transforms. All concave-or-linear in roto points; the
 # linear one is the first cut, kept in so the CV table shows why it loses.
-TRANSFORMS = {
-    "linear": lambda x: x,
-    "sqrt": lambda x: np.sqrt(x.clip(lower=0)),
-    "log1p": lambda x: np.log1p(x.clip(lower=0)),
-}
-
 
 # ---------------------------------------------------------------- design
-
-def age_fills(train: pd.DataFrame) -> dict:
-    """Fill values for missing age, estimated on TRAINING rows only, so no
-    number here is hand-entered and none of it comes from the held-out season
-    (CONSTRAINTS.md forbids inventing a figure; leakage would invalidate the
-    acceptance test)."""
-    have = train[train["age"].notna()]
-    rook = have[have["no_prior_line"] == 1]["age"]
-    return {"mean": float(have["age"].mean()),
-            "rookie": float(rook.mean()) if len(rook) else float(have["age"].mean()),
-            "veteran": float(have[have["no_prior_line"] == 0]["age"].mean()),
-            "upside": float(train["comp_upside"].mean())}
-
-
-def impute_age(d: pd.DataFrame, how: str, fills: dict) -> tuple[pd.Series, pd.Series | None]:
-    """Age, and optionally a missingness flag.
-
-    `mean+flag` is the obvious design and it is a trap here. Age comes from the
-    Chadwick register, which misses a player only when his FanGraphs id is
-    newer than the register: in 2023-2025 that was five unmatched $1
-    placeholders, in 2026 it is eight prospects and NPB imports sold for $1-$20.
-    The flag therefore learns "missing age means $1" from training and applies
-    it to the most expensive rookie class in the sample. `segment` drops the
-    flag and fills age from players with the same prior-line status instead,
-    which is what the missingness actually tracks.
-    """
-    age = d["age"]
-    if how == "mean+flag":
-        return age.fillna(fills["mean"]), age.isna().astype(float)
-    fill = pd.Series(np.where(d["no_prior_line"] == 1, fills["rookie"],
-                              fills["veteran"]), index=d.index)
-    return age.fillna(fill), None
-
-
-def design(d: pd.DataFrame, seasons: tuple[int, ...], transform: str,
-           age_fill: str, fills: dict, upside: bool = False) -> pd.DataFrame:
-    """Model matrix. Season dummies are built against `seasons`; a row whose
-    season is not among them gets the most recent training season's dummy, so
-    a future season inherits the latest observed price level instead of the
-    omitted base year's."""
-    f = TRANSFORMS[transform]
-    pit = (d["role"] == "PIT").astype(float)
-    rp1, rp2 = f(d["rp_prior1"]), f(d["rp_prior2"])
-    X = pd.DataFrame({
-        "const": 1.0,
-        "rp_prior1": rp1,
-        "rp_prior2": rp2,
-        # Role interaction: hitters and pitchers are paid on different slopes
-        # (1.10 vs 0.48 $/pt in the ROADMAP diagnosis), so one slope fits neither.
-        "rp_prior1_pit": rp1 * pit,
-        "is_pit": pit,
-        "no_prior_line": d["no_prior_line"].astype(float),
-        "log_PA_prior1": np.log1p(d["PA_prior1"]),
-        "log_IP_prior1": np.log1p(d["IP_prior1"]),
-        "SV_prior1": d["SV_prior1"],
-        "auction_tenure": d["auction_tenure"].astype(float),
-        "ever_bought_before": d["ever_bought_before"].astype(float),
-        # log1p, not raw: $40 -> $45 is a smaller signal than $1 -> $6.
-        "log_last_salary": np.log1p(d["last_salary"].fillna(0.0)),
-        "years_since_last": d["years_since_last"].fillna(0.0),
-    }, index=d.index)
-    age, flag = impute_age(d, age_fill, fills)
-    X["age"] = age
-    if flag is not None:
-        X["age_missing"] = flag
-    if upside:
-        # ROADMAP item 1 Step 5. Interaction as well as level: the hypothesis on
-        # record is that the market pays for spread among hitters and not among
-        # pitchers, so the two are separated rather than pooled.
-        u = d["comp_upside"].fillna(fills["upside"])
-        X["comp_upside"] = u
-        X["comp_upside_pit"] = u * pit
-
-    latest = max(seasons)
-    for s in seasons[1:]:
-        on = (d["season"] == s)
-        if s == latest:
-            on = on | ~d["season"].isin(seasons)   # unseen season carries the latest level
-        X[f"season_{s}"] = on.astype(float)
-    return X
-
-
-def fit_price_model(train: pd.DataFrame, seasons: tuple[int, ...], transform: str,
-                    age_fill: str = "mean+flag", upside: bool = False) -> dict:
-    fills = age_fills(train)
-    X, y = design(train, seasons, transform, age_fill, fills, upside), train["log_salary"]
-    ols = sm.OLS(y, X).fit()
-    # Duan smearing: E[price] = exp(Xb) * mean(exp(residual)), from training only.
-    smear = float(np.mean(np.exp(ols.resid)))
-    q20 = sm.QuantReg(y, X).fit(q=0.20, max_iter=5000)
-    q80 = sm.QuantReg(y, X).fit(q=0.80, max_iter=5000)
-    return {"ols": ols, "smear": smear, "q20": q20, "q80": q80,
-            "seasons": seasons, "transform": transform, "age_fill": age_fill,
-            "fills": fills, "upside": upside, "conformal": (0.0, 0.0),
-            # The league has never paid more than this for the role; a price
-            # model that predicts past it is extrapolating, not forecasting.
-            "role_cap": train.groupby("role")["salary"].max().to_dict()}
-
-
-def conformal_width(train: pd.DataFrame, seasons: tuple[int, ...], transform: str,
-                    age_fill: str, upside: bool, miss: float = 0.20) -> tuple[float, float]:
-    """How much each END of the P20-P80 band has to move to actually cover.
-
-    In-sample the quantile fits cover 57.5%, out of sample 38.4%: the band is
-    fit where the residuals are already minimised and does not transfer. This is
-    split-conformal quantile regression with the training SEASONS as the folds,
-    which is the right split here because the thing that fails to transfer is a
-    season, not a random row. Each fold refits q20/q80 on the other seasons and
-    scores the held-out one.
-
-    The two ends are calibrated separately. Pooling them left the misses
-    lopsided (19.6% below P20 against 27.7% above P80) because the upper tail is
-    what the model underprices; one shared widening cannot fix an asymmetric
-    miss. Each end targets `miss` of the mass outside it.
-
-    Calibrated on training seasons only, so the held-out season stays held out.
-    """
-    lo_scores, hi_scores = [], []
-    for hold in seasons:
-        fit_seasons = tuple(s for s in seasons if s != hold)
-        tr = train[train["season"].isin(fit_seasons)]
-        te = train[train["season"] == hold]
-        f = age_fills(tr)
-        Xtr = design(tr, fit_seasons, transform, age_fill, f, upside)
-        lo = sm.QuantReg(tr["log_salary"], Xtr).fit(q=0.20, max_iter=5000)
-        hi = sm.QuantReg(tr["log_salary"], Xtr).fit(q=0.80, max_iter=5000)
-        Xte = design(te, fit_seasons, transform, age_fill, f, upside)
-        y = te["log_salary"]
-        lo_scores.append(lo.predict(Xte) - y)      # > 0 when the truth fell below P20
-        hi_scores.append(y - hi.predict(Xte))      # > 0 when it fell above P80
-    q = 1.0 - miss
-    return (max(0.0, float(np.quantile(np.concatenate([s.to_numpy() for s in lo_scores]), q))),
-            max(0.0, float(np.quantile(np.concatenate([s.to_numpy() for s in hi_scores]), q))))
-
-
-def predict(m: dict, d: pd.DataFrame, cap: bool = True) -> pd.DataFrame:
-    X = design(d, m["seasons"], m["transform"], m["age_fill"], m["fills"], m["upside"])
-    w_lo, w_hi = m.get("conformal", (0.0, 0.0))
-    out = pd.DataFrame({
-        "pred": np.exp(m["ols"].predict(X)) * m["smear"],
-        "p20": np.exp(m["q20"].predict(X) - w_lo),
-        "p80": np.exp(m["q80"].predict(X) + w_hi),
-    }, index=d.index).clip(lower=1.0)
-    if cap:
-        ceiling = d["role"].map(m["role_cap"]).astype(float)
-        ceiling = ceiling.fillna(float(max(m["role_cap"].values())))
-        for c in ("pred", "p20", "p80"):
-            out[c] = np.minimum(out[c], ceiling)
-    return out
-
-
-# ---------------------------------------------------------------- baselines
 
 def baseline_prior_salary(train: pd.DataFrame, test: pd.DataFrame) -> pd.Series:
     """Last price this league paid him, carried forward by the training
