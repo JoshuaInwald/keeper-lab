@@ -2,6 +2,14 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (first user pass over the new board)
+
+| type | item |
+|---|---|
+| bug | The `Surplus '27` tooltip still said "Production $ minus cost" after #70 moved the keep decision to `keep_value`, so the app stated arithmetic that did not reproduce its own number (Neto: $19.98 production, $40.98 surplus). Added a `Replace $` column and the explicit subtraction in the drawer; corrected both surplus tooltips; re-counted the phone CSS nth-child hide-list for the inserted column (FINDINGS #71) |
+| built | Standings and Contention merged into one tab with **money odds as the second column**, ahead of projected points. They were not redundant (point estimate against Monte Carlo money odds) but were indistinguishable, both being ten-row team tables. `app/verify.mjs` now checks the odds column leads both standings seasons and that the Contention tab is gone (FINDINGS #71) |
+| built | Rule recorded: a `KEEP_BASIS` / `POOL_RULE` change is not done when the tests pass. The app states its arithmetic in prose and prose is not covered by `verify.mjs` |
+
 ## 2026-09-08 (assessment phase, Phase B item 3: two valuation changes ship)
 
 | type | item |

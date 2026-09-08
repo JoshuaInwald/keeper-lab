@@ -131,5 +131,8 @@ Phase B is complete. #68 and #69 diagnosed, #70 shipped. This is a fresh-context
 
 **4. The projection-source toggle.** Build last. `PROJECTION_BASIS` is the precedent. **Marcel 2027 does not exist** (Baseball-Reference publishes after a season ends), so the toggle is backward-facing only and the 2027 board stays ZiPS.
 
+### A rule the first user pass added (#71)
+**A `KEEP_BASIS` or `POOL_RULE` change is not done when the tests pass.** The app explains its own arithmetic in prose tooltips and that prose is not covered by `app/verify.mjs`. #70 shipped with a `Surplus '27` tooltip still reading "Production $ minus cost", which it had just made false. Grep `app/template.html` for the affected labels whenever a dollar scale changes hands.
+
 ### Still true regardless
 Do not build a hitter/pitcher budget split (#64). Do not promote `keep_2027_market` (#57.5). Do not read `keep_value` as a price: it is an opportunity cost and is known to run rich at the top end (#57, #70). `redraft_value` remains the fair-value/trade scale and its DEFINITION is unchanged; #70 changed what consumes it, not what it is.

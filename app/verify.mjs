@@ -65,7 +65,7 @@ const got = await page.evaluate(ref => {
 
 // Every tab, the drawer, the filters, a re-sort -- anything that throws shows
 // up in `errs`.
-for (const t of ['board', 'teams', 'contention', 'trade', 'standings', 'fa', 'intuition', 'model']) {
+for (const t of ['board', 'teams', 'trade', 'standings', 'fa', 'intuition', 'model']) {
   await page.evaluate(t => go(t), t);
   await page.waitForTimeout(50);
 }
@@ -332,24 +332,32 @@ const keeper2027Result = await page.evaluate(() => {
 const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
-// Contention tab's 2027 season toggle (docs/SESSION-LOG.md Phase 5 Stage 3):
-// must render all 10 teams and must vary with PROJECTION_BASIS, since
-// which players are flagged keep_2027 is basis-dependent -- unlike the
-// 2026 rest-of-season view, which isn't.
+// Money odds moved INTO the Standings tab (the Contention tab is gone: it
+// showed the same ten teams and readers could not tell the two apart). Both
+// standings seasons must now carry a "Money odds" column, it must lead the
+// table, and the 2027 view must still vary with PROJECTION_BASIS since which
+// players are flagged keep_2027 is basis-dependent.
 const contention2027Result = await page.evaluate(() => {
-  go('contention');
-  S.contentionSeason = '2027';
+  go('standings');
+  S.standSeason = 'keepers2027';
   render();
+  const hdr = [...document.querySelectorAll('#view thead th')].map(t => t.textContent.trim());
   const rowsShown = document.querySelectorAll('#view tbody tr').length;
   const before = D.basis_variants[S.basis].keeper_finish_odds['NPB No Stars']?.p_money;
   setBasis('actuals');
   const after = D.basis_variants[S.basis].keeper_finish_odds['NPB No Stars']?.p_money;
   setBasis('blend');
-  S.contentionSeason = '2026'; render();
-  return { rowsShown, before, after, basisAware: before !== after };
+  S.standSeason = 'live'; render();
+  const liveHdr = [...document.querySelectorAll('#view thead th')].map(t => t.textContent.trim());
+  return { rowsShown, before, after, basisAware: before !== after,
+           oddsFirst2027: (hdr[1] || '').startsWith('Money odds'),
+           oddsFirstLive: (liveHdr[1] || '').startsWith('Money odds'),
+           noContentionTab: !document.querySelector('[data-t="contention"]') };
 });
-const contention2027Bad = contention2027Result.rowsShown !== 10 || !contention2027Result.basisAware;
-if (contention2027Bad) console.log('  CONTENTION 2027 TOGGLE MISMATCH:', JSON.stringify(contention2027Result));
+const contention2027Bad = contention2027Result.rowsShown !== 10
+  || !contention2027Result.basisAware || !contention2027Result.oddsFirst2027
+  || !contention2027Result.oddsFirstLive || !contention2027Result.noContentionTab;
+if (contention2027Bad) console.log('  STANDINGS/ODDS MERGE MISMATCH:', JSON.stringify(contention2027Result));
 
 // upside_ft's role/health split (docs/FINDINGS.md #53): a reliever whose
 // full-time upside comes from being scaled to a closer's save total must be
@@ -449,8 +457,8 @@ console.log(historyBad ? 'FAIL  historical standings did not render or did not r
                        : 'PASS  historical standings render and return to the live view cleanly');
 console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignores projection basis'
                           : 'PASS  2027 keeper standings render all 10 teams and track projection basis');
-console.log(contention2027Bad ? 'FAIL  Contention tab 2027 toggle missing teams or ignores projection basis'
-                              : 'PASS  Contention tab 2027 toggle renders all 10 teams and tracks projection basis');
+console.log(contention2027Bad ? 'FAIL  Standings/odds merge: missing teams, odds not leading, or basis ignored'
+                              : 'PASS  Money odds lead both standings seasons, 10 teams, basis-aware, Contention tab gone');
 console.log(upsideKindBad ? 'FAIL  upside_ft role/health split missing a case or not tagged correctly'
                           : 'PASS  upside_ft tags closer-role upside separately from health upside');
 console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'

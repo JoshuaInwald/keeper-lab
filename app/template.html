@@ -213,7 +213,7 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 const S = {tab:"model", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
            desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
            rosBasis: D.ros_basis_default || "ros", standSeason: "live", positional: false,
-           shades: {}, intuitionQ: "", intuitionCalculated: false, contentionSeason: "2026"};
+           shades: {}, intuitionQ: "", intuitionCalculated: false};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
 
@@ -440,7 +440,7 @@ function simulateFinishOdds(swap, B, shockScale, payoutSpots){
 
 // ---------- nav ----------
 const TABS=[["model","Home"],["board","Keeper board"],["teams","League"],
-            ["contention","Contention"],["trade","Trade"],
+            ["trade","Trade"],
             ["standings","Standings"],["fa","Free agents"],["intuition","Intuition"]];
 $("nav").innerHTML = TABS.map(([k,l])=>
   `<button data-t="${k}" onclick="go('${k}')">${l}</button>`).join("");
@@ -1023,49 +1023,26 @@ function contentionHelp(is2027){
   return base + scope + "Contender: 50%+ chance of the money. Bubble: 5-50%. Rebuild: under "
     + "5%. Judgment-call thresholds, not a hard line.";
 }
-function contentionView(){
-  const is2027 = S.contentionSeason === "2027";
-  const zeroFinish = Object.fromEntries(Array.from({length:PAYOUT_SPOTS}, (_,i)=>[`p_finish_${i+1}`,0]));
-  const basisData = is2027
-    ? (D.basis_variants[S.basis].keeper_finish_odds || {})
-    : (D.finish_odds[S.rosBasis] || D.finish_odds.ros);
-  const nKeepByTeam = is2027
-    ? Object.fromEntries((D.basis_variants[S.basis].keeper_standings_2027 || []).map(r=>[r.team, r.n_keep]))
-    : {};
-  const rows = TEAMS.map(t=>{
-    const o = basisData[t] || {p_money:0, ...zeroFinish};
-    const context = is2027 ? (nKeepByTeam[t] ?? 0) : (o.current_points ?? 0);
-    return {team:t, context, ...o};
-  });
-  const placeCols = Array.from({length:PAYOUT_SPOTS}, (_,i)=>{
-    const place = i+1, ord = place===1?"1st":place===2?"2nd":place===3?"3rd":`${place}th`;
-    return [`p_finish_${place}`, `P(${ord})`, "", x=>`${nf(x[`p_finish_${place}`]*100,0)}%`,
+// Merged into the Standings tab. The two used to be separate tabs showing the
+// same ten teams, and a reader could not tell them apart: one is a point
+// estimate, the other is the distribution around it. They now sit in one table
+// with the odds FIRST, because with a 50/25/15/breakeven payout the odds are
+// the number that decides anything and the point estimate is context.
+function oddsColumns(basisData, help){
+  const zero = Object.fromEntries(Array.from({length:PAYOUT_SPOTS},(_,i)=>[`p_finish_${i+1}`,0]));
+  const get = t => basisData[t] || {p_money:0, ...zero};
+  const placeCols = Array.from({length:PAYOUT_SPOTS},(_,i)=>{
+    const place=i+1, ord = place===1?"1st":place===2?"2nd":place===3?"3rd":`${place}th`;
+    return [`p_finish_${place}`, `P(${ord})`, "", x=>`<span class="dim">${nf(x[`p_finish_${place}`]*100,0)}%</span>`,
       `Simulated odds of finishing exactly ${ord}.`];
   });
-  const help = contentionHelp(is2027);
-  const contextCol = is2027
-    ? ["context","Keepers","",x=>x.context,"How many players are in this team's current 2027 keeper set."]
-    : ["context","Points now","",x=>nf(x.context,1),"Roto points in the live 2026 standings."];
-  const cols = [
-    ["team","Team","l",x=>`<span class="name" onclick="S.tab='board';S.team=${JSON.stringify(esc(x.team))};render()">${esc(x.team)}</span>`,
-      "Click to see this team's players."],
-    contextCol,
-    ["p_money","P(money)","",x=>{
+  return {get, cols: [
+    ["p_money","Money odds","",x=>{
         const lab = contentionLabel(x.p_money);
         return `${nf(x.p_money*100,0)}% <span class="${lab.cls}" style="font-size:11px;margin-left:4px">${lab.text}</span>`;
       }, help],
     ...placeCols,
-  ];
-  const seasonPicker = `<select onchange="S.contentionSeason=this.value;render()">
-    <option value="2026" ${!is2027?"selected":""}>2026 — rest of season</option>
-    <option value="2027" ${is2027?"selected":""}>2027 — keeper core</option>
-  </select>`;
-  return `<div class="bar">${seasonPicker}${is2027?"":rosBasisPicker()}</div>`
-    + sortableTable(rows, cols, "sortContention"+S.contentionSeason, help
-      + (is2027 ? " Change the \"projection basis\" dropdown in the header to see how the "
-                 + "projection source moves this."
-                : " Change the \"rest-of-2026 basis\" dropdown above to see how the signal "
-                 + "driving this changes the picture."));
+  ]};
 }
 
 // ---------- standings ----------
@@ -1104,8 +1081,12 @@ function seasonPicker(){
   </select>`;
 }
 function keeperStandings2027View(){
+  const odds = oddsColumns(D.basis_variants[S.basis].keeper_finish_odds || {},
+                           contentionHelp(true));
+  const rows = KEEPER_STANDINGS_2027.map(r=>({...r, ...odds.get(r.team)}));
   const cols = [
     ["team","Team","l",r=>esc(r.team),"Fantasy team."],
+    ...odds.cols,
     ["points","Projected points","",r=>nf(r.points,1),
       "10 for first place down to 1 for last, using ONLY each team's current keeper set plus "
       +"replacement-level filler for every roster slot not yet occupied by a keeper -- not a "
@@ -1117,9 +1098,12 @@ function keeperStandings2027View(){
       `Projected 2027 ${c} total (${C_UNIT(c)}), keeper core + replacement-level fill.`])
   ];
   return `<div class="bar">${seasonPicker()}</div>`
-    + sortableTable(KEEPER_STANDINGS_2027, cols, "sortStandKeepers2027",
-        "Isolates keeper-core strength from what an average auction might add. Change the "
-        +"\"projection basis\" dropdown in the header to see how the projection source moves this.");
+    + sortableTable(rows, cols, "sortStandKeepers2027",
+        "Money odds first: with a 50/25/15/breakeven payout, how OFTEN a keeper core cashes "
+        +"matters more than where its point estimate lands. Projected points are the same "
+        +"simulation's centre. Isolates keeper-core strength from what an average auction might "
+        +"add. Change the \"projection basis\" dropdown in the header to see how the "
+        +"projection source moves this.");
 }
 function historyStandingsView(yr){
   const rows = HISTORY[yr] || [];
@@ -1141,14 +1125,17 @@ function standingsView(){
   if(S.standSeason !== "live") return historyStandingsView(S.standSeason);
 
   const now={}; D.standings.forEach(s=>now[s.team]=s);
+  const odds = oddsColumns(D.finish_odds[S.rosBasis] || D.finish_odds.ros,
+                           contentionHelp(false));
   const rows=TEAMS.map(t=>{
-    const r={team:t, now:now[t].points_2026, proj:PROJ_PTS[t].TOTAL};
+    const r={team:t, now:now[t].points_2026, proj:PROJ_PTS[t].TOTAL, ...odds.get(t)};
     r.delta=r.proj-r.now;
     CATS.forEach(c=>{ r[c]=S.totals?PROJ_TOT[t][c]:PROJ_PTS[t][c]; });
     return r;
   });
   const cols=[
     ["team","Team","l",r=>esc(r.team),"Fantasy team."],
+    ...odds.cols,
     ["now","Points now","",r=>nf(r.now,1),"Roto points in the live standings."],
     ["proj","Projected","",r=>nf(r.proj,1),"Roster rolled forward to the end of 2026, re-ranked."],
     ["delta","Change","",r=>sgn(r.delta,1),"Projected finish minus current position."],
@@ -1167,9 +1154,12 @@ function standingsView(){
       ${rosBasisPicker()}
     </div>`
     + sortableTable(rows, cols, "sortStand",
-        S.totals
+        "Money odds first: this league pays 1st-4th, so how OFTEN a roster cashes decides "
+        + "more than where its point estimate lands. Projected points are the same "
+        + "simulation's centre, not a separate forecast. "
+        + (S.totals
           ? "Projected end-of-season totals. Rate categories are team rates, not sums."
-          : "Projected roto points, 10 for first place down to 1 for last. Every column sorts.");
+          : "Projected roto points, 10 for first place down to 1 for last. Every column sorts."));
 }
 const C_UNIT = c => NEG.has(c) ? "lower is better"
   : c==="AVG" ? "team batting average, higher is better" : "season total";
@@ -1683,7 +1673,6 @@ function render(){
   if(S.tab==="board") v.innerHTML=controls()+boardView(curRows());
   else if(S.tab==="fa") v.innerHTML=controls(false)+boardView(curRows(), FA_NOTE);
   else if(S.tab==="teams") v.innerHTML=teamsView();
-  else if(S.tab==="contention") v.innerHTML=contentionView();
   else if(S.tab==="trade") v.innerHTML=tradeView();
   else if(S.tab==="standings") v.innerHTML=standingsView();
   else if(S.tab==="intuition") v.innerHTML=intuitionView();
