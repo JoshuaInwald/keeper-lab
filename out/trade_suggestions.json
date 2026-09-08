@@ -35,7 +35,7 @@
       "a_sends": "Miguel Vargas",
       "b_sends": "George Kirby",
       "buyer_standings_gain": 3.0,
-      "seller_surplus_gain": 17.29
+      "seller_surplus_gain": 17.24
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -82,7 +82,7 @@
       "a_sends": "Jonathan Aranda",
       "b_sends": "Nico Hoerner",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 26.46
+      "seller_surplus_gain": 26.45
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -103,7 +103,7 @@
       "a_sends": "Miguel Vargas",
       "b_sends": "Kodai Senga",
       "buyer_standings_gain": 2.0,
-      "seller_surplus_gain": 1.77
+      "seller_surplus_gain": 1.76
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -124,7 +124,7 @@
       "a_sends": "Jes\u00fas Luzardo",
       "b_sends": "Shea Langeliers",
       "buyer_standings_gain": 4.0,
-      "seller_surplus_gain": 18.76
+      "seller_surplus_gain": 18.67
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -171,7 +171,7 @@
       "a_sends": "Aroldis Chapman",
       "b_sends": "George Kirby",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 26.83
+      "seller_surplus_gain": 26.88
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -212,7 +212,7 @@
       "a_sends": "Jos\u00e9 Ram\u00edrez",
       "b_sends": "JJ Wetherholt",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 28.1
+      "seller_surplus_gain": 28.11
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -234,7 +234,7 @@
       "a_sends": "Aroldis Chapman",
       "b_sends": "Shea Langeliers",
       "buyer_standings_gain": 3.5,
-      "seller_surplus_gain": 7.95
+      "seller_surplus_gain": 7.84
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -268,7 +268,7 @@
       "a_sends": "Ceddanne Rafaela",
       "b_sends": "Chandler Simpson",
       "buyer_standings_gain": 1.5,
-      "seller_surplus_gain": 8.93
+      "seller_surplus_gain": 8.92
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -289,7 +289,7 @@
       "a_sends": "Ceddanne Rafaela",
       "b_sends": "Max Fried",
       "buyer_standings_gain": 2.0,
-      "seller_surplus_gain": 34.6
+      "seller_surplus_gain": 34.52
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -317,7 +317,7 @@
       "a_sends": "Jackson Chourio",
       "b_sends": "Nico Hoerner",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 14.5
+      "seller_surplus_gain": 14.49
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -332,7 +332,7 @@
       "a_sends": "Hunter Goodman",
       "b_sends": "Cody Bellinger",
       "buyer_standings_gain": 0.5,
-      "seller_surplus_gain": 16.88
+      "seller_surplus_gain": 16.87
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -347,7 +347,7 @@
       "a_sends": "Chris Sale",
       "b_sends": "Shea Langeliers",
       "buyer_standings_gain": 4.0,
-      "seller_surplus_gain": 19.26
+      "seller_surplus_gain": 19.24
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -388,7 +388,7 @@
       "a_sends": "George Kirby",
       "b_sends": "Carter Jensen",
       "buyer_standings_gain": 1.5,
-      "seller_surplus_gain": 35.91
+      "seller_surplus_gain": 35.85
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -409,7 +409,7 @@
       "a_sends": "George Kirby",
       "b_sends": "JJ Wetherholt",
       "buyer_standings_gain": 0.5,
-      "seller_surplus_gain": 20.91
+      "seller_surplus_gain": 20.85
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -430,7 +430,7 @@
       "a_sends": "George Kirby",
       "b_sends": "Garrett Crochet",
       "buyer_standings_gain": 0.5,
-      "seller_surplus_gain": 31.56
+      "seller_surplus_gain": 31.46
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -451,7 +451,7 @@
       "a_sends": "George Kirby",
       "b_sends": "Shea Langeliers",
       "buyer_standings_gain": 3.0,
-      "seller_surplus_gain": 34.79
+      "seller_surplus_gain": 34.72
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -472,7 +472,7 @@
       "a_sends": "George Kirby",
       "b_sends": "Konnor Griffin",
       "buyer_standings_gain": 1.5,
-      "seller_surplus_gain": 26.29
+      "seller_surplus_gain": 26.22
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -500,7 +500,7 @@
       "a_sends": "Michael Harris II",
       "b_sends": "Nico Hoerner",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 7.96
+      "seller_surplus_gain": 7.97
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -515,7 +515,7 @@
       "a_sends": "Andy Pages",
       "b_sends": "Mookie Betts",
       "buyer_standings_gain": 0.5,
-      "seller_surplus_gain": 18.92
+      "seller_surplus_gain": 18.91
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -530,7 +530,7 @@
       "a_sends": "Max Fried",
       "b_sends": "Shea Langeliers",
       "buyer_standings_gain": 4.0,
-      "seller_surplus_gain": 23.57
+      "seller_surplus_gain": 23.49
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -579,7 +579,7 @@
       "a_sends": "Caleb Durbin",
       "b_sends": "Cody Bellinger",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 18.38
+      "seller_surplus_gain": 18.39
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -594,7 +594,7 @@
       "a_sends": "Josh Hader",
       "b_sends": "Shea Langeliers",
       "buyer_standings_gain": 4.0,
-      "seller_surplus_gain": 18.98
+      "seller_surplus_gain": 18.96
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -656,7 +656,7 @@
       "a_sends": "Nico Hoerner",
       "b_sends": "Yordan Alvarez",
       "buyer_standings_gain": 1.0,
-      "seller_surplus_gain": 25.18
+      "seller_surplus_gain": 25.19
     },
     "challenge_trade": null,
     "mutual_value_swap": null
@@ -671,7 +671,7 @@
       "a_sends": "Mookie Betts",
       "b_sends": "Shea Langeliers",
       "buyer_standings_gain": 2.0,
-      "seller_surplus_gain": 30.29
+      "seller_surplus_gain": 30.28
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -692,7 +692,7 @@
       "a_sends": "Willson Contreras",
       "b_sends": "Hunter Greene",
       "buyer_standings_gain": 2.0,
-      "seller_surplus_gain": 8.86
+      "seller_surplus_gain": 9.0
     },
     "challenge_trade": {
       "scenario": "challenge_trade",
@@ -713,7 +713,7 @@
       "a_sends": "Shea Langeliers",
       "b_sends": "Yoshinobu Yamamoto",
       "buyer_standings_gain": 4.0,
-      "seller_surplus_gain": 15.44
+      "seller_surplus_gain": 15.47
     },
     "challenge_trade": {
       "scenario": "challenge_trade",

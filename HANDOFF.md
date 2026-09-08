@@ -37,13 +37,21 @@ Run order is fetch_chadwick -> price_features -> {keeper_revealed, price_model, 
 - The ROADMAP's "25% of purchases have no prior MLB line" is 137 censored 2022 rows plus 30 real rookies. The observable rookie rate is 5.6% (FINDINGS #56.3).
 
 ## Open, in priority order
-1. **Season-to-date actuals are stale (2026-08-12) and it is a one-export fix.** `fg_hitters_2022_2026.csv` / `fg_pitchers_2022_2026.csv` were NOT refreshed on 2026-09-07: the leaderboard exports Josh downloaded came from FanGraphs' Dashboard view and lack `AB`, `H` (hitters) and `K`, `ER`, `BB`, `H` (pitchers), which are the denominators for AVG/ERA/WHIP and the K category itself. Re-export from the Standard view, append as Season 2026, rebuild. Everything else in `data/` is current to 2026-09-07. Deriving the pitching columns from K/9 and BB/9 was rejected: rounding would inject error into every rate stat.
-2. **`market_price` shipped** as a board column ("Market $") next to Production $, with the P20-P80 range and the buy/sell gap on hover, plus an auction-price block in the player drawer. Adding it exposed a stale `nth-child` list in the phone CSS that had been hiding Production $, the one number its own comment says the phone keeps; fixed in the same pass.
-3. **The role cap stays, and that is now a decision rather than a gap.** Three approaches tried (concave predictor transforms, monotone GBM, bounded logit response); all trade top-end accuracy for top-end safety, because they are the same knob (`docs/FINDINGS.md` #62.5). Reopen only with a mechanism that separates "worth $50" from "the model is extrapolating".
-4. **Lower-tail band coverage: fixed** (#63). The misses were the $1 minimum bid, a point mass a continuous quantile fit cannot represent. A hurdle on `P(salary = $1)` took the lower tail from 25.0% to 11.6% against a 20% target. The band now over-covers (68.8% against a nominal 60%), which is conservative rather than wrong.
-5. **Step 4 needs the right object.** `market_price - keeper_cost` is transaction arbitrage; `production_value - keeper_cost` ignores that the money has an alternative use. The construction that fixes both is production priced at the market's own marginal rate, but at $12.18 per roto point it overshoots the top worse than `keep_value` does. This is ROADMAP item 2 territory (team-specific category value), not a fifth dollar scale.
+1. **Nothing is blocking.** `data/` is current to 2026-09-07 including season-to-date actuals; ROADMAP items 1, 2 and 4 are closed; the two loose ends from item 1 (role cap, lower-tail coverage) are resolved or decided.
+2. **`WAIVER_VALUE` is a live one-line question, deliberately left alone.** Observed waiver churn says replacement should be ~4.4 (the unused `"medium"`, 4.381) and would put the top of the board at $45.20, the league ceiling. The internal-consistency test says the opposite: at 4.381, 106 unrostered players beat replacement. `docs/FINDINGS.md` #62 has both sides. Transaction logs WITH DATES would settle it.
+3. **Step 4 still needs the right object.** `market_price - keeper_cost` is transaction arbitrage; `production_value - keeper_cost` ignores that the money has an alternative use. Production priced at the market's own marginal rate fixes the sign errors but overshoots the top worse than `keep_value`. Not a fifth dollar scale; see #60's contend-or-punt flag instead.
+4. **`data/positions_2026.csv` will go stale.** It is a roster-time snapshot and rosters churn (38 adds in 3.5 weeks). Rebuild when comp pools start looking wrong; `data/README.md` says how.
+5. **Intuition tab v2 is blocked on Josh, not on work.** Sandboxed overrides or overrides that propagate through the 2027 pipeline. The propagating version is materially larger. Nothing else needs a decision.
+
+## What is deliberately NOT built, with the evidence
+- **Per-team category multipliers** (ROADMAP item 2 as written): 0.29x-13.28x within a season, persistence -0.07 across seasons. Implementation kept in `klab/teamvalue.py` so nobody rebuilds it. #60.
+- **An upside/spread price feature** (item 1 Step 5): both terms insignificant, loses on LOSO. #57.1.
+- **Removing the role cap**: three mechanisms tried, all trade top-end accuracy for safety. #62.5.
+- **An aging curve on the projection**: the engine already applies +0.621 roto points to under-25s against an empirical +0.778. CONSTRAINTS.md's decision is vindicated, not merely inherited. #59.
+- **`keep_2027_market` as the headline call**: keeps 104 including 30 below replacement, and cuts Skubal. #57.5.
 
 ## Next session: start here
 1. `git status`, `./check_sync.sh`, `ls data/`.
-2. ROADMAP item 1 is done. Refresh the two season-to-date files first (item 1 above, ~15 min), then ROADMAP item 2 (team-specific category value) is the next unbuilt priority.
+2. The unbuilt roadmap is now items 3 (Intuition v2, needs Josh's decision), 5 (uncertainty ranges on tabs) and 6 (small contained items). Item 2's remnant is a contend-or-punt flag on K, SB, R, AVG and SV, feeding the trade evaluator rather than the dollar scale.
 3. Do not touch `redraft_value`'s definition and do not promote `keep_2027_market` to the headline call.
+4. Before the next data refresh, consider one pass over the suite for assertions still pinned to specific players or to standings POINTS rather than category totals; four broke on the 2026-09-07 refresh and were fixed, but the pattern may not be exhausted.
