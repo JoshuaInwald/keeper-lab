@@ -41,8 +41,10 @@ Pushback on the review itself: a single owner's price sense is a noisy instrumen
 
 **What to expect.** Even a good model will leave roughly half the price variance unexplained; report that ceiling rather than tune to the reviewer's list. The ordering of players by `production_value` is already validated (Spearman 0.85-0.89 against three external systems); what changes is the dollar level and the identity of who is cheap relative to market.
 
-## 2. Team-specific category value (1 session to scope)
-Roto points add linearly today; the marginal value of a category unit depends on where a team sits in it. Turn one value per player into one per team. The trade evaluator's win-now lens already re-ranks standings; the general fix is unbuilt. Highest-value gap after item 1.
+## 2. Team-specific category value [SCOPED 2026-09-08: DO NOT BUILD AS WRITTEN]
+Roto points add linearly today; the marginal value of a category unit depends on where a team sits in it. Scoped and measured (`docs/FINDINGS.md` #60): the continuous per-team multiplier is unestimable here. Within a season it ranges 0.29x to 13.28x, and its year-over-year persistence is **-0.07** -- pure n=10 noise. Category RANK persists at +0.25 and is usable in K, SB, R, AVG and SV only. `klab/teamvalue.py` holds the working implementation and the negative result; do not rebuild it.
+
+What is left worth doing, much smaller: a contend-or-punt flag on the five categories where rank persists, feeding the trade evaluator rather than the dollar scale. The in-season case already works correctly through `trade.win_now_delta()`, which re-ranks observed standings instead of projecting them.
 
 ## 3. Intuition tab v2 (scope needs a decision)
 Show each player's PA/IP and per-category rates; three ways to adjust (+/- buttons, direct entry, presets such as full-time); all 230 rostered players grouped by team with contract fields. Open decision: sandboxed (as now) or a propagating override that flows through the 2027 pipeline. The propagating version is a materially larger change; decide before scoping.

@@ -320,6 +320,26 @@ This vindicates CONSTRAINTS.md's 2026-08-14 decision to decline an aging curve. 
 
 Owners look close to binary on the young: of the 11 decisions on players 25 and under, the 5 with above-median prior production went 4 kept, and the 6 below-median went 0 kept. Suggestive of a "produce or be cut" rule that a continuous production scale cannot express, and far too small a cell (n=11) to claim; recorded as a thing to re-test when the 2027 decisions land.
 
+### 60. Team-specific category value: the premise holds, the estimate does not
+ROADMAP item 2, scoped and not built. `klab/teamvalue.py` and `scripts/team_category_value.py`.
+
+The premise is not in doubt: `denoms.py` divides every player's units by ONE league-wide denominator, so a save is worth the same to the team with 106 of them and the team with 0. Built the correction the obvious way. `local_denominators()` measures how many units a team needs for one standings point from where it actually sits, as the mean gap between adjacent teams within two ranks either side (the raw next-team-up gap is 0.1 units when two teams are tied and 50 when a team is isolated, which would swing a player's value 100x on standings noise). `value_multipliers()` expresses that against the league-average team. The prize is large: within a season the multiplier runs 0.29 to 13.28.
+
+**It is noise.** Year-over-year persistence of a team's multiplier in a category, pooled over the four transitions 2022-2026, n=32 per category:
+
+| | R | HR | RBI | SB | AVG | W | SV | K | ERA | WHIP | mean |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| gap multiplier | -0.14 | +0.09 | -0.02 | -0.10 | -0.02 | -0.12 | -0.03 | +0.09 | -0.24 | -0.20 | **-0.07** |
+| category rank | +0.46 | +0.22 | -0.07 | +0.49 | +0.33 | +0.18 | +0.31 | +0.56 | -0.20 | +0.18 | **+0.25** |
+
+Whole-matrix correlations across consecutive seasons are -0.108, -0.026, +0.010, +0.054. Where a team sits relative to the pack is a property of one season's realised standings, not of the team. Pricing 2027 keepers with it would be fitting n=10 noise, the same instability METHODS section 3 #1 already rejected per-season denominators for.
+
+What survives is coarser. Category RANK persists at +0.25 on average, usefully in K (+0.56), SB (+0.49), R (+0.46), AVG (+0.33) and SV (+0.31), and not at all in RBI (-0.07) or ERA (-0.20). That supports a contend-or-punt flag on five of ten categories, not a continuous per-team multiplier, and it is a much smaller build than item 2 as written.
+
+Saves remain the one structural case and are already handled (#1): every season has one or two punters at 0-16 saves and the rest inside a 40-save band (2026: 0, 37, 46, 51, 56, 59, 61, 67, 73, 106). That bimodality is real and durable, which is exactly why #1's "saves are cheap conditional on competing" survived and a general version of the same idea does not.
+
+**Not wired into the board.** `klab/teamvalue.py` is committed as the scoping artifact with the negative result attached, so the next person does not rebuild it. The in-season case is different and is already correct: `trade.win_now_delta()` re-ranks actual observed standings rather than projecting them, which is the one setting where the gap structure is known rather than estimated.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).
