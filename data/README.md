@@ -30,7 +30,25 @@ there).
 
 | file | what it is |
 |---|---|
-| `chadwick_register.csv` | Chadwick Bureau player register, filtered to the ~21k players carrying a FanGraphs id. Columns: `key_fangraphs` (this repo's `fg_id`), `key_mlbam`, name, birth date. The only source of **age** in the project — no FanGraphs or CBS export here carries it (`docs/METHODS.md` section 3 #18). Feeds `scripts/price_features.py`. Unlike everything else in `data/`, this one is public and scripted: rebuild with `PYTHONPATH=.:scripts python3 scripts/fetch_chadwick.py`. Covers 98% of players in the auction history; the misses are 2026 prospects and NPB imports whose FanGraphs ids postdate the register. |
+| `chadwick_register.csv` | Chadwick Bureau player register, filtered to the ~21k players carrying a FanGraphs id. Columns: `key_fangraphs` (this repo's `fg_id`), `key_mlbam`, `key_bbref` (the join for the Marcel archive), name, birth date. The only source of **age** in the project — no FanGraphs or CBS export here carries it (`docs/METHODS.md` section 3 #18). Feeds `scripts/price_features.py`. Unlike everything else in `data/`, this one is public and scripted: rebuild with `PYTHONPATH=.:scripts python3 scripts/fetch_chadwick.py`. Covers 98% of players in the auction history; the misses are 2026 prospects and NPB imports whose FanGraphs ids postdate the register. |
+
+## Marcel projection archive (Baseball-Reference, public)
+
+| file | what it is |
+|---|---|
+| `marcel_2024_hitters.csv`, `marcel_2024_pitchers.csv` | Marcel projections **for the 2024 season**, published before it was played |
+| `marcel_2025_hitters.csv`, `marcel_2025_pitchers.csv` | Marcel projections for the 2025 season |
+| `marcel_2026_hitters.csv`, `marcel_2026_pitchers.csv` | Marcel projections for the 2026 season |
+
+The file year is the season being **projected**, not the Baseball-Reference page it came from: BR files the 2026 projections under `/leagues/majors/2025-projections.shtml`. Read them through `klab/marcel.py`, never with a bare `read_csv` (see `docs/FINDINGS.md` #67 for the three traps).
+
+These are the first ex-ante projections in the project for seasons that have since been played, which is what unblocks the blend weights, the pool rule, and the only out-of-sample test of the keep/cut advice. **Marcel is not ZiPS**: it is Tom Tango's deliberately naive baseline (three-year weighted average, regressed to the mean, flat age adjustment) and is the bar a real system is supposed to clear, not a substitute for one.
+
+Every row carries `Name-additional`, a Baseball-Reference player id, which joins to `fg_id` through `key_bbref` in `chadwick_register.csv` at 100% coverage on all six files. The id is in the page DOM but **not** in the visible pitcher table, so copy-pasting that table off the page loses it.
+
+`Rel` is Marcel's reliability weight: the share of the projection carried by the player's own record rather than regression to the league mean. Kept as `rel` on a 0-1 scale. Median is 0.70-0.72 for hitters and 0.47-0.49 for pitchers, and 21-26% of pitcher rows sit below 0.30, which is mostly league mean wearing a player's name. Any backtest that scores those rows as forecasts is scoring the league mean.
+
+Refresh: not needed for the seasons above; BR keeps historical pages up. To add a season, see the extraction note in `docs/FINDINGS.md` #67 (BR returns 403 to automated fetches, so this came out of a browser session).
 
 ## League exports (CBS Sports, private league)
 

@@ -512,3 +512,39 @@ Kept players return negative mean realised surplus here. This cannot be read at 
 **Luck against judgment.** The ex-ante and realised verdicts agree on 84 of 134 decisions in 2026 (63%) and 119 of 202 in 2023-2025 (59%). Roughly two decisions in five are scored differently by what was knowable and by what happened, which is the size of the noise any single-season verdict carries and the reason the two columns are reported separately.
 
 **What this does not answer, and it is the biggest gap in the project.** Whether the MODEL would have beaten the owners is still unmeasured. It needs the model's own keep/cut call as of each past deadline, which needs a projection built from data as of that date. The board is a 2027 object and cannot be rewound. This is the same missing artefact as #65 and Link 1: without projection archives the product's central claim has no out-of-sample test.
+
+### 67. The blocker is gone: three seasons of ex-ante projections are now in `data/`
+Same day as #64-#66, after Phase A named the missing artefact. No constant was changed and no finding was re-run; this entry records the archive and its traps so the session that uses it does not rediscover them.
+
+Phase A ended with three open questions and one blocker common to all of them: the blend weights have never been fitted (Link 1), the calibration-pool rule cannot be chosen (#65), and the keep/cut advice has never been tested out of sample (#66). Each needs a projection made BEFORE a season that has since been played, and `data/` carried only the ZiPS 2027 and 2028 pulls.
+
+Baseball-Reference publishes Marcel projections per season and keeps the pages up. `data/` now holds six files covering **2024, 2025 and 2026**, all three of which have actuals. `klab/marcel.py` reads them; `scripts/validate_marcel.py` checks them.
+
+**Marcel is not ZiPS and must not be swapped in for it.** Marcel is Tom Tango's deliberately naive baseline: a three-year weighted average, regressed to the league mean, with a flat age adjustment. It is the bar a real projection system is expected to clear. What it provides here is not accuracy but an *honest ex-ante* line, which is the only property a backtest needs. Blend weights fitted against Marcel describe the Marcel blend; treat the result as a shape, not a transfer to ZiPS.
+
+**Provenance.** Baseball-Reference returns HTTP 403 to automated fetches, so these came out of a logged-in browser session against `/leagues/majors/{year}-projections.shtml`, extracted from the table DOM and written to disk over loopback. They were not transcribed by hand.
+
+**Verification, because the extraction was not a plain download.** Baseball-Reference publishes derived columns that are algebraically determined by the counting stats, so `scripts/validate_marcel.py` re-derives all of them: `WHIP`, `ERA`, `H9`, `BB9`, `SO9`, `SO/W` for pitchers and `BA`, `TB`, `SLG`, `OPS` for hitters. **All ten identities hold on all six files, zero violations**, every residual inside published rounding. Row counts independently match the pasted source tables exactly (514/623/504/611/644/750 before de-duplication).
+
+| | 2024 | 2025 | 2026 |
+|---|---|---|---|
+| hitters, rows after de-dup | 493 | 504 | 644 |
+| pitchers, rows | 610 | 611 | 750 |
+| `fg_id` join coverage | 100% | 100% | 100% |
+
+**Three traps, all encoded in `klab/marcel.py`.**
+
+1. **The file year is the projected season, not the source page.** BR files the 2026 projections under `2025-projections.shtml`. Off-by-one here would silently score a projection against the wrong season and every downstream number would look plausible.
+2. **The pitcher id is in the DOM but not in the rendered table.** Copy-pasting the pitcher table off the page loses `Name-additional` and forces fuzzy name matching. Extracted from the DOM it is present, and the bbref-to-`fg_id` join through `key_bbref` is exact at 100% on all six files. `scripts/fetch_chadwick.py` now keeps `key_bbref`; it did not before.
+3. **Marcel writes whole innings.** `157.0`, never thirds notation. The conversion `io.py` applies to FanGraphs innings (#58) would corrupt these, so `_read_pitchers` raises if it ever sees a `.1`/`.2` rather than trusting a comment.
+
+**One result falls straight out of the archive, before any analysis.** Marcel's `Rel` column is its reliability weight: the share of a projection carried by the player's own record rather than regression to the league mean.
+
+| | median rel | p10 | share below 0.30 |
+|---|---|---|---|
+| hitters (2024-2026) | 0.70-0.72 | 0.21-0.32 | 8-15% |
+| pitchers (2024-2026) | 0.47-0.49 | 0.12-0.18 | 21-26% |
+
+**Marcel trusts a pitcher's own record about half as much as a hitter's, and a fifth to a quarter of pitcher rows are mostly league mean wearing a player's name.** This is independent corroboration, from a projection system with no connection to this project, of the pitcher-side compression #65 measured in the ZiPS blend: pitcher performance is simply less projectable, so any system regresses it harder, so pitchers cluster toward the middle and fall out of a pool selected on projected roto points. #65 diagnosed that as possibly a ZiPS artefact. It is not: it is a property of pitching.
+
+The consequence for the work ahead is a warning. A backtest that scores every Marcel row as a forecast is, for a quarter of pitchers, scoring the league mean and calling it a projection. `rel` must be carried through and reported, and low-`rel` rows either weighted or excluded with the count stated.

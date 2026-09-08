@@ -5,10 +5,12 @@ section 3 #18 notes the gap). The register is the public crosswalk: it maps
 `key_fangraphs` (this repo's `fg_id`) to a birth date, which is all the price
 model needs (docs/ROADMAP.md item 1 Step 1).
 
-Writes `data/chadwick_register.csv` with seven columns and only the ~21k rows
+Writes `data/chadwick_register.csv` with eight columns and only the ~21k rows
 that carry a FanGraphs id: the full register is 16 shards and ~120 MB, which
 does not belong in a working tree that is already gitignored. `key_mlbam` rides
-along as a second join path (`MLBAMID` is in the FanGraphs history exports).
+along as a second join path (`MLBAMID` is in the FanGraphs history exports), and
+`key_bbref` is the join for the Marcel projection archive, whose hitter files
+carry a Baseball-Reference id and no FanGraphs id (docs/FINDINGS.md #67).
 
     PYTHONPATH=.:scripts python3 scripts/fetch_chadwick.py
 """
@@ -25,7 +27,7 @@ from klab import config as C
 BASE = ("https://raw.githubusercontent.com/chadwickbureau/register/"
         "master/data/people-{shard}.csv")
 SHARDS = "0123456789abcdef"
-KEEP = ["key_fangraphs", "key_mlbam", "name_first", "name_last",
+KEEP = ["key_fangraphs", "key_mlbam", "key_bbref", "name_first", "name_last",
         "birth_year", "birth_month", "birth_day"]
 
 
