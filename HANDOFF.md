@@ -53,7 +53,8 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 4. **`WAIVER_VALUE` is open and now matters more.** Replacement is a per-role pair since #70 (5.121 HIT / 3.526 PIT). The #62 tie (4.381 from waiver churn against the internal-consistency objection) should be re-asked in that frame. Transaction logs WITH DATES would settle it.
 5. **The projection-source toggle.** Build last; `PROJECTION_BASIS` is the precedent. Backward-facing only, since Marcel 2027 does not exist.
 6. **`data/positions_2026.csv` goes stale.** A roster-time snapshot; rebuild when comp pools look wrong.
-7. **Intuition tab v2 is blocked on Josh, not on work**: sandboxed overrides, or overrides that propagate through the 2027 pipeline. The propagating version is materially larger.
+7. **An expert review is scoped and unrun.** `docs/EXPERT-REVIEW.md` holds the question set for Pookie 2.0's owner, blind-first so the answers are scoreable rather than a review. Highest-value question is playing time (44 keeper calls flip on it alone); biggest testable claim is that 20 of the model's 25 largest bargains are pitchers.
+8. **Intuition tab v2 is blocked on Josh, not on work**: sandboxed overrides, or overrides that propagate through the 2027 pipeline. The propagating version is materially larger.
 
 ## Deliberately NOT built, with the evidence
 - **A hitter/pitcher budget split.** The league pays the same per realised roto point for both roles (2.092 against 2.114). Refuted on its own data. #64.
