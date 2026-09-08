@@ -90,6 +90,37 @@ PYTHONPATH=.:scripts python3 scripts/build_trade_suggestions.py
 
 Do not commit regenerated numbers without saying so in the commit message.
 
+## 6b. Collect a human's keep/cut calls (FINDINGS #77)
+
+The model does not beat this league's owners out of sample (#69), so a good
+owner is a benchmark, not a reviewer. Collect his calls blind and score them.
+
+```
+PYTHONPATH=.:scripts python3 scripts/build_survey.py     # writes out/keeper_survey.html
+node app/verify_survey.mjs "$PWD/out/keeper_survey.html" # flow + blindness check
+```
+
+**Send him `out/keeper_survey.html`.** It is one self-contained file with no
+external references, so it works offline, from an attachment, on a phone. He
+opens it, types a name, and answers one player at a time; progress saves to his
+browser automatically. At the end (or via "finish & export" on any card) he gets
+**Download file** and **Copy text**. The download self-names `survey_<him>.json`,
+which is what the next step wants. He never uploads anything and needs no account.
+
+Save what he sends into `data/` (gitignored: private opinions), then:
+
+```
+python3 scripts/ingest_survey.py data/survey_him.json data/survey_you.json
+```
+
+Answer it yourself too, under your own name. Two independent humans bound how
+much of any model gap is judgment rather than noise. **Read the role-split price
+calibration first**: if his pitcher prices land above the model's while hitters
+land level, the "this league underpays for pitching" claim is dead.
+
+Regenerate the survey after any roster change, or it asks about players who
+have moved.
+
 ## 7. After changing `klab/`, `scripts/build_app.py`, or `app/template.html`
 
 The app re-implements a little arithmetic in JavaScript, and that copy drifts independently (FINDINGS #32.1); step 3 is the only check that catches it.

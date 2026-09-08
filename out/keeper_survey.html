@@ -152,16 +152,31 @@ function done(){
       <div class="meta" style="margin-top:8px">Copy the text below and send it back.</div>
     </div>
     <div class="btns">
-      <button onclick="copyOut()">Copy answers</button>
-      <button onclick="S.i=0;save();view()">Go back through them</button>
+      <button onclick="dlOut()">Download file</button>
+      <button onclick="copyOut()">Copy text</button>
     </div>
+    <div class="meta" style="margin-top:10px">Send the file back if you can &mdash; it is
+      cleaner than pasting. Either works.</div>
+    <div class="nav"><a onclick="S.i=0;save();view()">&larr; go back through them</a></div>
     <textarea id="out" readonly>${esc(payload)}</textarea>
   </div>`;
+}
+function dlOut(){
+  // a plain Blob download: the friend attaches one small file instead of
+  // pasting 15 KB of text into a message
+  const name = (S.who || "reviewer").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const blob = new Blob([$("out").value], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `survey_${name}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  document.querySelectorAll(".btns button")[0].textContent = "Downloaded ✓";
 }
 function copyOut(){
   const t = $("out"); t.select(); t.setSelectionRange(0, 999999);
   navigator.clipboard.writeText(t.value).then(
-    ()=>{ document.querySelector(".btns button").textContent = "Copied \u2713"; },
+    ()=>{ document.querySelectorAll(".btns button")[1].textContent = "Copied \u2713"; },
     ()=>{ document.execCommand("copy"); });
 }
 view();
