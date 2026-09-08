@@ -269,11 +269,31 @@ def multiyear_surplus(value_2027: pd.Series, value_2028: pd.Series,
 # --- positional replacement -------------------------------------------------
 
 def position_map() -> pd.Series:
-    """fg_id -> position, from the auction files (the only source we have)."""
+    """fg_id -> position.
+
+    `data/positions_2026.csv` first, then the auction files. The auction files
+    alone left 134 of 277 rostered players (48%) with no position at all --
+    anyone acquired through free agency rather than bought at auction -- and
+    `auction_estimator.find_comps()` silently falls back to the full role for
+    those, so half the roster was comped against every hitter or every pitcher
+    instead of its own position group (docs/FINDINGS.md #61).
+
+    Hitters in the positions file are the primary position off the league's own
+    contracts page. Pitchers are classified SP or RP by career starts share
+    (GS/G >= 0.5), which is derived, not hand-entered.
+    """
     from .auction import match_drafts
     d = match_drafts(verbose=False).dropna(subset=["fg_id"])
     d["fg_id"] = d["fg_id"].astype(int)
-    return d[d["pos"].notna()].sort_values("season").groupby("fg_id")["pos"].last()
+    out = d[d["pos"].notna()].sort_values("season").groupby("fg_id")["pos"].last()
+
+    path = C.DATA / "positions_2026.csv"
+    if path.exists():
+        cur = pd.read_csv(path)
+        cur = cur.dropna(subset=["fg_id", "pos"]).astype({"fg_id": int})
+        out = pd.concat([out, cur.set_index("fg_id")["pos"]])
+        out = out[~out.index.duplicated(keep="last")]
+    return out
 
 
 def two_position_replacement(players: pd.DataFrame, elig: dict) -> dict:

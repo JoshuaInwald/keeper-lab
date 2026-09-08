@@ -56,7 +56,7 @@ Free agents supply ~40% of roto production at $10-20 each. Quantify it to sharpe
 Per-cell tooltip reusing the existing bootstrap bands.
 
 ## 6. Small, contained
-- `position_map()` returns UNKNOWN for some players (Cade Smith), thinning comp pools.
+- ~~`position_map()` returns UNKNOWN for some players (Cade Smith), thinning comp pools.~~ FIXED 2026-09-08: it was 48% of the roster, not "some"; `data/positions_2026.csv` takes coverage to 100% (`docs/FINDINGS.md` #61).
 - 2027 odds live in the Trade tab (`simulate_keeper_finish_odds(keeper_override=...)` already accepts the input).
 - FA tab "likely range" is blank by design; `value_lo/value_hi` could be extended cheaply.
 

@@ -42,6 +42,7 @@ auction results, keeper submissions, and standings pages.
 | `draft_2022.csv` … `draft_2025.csv` | Per-year auction results (price paid per player, by team) |
 | `draft_salaries_all.csv` | Combined multi-year auction results with FanGraphs player IDs matched in |
 | `keepers_2022.csv` … `keepers_2026.csv` | Keeper submissions by season |
+| `positions_2026.csv` | `fg_id` → primary position for every rostered player. Hitters are the primary position off the league's contracts page; pitchers are classified SP/RP by career starts share (GS/G ≥ 0.5), derived rather than entered. Feeds `klab.keeper.position_map()`, which previously left 48% of the roster with no position at all (`docs/FINDINGS.md` #61). Rebuild whenever rosters change materially. |
 | `standings_long_all.csv` | Tidy long-format standings, all categories, all seasons |
 | `cbs_rank_2026.csv` | CBS's own player rankings, 2026 |
 | `contracts_parsed.csv` | Current salary + contract year (1/2/3/F) per rostered player, parsed from the league's contracts dump |
@@ -84,6 +85,7 @@ wiped.
 | `standings_20XX.csv`, `standings_long_all.csv` | CBS standings page | in-season if you want live trade evaluation to be accurate; final once the season ends | manual export |
 | `contracts_parsed.csv` | CBS contracts dump | whenever a contract changes — trade, extension, FA signing | no standalone script; paste the raw dump to an LLM session and re-derive using the code-semantics in `docs/METHODS.md` section 1 §2 |
 | `rosters_current.csv`, `rosters_valued.csv` | CBS rosters | whenever rosters move, ideally right before any fresh valuation run | manual export |
+| `positions_2026.csv` | league contracts page (hitters) + FanGraphs GS/G (pitchers) | whenever a player joins the league who has never been bought at auction | hitters transcribed from the contracts dump, pitchers derived; see `docs/FINDINGS.md` #61 |
 | `cbs_rank_2026.csv` | CBS's own rankings | optional, informational only | manual export |
 | `franchise_map.csv` | hand-maintained | only when a franchise renames | manual edit |
 

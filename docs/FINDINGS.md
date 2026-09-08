@@ -340,6 +340,26 @@ Saves remain the one structural case and are already handled (#1): every season 
 
 **Not wired into the board.** `klab/teamvalue.py` is committed as the scoping artifact with the negative result attached, so the next person does not rebuild it. The in-season case is different and is already correct: `trade.win_now_delta()` re-ranks actual observed standings rather than projecting them, which is the one setting where the gap structure is known rather than estimated.
 
+### 61. Half the roster had no position, so half the comp pools were wrong
+`klab.keeper.position_map()` read positions from the auction files only, which means a player who arrived through free agency rather than the auction had none. That was **134 of 277 rostered players, 48%**, not the "some players (Cade Smith)" the roadmap recorded. `auction_estimator.find_comps()` falls back to the full role when it cannot match a position group, silently, so those players were comped against every hitter or every pitcher in league history instead of against their own position.
+
+Fixed with `data/positions_2026.csv`: hitters take the primary position off the league's own contracts page, pitchers are classified SP or RP by career starts share (GS/G >= 0.5), which is derived rather than entered. Coverage went 143/277 to **277/277**, and UNKNOWN to zero.
+
+| position group | before | after |
+|---|---|---|
+| SP | 40 | 91 |
+| OF | 29 | 50 |
+| CI | 23 | 54 |
+| MI | 24 | 41 |
+| RP | 16 | 25 |
+| C | 5 | 14 |
+| UTIL | 6 | 2 |
+| UNKNOWN | **134** | **0** |
+
+`comp_price` moved for 146 of 277 players, mean absolute change $3.81. The largest are exactly the players who had been comped against the wrong pool: Justin Crawford $18 to $6 and Caleb Durbin $14 to $2 (young hitters previously comped against all hitters, now against outfielders and third basemen), Drew Rasmussen $6 to $16 and Nick Pivetta $3 to $13 (starters previously pooled with relievers). No other dollar figure is affected: the comp estimator is deliberately separate from `redraft_value` (#35, CONSTRAINTS.md).
+
+The position file is a data asset, not a code fix, and it will go stale as rosters churn. `data/README.md` records how to rebuild it.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).
