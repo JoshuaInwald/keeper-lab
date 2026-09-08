@@ -1,6 +1,6 @@
 # Session handoff (current state only; history lives in docs/SESSION-LOG.md)
 
-Last updated: 2026-09-08 (ROADMAP item 1 Steps 0/1/1b/2). Read `CONSTRAINTS.md` first, then "Next session: start here" at the bottom.
+Last updated: 2026-09-08 (ROADMAP item 1 complete, Steps 0-5). Read `CONSTRAINTS.md` first, then "Next session: start here" at the bottom.
 
 ## System
 - Repo: `~/PycharmProjects/keeper-lab` on the Mac, GitHub `JoshuaInwald/keeper-lab` (public, `main`), mirror at `~/Documents/Fantasy Baseball/keeper-lab/`. See `CLAUDE.md` for the three-surface rule.
@@ -9,8 +9,10 @@ Last updated: 2026-09-08 (ROADMAP item 1 Steps 0/1/1b/2). Read `CONSTRAINTS.md` 
 - Committed build numbers: $9.17 per roto point (keeper-adjusted auction scale), $6.56 (redraft scale), replacement 4.81 roto pts, +33% projected 2027 inflation, Spearman 0.851 vs 2026 standings. Every one moves on a rebuild; quote from `out/model_params.json`.
 
 ## State of the model
-- Headline `redraft_value` is a production scale normalised to top-230 = $2,600. It is NOT a market price and is known to overshoot at the top (Skubal $52 vs a $45 league ceiling) and undershoot young/no-track-record players. `docs/ROADMAP.md` item 1 is the fix. Steps 0, 1, 1b and 2 are built (FINDINGS #56); Steps 3, 4 and 5 are not.
-- `production_value` is an exact alias of `redraft_value`; `market_price` is a real column and is **NaN on purpose**. The fitted price model beats both baselines out of sample (MAE 5.76 vs 6.84 prior-salary and 7.20 comps) but fails its own P20-P80 coverage test (38.4% against a nominal 60%) and needs the Step 3 level calibration. Do not populate the column until both are fixed.
+- `docs/ROADMAP.md` item 1 is complete (FINDINGS #56, #57). Five dollar figures now exist and `out/valuation_comparison.csv` puts them side by side.
+- `production_value` is an exact alias of `redraft_value` (worth to a roster). `market_price` is live: fitted on 677 revealed purchases, calibrated so the 126 lots the 2027 auction sells sum to $1,765. Held-out MAE 5.76 vs 6.84 (prior salary) and 7.20 (comps); P20-P80 coverage 55.4% against a nominal 60%.
+- **`keep_2027` is still the production basis and has not moved.** Step 4's market-arbitrage rewire (`surplus_market`, `keep_2027_market`) keeps 104 against 70, of which 30 project below replacement, and cuts Skubal. It ships as a second lens. Do not promote it without fixing what it measures (FINDINGS #57.5).
+- The two league-anchored measures agree where the model does not: Skubal `market_price` $34.00, `revealed_price` $34.31, against `production_value` $51.91 and `keep_value` $78.81. The 2026-08-15 reviewer was right about the top end.
 - Age now exists in the project: `data/chadwick_register.csv`, rebuilt by `scripts/fetch_chadwick.py`. The market discounts 8.0% per year of age holding production constant. This does not reopen the aging-curve decision for *production*, which CONSTRAINTS.md still declines.
 - The comp-based auction estimator (`klab/auction_estimator.py`) is anchored to comps' real salaries and shown in the player drawer; it is a separate estimate, not blended in.
 - Ohtani is two 2027 assets. `F` contracts are unkeepable. Payout is 50/25/15/breakeven.
@@ -25,15 +27,22 @@ Last updated: 2026-09-08 (ROADMAP item 1 Steps 0/1/1b/2). Read `CONSTRAINTS.md` 
 - `scripts/fetch_chadwick.py` writes `data/chadwick_register.csv` (network; ~1 min).
 - `scripts/price_features.py` writes `out/price_features.csv` (677 purchases, ex-ante features).
 - `scripts/keeper_revealed.py` writes `out/keeper_decisions.csv` (133 clean 2026 decisions plus 202 reconstructed).
-- `scripts/price_model.py` writes `out/price_model_holdout.csv` and prints the acceptance battery.
-Run order is fetch_chadwick -> price_features -> {keeper_revealed, price_model}.
+- `scripts/price_model.py` writes `out/price_model_holdout.csv` and prints the acceptance battery, including the rejected alternatives (Step 5 upside, monotone GBM).
+- `scripts/compare_valuations.py` writes `out/valuation_comparison.csv`: all five systems plus both keeper calls, per rostered player.
+Run order is fetch_chadwick -> price_features -> {keeper_revealed, price_model, compare_valuations}.
+`klab/price.py` is the production model `board.py` calls; the scripts are research harnesses on top of it. scikit-learn is an optional dependency (the GBM comparison skips without it).
 
 ## Settled this session
 - The 2022-2025 keeper files are **not** keeper submissions: `keepers_2025.csv` shares zero players with the 2024 auction class. Nothing needs asking the commissioner; labels are reconstructed from the auction and roster files instead (FINDINGS #56.4). `keepers_2026.csv` is sound.
 - The ROADMAP's "25% of purchases have no prior MLB line" is 137 censored 2022 rows plus 30 real rookies. The observable rookie rate is 5.6% (FINDINGS #56.3).
 
+## Open, in priority order
+1. **`market_price` is not on the board UI yet.** It is in the payload (`market_price`, `market_price_lo/hi`) and in every committed CSV, but the visible board still shows only Production $. Adding the column means reindexing the `nth-child` list in the phone CSS in `app/template.html`.
+2. **The role cap is still a patch.** Uncapped, the model predicts $55 for a hitter against a $45 ceiling; 3 players sit at the cap. Both designed-in fixes lost on LOSO (concave transforms, monotone GBM), so this needs a different idea, not another sweep.
+3. **Lower-tail band coverage does not transfer.** Conformal calibration fixed the upper end exactly (19.6% against a 20% target) and left the lower at 25%. 55.4% overall against a nominal 60%.
+4. **Step 4 needs the right object.** `market_price - keeper_cost` is transaction arbitrage; `production_value - keeper_cost` ignores that the money has an alternative use. The construction that fixes both is production priced at the market's own marginal rate, but at $12.18 per roto point it overshoots the top worse than `keep_value` does. This is ROADMAP item 2 territory (team-specific category value), not a fifth dollar scale.
+
 ## Next session: start here
 1. `git status`, `./check_sync.sh`, `ls data/`.
-2. ROADMAP item 1 Step 3 (calibrate `market_price` to the 2027 budget) is the next deliverable, but Step 2 has an open failure that Step 3 will not fix: P20-P80 coverage is 38.4% against a nominal 60%, asymmetric (36.6% above P80). Decide whether to widen the bands first or to ship Step 3 with the point estimate only and no band.
-3. The uncapped model predicts $55 for a hitter against a $45 ceiling. The role cap is a patch, not a fix; a concave production term lost on leave-one-season-out (sqrt 6.86 vs linear 6.56), so the honest options are a monotone GBM (ROADMAP Step 2's own fallback) or ZiPS P90 spread as a feature (Step 5).
-4. Do not touch `redraft_value`'s definition, and do not populate `market_price`, until the coverage test passes and Step 3 has set the level.
+2. Item 1 is done. The ranked list above is what it left open; ROADMAP item 2 (team-specific category value) is the next unbuilt priority.
+3. Do not touch `redraft_value`'s definition and do not promote `keep_2027_market` to the headline call.

@@ -6,6 +6,12 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 
 | type | item |
 |---|---|
+| built | ROADMAP item 1 Steps 3, 4, 5: market_price calibrated to the 2027 budget (126 lots, $1,765, identity exact); market keeper lens shipped alongside, not instead; five-system comparison in out/valuation_comparison.csv (FINDINGS #57) |
+| bug | Quantile crossing put P20 above P80 (Crow-Armstrong $41.53 vs $39.73); band ends now sorted |
+| bug | Budget identity missed by $7 because the band repair clipped the point estimate after the solve; solver now scores through the same function the output uses |
+| declined | Step 5 upside feature: both terms insignificant, loses on LOSO 6.59 to 6.81 (FINDINGS #57.1) |
+| declined | Monotone GBM fallback: LOSO 6.91-7.04 against 6.59, and shrinks the top end (FINDINGS #57.2) |
+| declined | Step 4 as specified (keep on market arbitrage): keeps 104 including 30 below replacement, cuts Skubal; keep_2027 left on the production basis (FINDINGS #57.5) |
 | built | ROADMAP item 1 Steps 0, 1, 1b, 2: `production_value`/`market_price` split, Chadwick age join, ex-ante feature table, keeper decisions reconstructed, price model held out on 2026 (MAE 5.76 vs 6.84 and 7.20 baselines). Coverage fails at 38.4%/60%; `market_price` left NaN (FINDINGS #56) |
 | bug | Held-out season defaulted to the omitted season dummy, handing 2026 the 2023 price level: MAE 8.76 and an $86 hitter against a $45 ceiling (FINDINGS #56.7) |
 | bug | Age-missingness flag learned "$1" from five unmatched placeholders and applied it to eight 2026 prospects (FINDINGS #56.7) |

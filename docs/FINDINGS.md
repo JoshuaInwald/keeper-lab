@@ -247,6 +247,45 @@ In-sample R^2 is 0.388. Calibration by predicted-price decile is within $3.21 fo
 - *Rookies are still underpriced*, $5.29 predicted against $9.75 realised even after the age fix, on n=8.
 Half the variance is unexplained and the ROADMAP said to expect that. But a column that fails its own coverage test does not belong on the board, and the level has not been calibrated to the 2027 budget (Step 3). `market_price` is NaN until it is.
 
+### 57. Steps 3, 4 and 5: the level calibrates, the decision rewire does not, and the market does not pay for upside
+ROADMAP item 1 finished. Two of the three remaining steps produced negative results, which is the finding.
+
+**57.1 Step 5 rejected: no measurable premium for upside.** ZiPS P10-P90 columns exist only in the 2027 and 2028 exports, so a coefficient on ZiPS spread cannot be estimated from 2023-2026 purchases; no historical archive is in `data/`. Substituted a proxy computable on both sides: for each purchase, the spread (P90 minus P50) of realised roto points among the 25 nearest EARLIER purchases in ex-ante space. Both terms are insignificant (level -0.026, t -0.55; pitcher interaction +0.049, t +0.76), R^2 moves 0.3746 to 0.3755, and it loses on leave-one-season-out (MAE 6.59 to 6.81) and on held-out 2026 including the rookie segment (5.96 to 6.45). The ROADMAP's hypothesis was "yes for hitters, no for pitchers"; the point estimates run the other way and neither is distinguishable from zero. Not shipped.
+
+**57.2 Step 2's GBM fallback also rejected.** A monotone gradient-boosted model cannot predict outside the observed price range, which is precisely the top-end problem the GLM needs a hard cap for. It solves that (max $37.04 hitter, $19.03 pitcher, both inside the ceiling) by shrinking the whole top end: bias -3.94 and LOSO MAE 7.04 monotone, 6.91 unconstrained, against 6.59 for the GLM. The cap stays a patch on a better model rather than being designed away by a worse one.
+
+**57.3 Band coverage fixed by conformal calibration.** #56.8 left P20-P80 coverage failing at 38.4% against a nominal 60%. Two-sided split-conformal quantile regression, with the training SEASONS as folds (what fails to transfer is a season, not a random row), lifts held-out coverage to 55.4%. The two ends are calibrated separately: one shared widening left the misses lopsided at 19.6% below against 27.7% above, because the upper tail is what the model underprices. After: 25.0% below P20, 19.6% above P80 against a 20/20 target. The upper end transfers, the lower end still does not.
+
+**57.4 Step 3: the level calibrates exactly, and the two inflation figures do not agree.** 70 keepers commit $636, leaving 126 lots and $1,765; rescaling the amount above the $1 minimum bid so those lots sum to the budget gives k = 0.837 and the identity holds to the cent. Solving it needs iteration, not algebra: the $1 floor, the role cap and the band repair are all non-linear, and a single algebraic pass shipped $1,853 against $1,964. The ROADMAP predicted the market's implied inflation would agree with `api._inflation()`'s remaining-budget / remaining-worth. It does not: **1.96 against 1.33**. The gap is the denominator. `_inflation()` assumes the production value left in the pool is `$2,600 minus keeper worth` = $1,481; the 126 lots that actually clear carry $1,001. The league will spend $1,765 on players holding $1,001 of modelled production, because it buys youth, name and last year's contract as well.
+
+**57.5 Step 4 refuted by its own output.** Implemented as specified: keeper surplus becomes `market_price - keeper_cost`, summed over control years with a 2028 price from the same model, iterated to a fixed point (the price level depends on committed keeper salary, which depends on the keeper set). It converges at **104 keepers against 70, flipping 56 of 276 calls**, and it is wrong in both directions:
+
+| | production basis | market arbitrage basis |
+|---|---|---|
+| keepers | 70 | 104 |
+| keeps Mike Trout at $4 (4.64 roto pts, $0 production) | no | yes, on $0.39 of arbitrage |
+| of its 45 extra keeps, projecting below replacement | n/a | 30 |
+| mean production value of those extra keeps | n/a | $2.69 |
+| keeps Tarik Skubal at $38 (12.57 roto pts) | yes | **no** |
+
+`market_price - keeper_cost` measures the gain on a transaction, not the worth of a roster spot. It keeps replacement-level players whose only virtue is being cheap relative to what someone would bid, and it drops the best pitcher in the sample because the $34 pitcher ceiling caps his market price below his salary. Shipped as `surplus_market` / `keep_2027_market`, a second lens; `keep_2027` stays on the production basis and did not move. A third construction (production priced at the market's own marginal rate, $12.18 per roto point above replacement) fixes the sign errors (Skubal $94.52 keep, Trout cut) but overshoots the top harder than anything else, which is the same failure as `keep_value`, not a fix for it.
+
+**57.6 Five systems, and the two anchored to league behaviour agree.** `out/valuation_comparison.csv`, 276 rostered players:
+
+| system | total $ | mean | median | max | anchored to |
+|---|---|---|---|---|---|
+| `production_value` | 2,319 | 8.40 | 5.07 | 51.91 | the $2,600 budget identity |
+| `keep_value` | 4,449 | 16.12 | 13.33 | 78.81 | the auction exchange rate |
+| `market_price` | 3,047 | 11.04 | 8.50 | 45.00 | 677 revealed purchases |
+| `comp_price` | 2,272 | 8.23 | 7.00 | 23.00 | 15 nearest comps' real salaries |
+| `revealed_price` | 2,973 | 10.77 | 10.39 | 39.85 | 133 keeper decisions |
+
+Rank agreement is high within the production family (`production_value` vs `keep_value` 0.985, vs `revealed_price` 0.929) and much lower against price (`market_price` vs `production_value` 0.594, vs `comp_price` 0.439). The systems split cleanly into "what is he worth" and "what will he cost", and the second pair does not rank players the way the first does.
+
+The convergence worth reporting is at the top. For Skubal the two measures built from what this league actually did, from completely separate data, land on the same number: `market_price` **$34.00**, `revealed_price` **$34.31**. `production_value` says $51.91 and `keep_value` $78.81. The league-mate's original complaint (2026-08-15) was that $52 was too high for a pitcher in a league that has never paid more than $34 for one. Two independent instruments now say he was right.
+
+**57.7 Where the systems disagree is the buy/sell signal.** Largest `production_value - market_price` gaps: Skubal +$17.91, Skenes +$17.78, Cade Smith +$16.96, Jhoan Duran +$16.35, Zach Neto +$15.69 (produce more than they will cost). Largest the other way: Ohtani's pitcher asset -$34.00, Cam Schlittler -$25.38, Gavin Williams -$19.33, Jordan Walker -$19.00, Nolan McLean -$19.52 (cost more than they produce). The sell list is almost entirely young pitchers, which is the market paying for prospect upside that the production model, correctly, does not see. Whether that is the market being wrong or the model being blind is the question Step 5 was meant to answer and could not.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).
