@@ -730,3 +730,30 @@ The board showed one scale and computed the decision on the other, with nothing 
 But both rendered a ten-row team table with a projection, and a reader could not tell them apart. Merged into one Standings tab with **money odds as the second column, ahead of projected points**, so the ordering encodes which number decides something. The per-place columns (`P(1st)`, `P(2nd)`, ...) came across; the 2026/2027 scope folded into the existing season picker; the table now defaults to sorting by money odds. `app/verify.mjs` gained a check that the odds column leads both standings seasons and that the Contention tab is gone, replacing the check that tested the removed tab.
 
 **What this costs.** One less place to look, and the odds are now one column among many rather than a view of their own. The mitigation is position: first after the team name, with the point estimate demoted to context behind it.
+
+### 72. A user challenge to two suspicious numbers: both hold, and the reliability discount is vindicated
+Josh read the rebuilt board and challenged two figures on Michael Wacha, plus asked for the header strip to go. No code error was found, but the audit produced one new empirical result and localises the disagreement precisely.
+
+**The ERA question, and the premise correction.** The board showed Wacha at 2.52 roto points with `rp_ERA = -1.66`, against a 2026 year-to-date ERA of 3.36. Those are different quantities: the board is a **2027 projection**, and it projects Wacha at a **4.27 ERA**, not 3.36. Against a league-average fantasy staff at 3.613 that is correctly negative.
+
+The 4.27 is essentially ZiPS's own number. The blend gives a pitcher's own prior-season earned runs only **11.9%** weight (`0.50` sample-size cap times `RELIABILITY["ER"] = 0.176 / REL_MAX = 0.739`), so the projection is 88% ZiPS's 4.383 and 12% his recent 3.43 form. ZiPS marks him up 1.02 runs over his 2026 ERA, the 85th percentile of markups among the 116 pitchers with 100+ IP in 2026, where the median markup is +0.17. He turns 36 in 2027. **This is ZiPS regressing an aging pitcher who has outperformed, not an arithmetic fault.**
+
+**The ERA scorer itself was validated end to end.** Mean `rp_ERA` by projected-ERA bucket for starters at 120+ IP: 2.39, 1.05, 0.29, -0.38, -1.04, -1.95. Monotonic, and the zero crossing sits between the buckets centred on 3.498 and 3.769, which brackets the 3.613 baseline exactly as the formula requires. Skubal at a 2.69 ERA scores +2.64.
+
+**New result: trusting a pitcher's recent ERA more would have made WORSE decisions.** The obvious response to the above is that 11.9% is too little weight on a full season. That is now testable. Sweeping `RELIABILITY` as `REL_MAX x (r / REL_MAX) ** alpha`, where `alpha = 1` is production and `alpha = 0` removes the discount entirely, and scoring on captured keeper surplus (#69's metric):
+
+| alpha | 2024 | 2025 | 2026 | mean |
+|---|---|---|---|---|
+| 0.00 (no discount) | 162.2 | 15.7 | 110.3 | 96.1 |
+| 0.50 | 146.0 | 14.7 | 111.3 | 90.7 |
+| **1.00 (production)** | 146.0 | 21.5 | 127.3 | **98.3** |
+| 1.50 | 146.0 | 24.5 | 86.3 | 85.6 |
+| 2.00 | 146.0 | -1.0 | 74.4 | 73.1 |
+
+Production is the maximum. The curve is flat between 0 and 1 and falls off above it, so the discount is not doing much harm in either direction, but there is **no evidence it should be relaxed**. Same caveat as #70: this runs on the Marcel path, and Marcel already averages three prior seasons internally, so the prior-season blend carries less here than it would against ZiPS. Read the shape.
+
+**The wins question, and it runs the other way.** Wacha's 9.55 projected wins score 2.70 roto points, implying 3.54 wins per standings place, which Josh read as too generous. Tested directly by adding 10 wins to each of the 30 team-seasons in 2024-2026 and counting places actually climbed: **the mean is 3.27 places, against the model's 2.82.** Team win totals are tightly bunched (2026: 62, 72, 72, 74, 77, 79, 79, 82, 87, 91), so wins are a higher-leverage category than they look and **the model is conservative, not generous**. The same test on ERA gives 3.83 places for a 0.20 improvement against the model's 4.64, so ERA is mildly aggressive in the other direction. Both are inside the year-to-year spread of the raw estimators (W range/9 runs 3.22 to 5.22 across the three seasons).
+
+**Header strip removed.** `10-team 5x5 roto keeper auction - $260/team - built ... - $/roto pt - projected auction inflation` sat above every tab. It restated league rules the only user already knows and two constants that mean nothing without their definitions, which are on the Home tab where there is room for them. The `#hdr` element is gone rather than blanked, so it leaves no gap.
+
+**What this changes about the plan.** Nothing was wrong, and that is itself the finding: the scale, the denominators and the blend weights have now each been challenged and held. The disagreement that remains is with **ZiPS's projection of a 36-year-old**, which is exactly the binding constraint #69 identified. A user who thinks ZiPS is wrong about Wacha should say so in the Intuition tab rather than expect the valuation layer to disagree on his behalf.

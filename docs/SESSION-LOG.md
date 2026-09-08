@@ -2,6 +2,16 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (user audit of the board: two challenged numbers, both hold)
+
+| type | item |
+|---|---|
+| declined | Wacha's negative `rp_ERA` is not a bug: the board is a 2027 projection at 4.27 ERA, not his 3.36 year-to-date. The blend gives a pitcher's own prior-season ER 11.9% weight, so it is 88% ZiPS's 4.383; ZiPS marks him up 1.02 runs (85th percentile of 116 pitchers, median markup +0.17) because he turns 36 (FINDINGS #72) |
+| built | ERA scorer validated end to end: mean `rp_ERA` by projected-ERA bucket is monotonic (2.39, 1.05, 0.29, -0.38, -1.04, -1.95) and crosses zero at the 3.613 baseline exactly as the formula requires |
+| declined | Relaxing the reliability discount so recent ERA counts for more. Swept as `REL_MAX x (r/REL_MAX)**alpha`: production (alpha=1) is the maximum at $98.3 of captured keeper surplus, against $96.1 with no discount and $85.6 at alpha=1.5. No evidence to change it (FINDINGS #72) |
+| built | Win denominator validated by direct experiment: adding 10 wins to each of 30 team-seasons gains a mean 3.27 standings places against the model's 2.82, so the model is CONSERVATIVE on wins, not generous. ERA is mildly aggressive the other way (3.83 actual against 4.64 modelled) |
+| built | Removed the header strip above every tab (league rules plus two undefined constants); the `#hdr` element is deleted rather than blanked so it leaves no gap. The same figures remain on Home with their definitions |
+
 ## 2026-09-08 (first user pass over the new board)
 
 | type | item |

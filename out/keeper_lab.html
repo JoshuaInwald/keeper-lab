@@ -152,7 +152,6 @@ code{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--pa
 <body>
 <header>
   <h1>Keeper <span>Lab</span></h1>
-  <div class="sub" id="hdr"></div>
   <div class="sub" id="basisbar"></div>
 </header>
 <nav id="nav"></nav>
@@ -446,9 +445,7 @@ $("nav").innerHTML = TABS.map(([k,l])=>
   `<button data-t="${k}" onclick="go('${k}')">${l}</button>`).join("");
 function go(t){S.tab=t;render();}
 function renderHeader(){
-  $("hdr").innerHTML = `10-team 5×5 roto keeper auction · $${D.league.budget}/team · `
-    + `built ${D.built} · <span class="dim">$${nf(D.constants.usd_per_roto_point_redraft,2)}/roto pt · `
-    + `+${nf((INFL-1)*100,0)}% projected auction inflation</span>`;
+
   $("basisbar").innerHTML = `<label class="chk" title="${esc(BASIS_HELP)}">projection basis `
     + `<select onchange="setBasis(this.value)">`
     + BASES_ORDER.map(b=>`<option value="${b}" ${b===S.basis?"selected":""}>${BASIS_LABEL[b]}</option>`).join("")
