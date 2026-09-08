@@ -155,7 +155,8 @@ and least stress-tested link.**
 | are we right about waiver-wire talent | #62, unresolved and contested | transaction data with dates |
 | does a single points-to-dollars number make sense given per-category dynamics | #60 rejected the per-team version; per-category dispersion IS handled by denominators | whether the right object was tested; category correlations are unexamined |
 | owners' real auction tendencies | #56, #57, best-tested link | 60% of variance unexplained |
-| who was kept vs let go, and how they turned out | **not built** (see below) | this is the highest-value unbuilt analysis |
+| who was kept vs let go, and how they turned out | **not built**; `scripts/decision_audit.py` is scaffolded and runnable | interpretation, and the ex-ante versus realised split |
+| does one dollar scale work across hitters and pitchers | **new lead, measured**: model splits 73.7/26.3, the league spends 64/36 | see the published-practice section |
 
 ### The unbuilt analysis Josh named, scoped
 
@@ -209,10 +210,97 @@ first. Anticipate these:
 6. **"Where is the out-of-sample test of the thing you actually sell?"** Price
    has one (#56). Keep/cut advice does not. That is the audit scoped above.
 
-Comparing against published work is legitimate and mostly unavailable offline:
-`data/` has no external benchmark beyond the FanGraphs ROS calculator already
-used in #54. Treat "what do other analysts find" as a research question needing
-sources, not something to assert from memory.
+`data/` has no external benchmark beyond the FanGraphs ROS calculator used in
+#54, so the comparison below was researched on 2026-09-08 and is sourced. Do not
+extend it from memory: confident-sounding recall of public fantasy research is
+the most likely place for a fresh session to invent something.
+
+## Where this project sits against published practice (researched 2026-09-08)
+
+### The core architecture is the one that wins the public bake-off
+
+RotoGraphs ran 13 valuation systems against 50 completed leagues, correlating
+each system's dollar values against teams' actual final standings points. SGP
+with league-specific denominators finished first (r = 0.9697, R^2 = 0.9403),
+ahead of Todd Zola's REP method (0.9672) and z-scores (0.9670); the whole field
+spanned 0.9453 to 0.9697. The stated conclusion was that "the denominators you
+choose when employing the SGP method are extremely important".
+
+This project is SGP with denominators fit to its own league's standings, which
+is precisely the winning configuration. That is real external support for the
+architecture, and it also sharpens where the risk actually lives: not in the
+method but in the denominators, which here rest on 10 teams x 3 seasons and
+carry +/-34% bootstrap bands (#30).
+
+It also reframes objection 3 in the list above. SGP and z-scores land within
+0.003 of each other in that test, so the SGP-versus-z-score debate is not where
+the uncertainty is. #18's z-score cross-check (0.855 against the engine's 0.842)
+is consistent with that and can be treated as settled rather than reopened.
+
+### The dollar formula is the standard one, character for character
+
+Smart Fantasy Baseball's published formula is `([TOTAL SGP] - [REPLACEMENT LEVEL
+SGP]) * $ PER USEFUL SGP + $1`. `board.value_players()` computes
+`(rp - replacement_rp) * usd_per_rp + 1.0`. Same object. The $1 floor is
+convention, not an invention here.
+
+That source also stresses updating replacement level as the player pool changes,
+which is the instability #62 documents rather than a defect unique to this
+league.
+
+### The one place this project diverges from standard practice, and it is measurable
+
+Standard SGP practice splits the budget into a hitting pool and a pitching pool
+before converting to dollars, commonly 65-35 or 70-30 in favour of hitters.
+Smart Fantasy Baseball argues hitter and pitcher SGP are **not** directly
+comparable and that pooling them on one scale silently imposes a 50-50 split.
+
+**This project pools them.** One `usd_per_rp` covers everyone. Measured on the
+current build:
+
+| | share of the $2,600 |
+|---|---|
+| model's implied split (top-230 `production_value`) | **73.7% hitters / 26.3% pitchers** |
+| this league's actual auction spend, 2022-2026 | 62% / 38%, 64/36, 65/35, 62/38, 68/32 |
+
+The model allocates about 10 points more to hitters than the league actually
+spends. And the composition is stranger than the split: the top 230 by roto
+points contains **183 hitters and 47 pitchers**, while the league must roster
+140 hitters and 90 pitchers. The budget identity is being satisfied by a pool
+teams cannot legally field, so pitchers are priced against 47 slots when 90
+exist. Note that `POSITION_SLOTS` was a config knob removed as unused in the
+2026-09-07 compaction pass; the roster constraint it implies has never bound.
+
+This is the strongest single lead in the brief. It is measurable, it has a
+public methodological literature behind it, it plausibly explains why the
+role interaction in the price model is so large (pitchers paid roughly half the
+per-point rate of hitters, #56.6), and it is upstream of every dollar figure.
+Whether the fix is a budget split, a roster-slot constraint on the pool, or
+separate hitter and pitcher replacement levels is exactly what an assessment
+should work out.
+
+### On keeper decisions specifically
+
+RotoGraphs' "Looking beyond surplus value for keeper decisions" argues that
+value-minus-salary is insufficient on its own, and that the missing axes are
+roster construction, positional scarcity, and the opportunity cost of the roster
+spot. That is independent confirmation of what #57.5 found the hard way: pricing
+a keeper decision on transaction arbitrage alone keeps replacement-level players
+because it never asks what else the spot could hold.
+
+Inflation-adjusting the value side before comparing to salary is standard
+practice in keeper leagues (a $28 player at 15% inflation is worth $32 against
+his salary). `api._inflation()` computes the league's rate; whether it is applied
+consistently at the decision margin is worth checking.
+
+Sources: [The Great Valuation System Test: The Results](https://fantasy.fangraphs.com/the-great-valuation-system-test-the-results/),
+[The Great Valuation System Test: The Process](https://fantasy.fangraphs.com/the-great-valuation-system-test-the-process/),
+[Are Hitter SGPs Directly Comparable to Pitcher SGPs?](https://www.smartfantasybaseball.com/2014/12/are-hitter-sgps-directly-comparable-to-pitcher-sgps/),
+[How To Use SGP To Rank and Value Players During the Season, Part 6: Adjust Replacement Level](https://www.smartfantasybaseball.com/2014/05/how-to-use-sgp-to-rank-and-value-players-during-the-season-part-6-adjust-replacement-level/),
+[Automated SGP Rankings and Dollar Values](https://www.smartfantasybaseball.com/2019/01/new-excel-tool-automated-sgp-rankings-and-dollar-values/),
+[Looking beyond surplus value for keeper decisions](https://fantasy.fangraphs.com/looking-beyond-surplus-value-for-keeper-decisions/),
+[On Surplus and Inflation in Keeper Leagues](https://fantasy.fangraphs.com/on-surplus-and-inflation-in-keeper-leagues/),
+[Creating Your Rankings? Start with Z-Scores](https://fantasy.fangraphs.com/creating-your-rankings-start-with-z-scores/).
 
 ## What NOT to spend the session on
 

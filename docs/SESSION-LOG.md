@@ -6,6 +6,8 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 
 | type | item |
 |---|---|
+| built | `scripts/decision_audit.py`: scores the owners rather than the model on 336 past keeper decisions, ex-ante and realised verdicts kept separate. 2026 owners' throw-backs vindicated 73.3% against keeps at 55.4% |
+| built | Sourced comparison against published fantasy-valuation practice in the brief. Lead finding: the model pools hitters and pitchers on one scale (73.7/26.3) where the league spends 64/36 and standard SGP practice splits the budget |
 | built | `docs/ASSESSMENT-BRIEF.md`: the chain link by link with a confidence claim and what would move each, Josh's questions mapped to evidence, the outside-analyst objections, and a scoped decision-quality audit. Next phase is assessment, not building |
 | bug | METHODS validation and limitations tables had gone stale (test count, replacement level, four items superseded by FINDINGS #57-#63); trued up |
 | built | Data refresh to 2026-09-07: standings, rosters and contracts re-derived from CBS pastes, ZiPS rest-of-season re-exported. 38 players added, 39 dropped, 2 contract changes. $/rp keep 9.17 to 10.86, redraft 6.56 to 7.00, replacement 4.811 to 4.599; keepers 70 to 75, 5 keep/cut flips |

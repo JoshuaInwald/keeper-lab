@@ -64,13 +64,19 @@ chain, how do the errors compound, and which link is load-bearing.
    with a confidence claim and what would move it, Josh's questions mapped to
    where the evidence is or is not, the objections an outside analyst raises
    first, and a list of what NOT to re-litigate.
-3. The single highest-value unbuilt analysis is scoped in that brief: a
-   decision-quality audit of who was kept versus let go and how those players
-   turned out. It is the only test of the thing this project actually sells, and
-   every input for it already exists.
-4. **Change no constant and no formula during the assessment.** Write the
+3. `scripts/decision_audit.py` is scaffolded and runs: it scores the OWNERS,
+   not the model, on 336 past keeper decisions, reporting ex-ante and realised
+   verdicts separately so luck is not mistaken for judgment. The assessment's
+   job is to interpret it, not build it. First read: in 2026 owners' throw-backs
+   were vindicated more often than their keeps (73.3% against 55.4% realised).
+4. The brief carries a sourced comparison against published fantasy-valuation
+   practice, researched 2026-09-08. Do not extend it from memory. Its strongest
+   lead: this project pools hitters and pitchers on one dollar scale, which
+   standard SGP practice says you should not, and the measured split is 73.7/26.3
+   against a league that actually spends 64/36.
+5. **Change no constant and no formula during the assessment.** Write the
    recommendation with its evidence and expected flip count; the change is a
    later session's deliverable. Demonstrable bugs are the exception and follow
    the usual before/after board diff.
-5. Still true regardless of phase: do not touch `redraft_value`'s definition and
+6. Still true regardless of phase: do not touch `redraft_value`'s definition and
    do not promote `keep_2027_market` to the headline call.
