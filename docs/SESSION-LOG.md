@@ -6,6 +6,7 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 
 | type | item |
 |---|---|
+| bug | `F` players showed a $0 keeper cost, which read as "free to keep" rather than "cannot be kept"; Cost is now blank for them on the board and in the drawer |
 | built | "Market $" board column and drawer block, with the P20-P80 range and the production-minus-price gap on hover |
 | bug | Phone CSS nth-child list had drifted and was hiding Production $, the column its own comment names as one the phone keeps |
 | built | ROADMAP item 1 Steps 3, 4, 5: market_price calibrated to the 2027 budget (126 lots, $1,765, identity exact); market keeper lens shipped alongside, not instead; five-system comparison in out/valuation_comparison.csv (FINDINGS #57) |

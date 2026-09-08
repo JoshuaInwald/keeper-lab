@@ -498,7 +498,8 @@ const COL_HELP = {
   salary:"What his owner pays in 2026.",
   contract:"Seasons left AFTER 2026. F = confirmed free agent after 2026, not extendable — "
     +"the extension window closes before his own walk-year draft, and it already has.",
-  keeper_cost:"What it costs to roster him in 2027, extension included.",
+  keeper_cost:"What it costs to roster him in 2027, extension included. Blank means he cannot "
+    +"be kept at any price -- a confirmed free agent after 2026, tagged LOCKED.",
   PA:"Projected 2027 PA (hitters) or IP (pitchers), the workload his roto points assume. "
     +"A ×N.NN tag means it's been scaled up from a shorter observed season -- hover the tag "
     +"for whether that's a health bet (nothing keeps him off the field) or a role bet "
@@ -584,6 +585,15 @@ function refilter(){
 }
 function money(v){ return usd(adj(v)); }
 
+// An `F` player has no 2027 cost because he cannot be kept at any price, and
+// keeper_cost is 0 for him. Rendering that as "$0" read as "free to keep",
+// the opposite of the truth -- so show nothing and say why on hover. Guarded on
+// an explicit false: free-agent rows carry keepable = true and are unaffected.
+function costCell(r){
+  if(g(r,"keepable")===false)
+    return '<span class="dim" title="Not keepable at any price: he is a confirmed free agent after 2026, and the extension window closed before his own walk-year draft.">—</span>';
+  return usd(g(r,"keeper_cost"));
+}
 // Market price is a different quantity from every other dollar figure here, so
 // its cell says so on hover rather than relying on the header gloss alone.
 function marketTooltip(r){
@@ -633,7 +643,7 @@ function playerRow(r){
   <td title="${esc(valueBreakdownTooltip(r))}">${nf(g(r,"roto_points"))}</td>
   <td>${usd(g(r,"salary"))}</td>
   <td class="dim">${esc(g(r,"contract"))}</td>
-  <td>${usd(g(r,"keeper_cost"))}</td>
+  <td>${costCell(r)}</td>
   <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"production_value"))}</td>
   <td title="${esc(marketTooltip(r))}">${money(g(r,"market_price"))}</td>
   <td>${band(r,"value_lo","value_hi")}</td>
@@ -840,7 +850,8 @@ function showPlayer(id){
       <h3>Money</h3>
       <div class="kv">
         <div class="k">salary</div><div class="v">${usd(g(r,"salary"))}</div>
-        <div class="k">cost to keep in 2027</div><div class="v">${usd(g(r,"keeper_cost"))}</div>
+        <div class="k">cost to keep in 2027</div>
+        <div class="v">${g(r,"keepable")===false?"not keepable":usd(g(r,"keeper_cost"))}</div>
         <div class="k">value, redraft scale</div><div class="v">${money(g(r,"redraft_value"))}</div>
         <div class="k">&nbsp;&nbsp;${D.band.lo}–${D.band.hi}% range</div>
         <div class="v">${band(r,"value_lo","value_hi")}</div>
