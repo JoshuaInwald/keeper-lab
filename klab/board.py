@@ -345,8 +345,8 @@ def build_board(exch: dict | None = None, positional: bool = False
     b["roto_points"] = b["roto_points"].fillna(0.0)
     b["keep_value"] = b["keep_value"].fillna(0.0)
     b["redraft_value"] = b["redraft_value"].fillna(0.0)
-    # Alias, so it must survive the same fillna; market_price must NOT be
-    # filled -- NaN means "no fitted price", which is not the same as $0.
+    # Alias, so it must survive the same fillna. market_price is filled later
+    # by attach_market_price(), which needs the keeper set to set its level.
     b["production_value"] = b["redraft_value"]
     b["pt_scale"] = b["pt_scale"].fillna(1.0)
     for c in ("roto_points_ft", "redraft_value_ft", "upside_ft"):
@@ -406,8 +406,42 @@ def build_board(exch: dict | None = None, positional: bool = False
     b.loc[~b["keepable"], surplus_cols] = 0.0
     b = mark_optimal_keepers(b[b["keepable"]].copy(), col="surplus_multiyear").pipe(
         lambda k: pd.concat([k, b[~b["keepable"]].assign(keep_2027=False)]))
+
+    b, price_meta = attach_market_price(b, players)
+    meta.update(price_meta)
     return (b.sort_values(["team", "surplus_multiyear"], ascending=[True, False]),
             exch, meta)
+
+
+def attach_market_price(b: pd.DataFrame, players: pd.DataFrame
+                       ) -> tuple[pd.DataFrame, dict]:
+    """Fill `market_price` (ROADMAP item 1 Step 3, docs/FINDINGS.md #56).
+
+    The level is set by the money that will actually be in the room: the lots
+    the 2027 auction will sell must sum to $2,600 minus committed keeper
+    salaries. Calibration uses the auction POOL (everyone projected who is not
+    a keeper) so free agents count toward the lot count; the resulting scale is
+    then applied to keepers too, because "what would he cost if I threw him
+    back" is exactly the keeper question.
+    """
+    from .price import (apply_scale, calibrate_to_budget, raw_prices_2027,
+                        role_ceiling)
+
+    kept = b[b["keep_2027"]]
+    keeper_ids = set(zip(kept["fg_id"], kept["role"]))
+    pool = players[~pd.Series(list(zip(players["fg_id"], players["role"])),
+                              index=players.index).isin(keeper_ids)].copy()
+
+    cal = calibrate_to_budget(pool, raw_prices_2027(pool), len(kept),
+                              float(kept["keeper_cost"].sum()))
+    k = cal["meta"]["scale_k"]
+
+    priced = apply_scale(raw_prices_2027(b), role_ceiling(b["role"]), k)
+    b = b.copy()
+    b["market_price"] = priced["pred"].to_numpy()
+    b["market_price_lo"] = priced["p20"].to_numpy()
+    b["market_price_hi"] = priced["p80"].to_numpy()
+    return b, {"market": cal["meta"]}
 
 
 def mark_optimal_keepers(b: pd.DataFrame,

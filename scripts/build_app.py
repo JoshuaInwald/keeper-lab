@@ -46,7 +46,7 @@ PLAYER_COLS = [
     "roto_points", "rp_above_repl", "redraft_value", "keep_value",
     # production_value is redraft_value renamed; market_price is the separate
     # auction-cost quantity, NaN until ROADMAP item 1 Step 3 (docs/FINDINGS.md #56).
-    "production_value", "market_price",
+    "production_value", "market_price", "market_price_lo", "market_price_hi",
     "roto_points_ft", "redraft_value_ft", "upside_ft", "upside_kind",
     "redraft_value_2028", "surplus_redraft",
     "surplus_y2027", "surplus_y2028", "surplus_y2029", "surplus_multiyear",
