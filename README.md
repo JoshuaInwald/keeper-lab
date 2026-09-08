@@ -27,12 +27,15 @@ open out/keeper_lab.html                                # the app: one file, no 
 | check | result |
 |---|---|
 | rostered players to 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale) |
-| replacement level, two independent routes | 4.81 roto pts (projection) vs 3.98 (auction intercept) |
-| budget identity | top 230 `redraft_value` sums to exactly $2,600 |
+| replacement level, per role | 5.12 hitters / 3.53 pitchers (fieldable pool) vs 3.98 (auction intercept) |
+| budget identity | the calibration pool's `redraft_value` sums to exactly $2,600 |
 | decision robustness | ~90% of keep/cut calls hold across six modelling variants |
 | error bar | +/-34% per category (bootstrap); wider than most modelling knobs |
+| out-of-sample keep/cut | the model does NOT beat this league's owners on 289 past decisions (FINDINGS #69) |
 
-Known gap, first on the roadmap: `redraft_value` is a production scale, not a market price. It exceeds what this league has ever paid at the top ($45 max ever; $34 for a pitcher) and misses what bidders pay for youth, upside, name and last contract. See `docs/ROADMAP.md` item 1.
+Known gap: the model has been tested out of sample for the first time and **it does not beat this league's owners** on 289 past keeper decisions (`docs/FINDINGS.md` #69). That test ran on a naive projection, so it is a floor rather than a verdict, but the valuation machinery was held fixed, which points at the forecast rather than the pricing as the binding constraint.
+
+Three dollar columns do three different jobs and are never blended: `production_value` is worth to a roster, `keep_value` is what replacing a player would cost at this league's auction, and `market_price` is the only one comparable to a draft price. #75 reconciles them.
 
 ## Layout
 

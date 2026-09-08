@@ -118,7 +118,7 @@ def scorer_2026_full():
     seasons: dividing each category by its own season's denominator is exactly
     what makes a 2026 home run and a 2027 home run comparable. So each season's
     production belongs on its own scale, and the difference between the two is
-    then a real statement about the player (FINDINGS #74).
+    then a real statement about the player (FINDINGS #72).
 
     The complication is that the 2026 standings are ~88% of a season. Scoring a
     full-season line against them would inflate every counting category by the
@@ -154,7 +154,7 @@ def roto_2026_lines() -> pd.DataFrame:
     should be as accurate as possible WITHIN that season. Roto points are
     standings places either way, so the two columns still subtract, and the
     difference is then a statement about the player rather than about which
-    denominators were used (FINDINGS #74).
+    denominators were used (FINDINGS #72).
     """
     scorer = scorer_2026_full()
     H = lines_2026_hitters()
@@ -350,9 +350,15 @@ def value_players(exch: dict | None = None, positional: bool = False
 
     # Merge on (fg_id, role), not a fg_id-keyed .map(): a two-way player
     # (TWO_WAY_SPLIT_NAMES) has two rows per fg_id, which breaks .map().
-    ft = ft_players[["fg_id", "role", "roto_points", "pt_scale", "pt_scale_kind"]].rename(
+    # Carry the per-category split for the full-time line too, so the app's
+    # playing-time toggle can show a breakdown that sums to the total it sits
+    # under; without these the toggle would flip the headline and leave the
+    # category tooltip describing the other basis (FINDINGS #76).
+    ft_cats = {f"rp_{c}": f"rp_{c}_ft" for c in C.CATS}
+    ft = ft_players[["fg_id", "role", "roto_points", "pt_scale", "pt_scale_kind"]
+                    + list(ft_cats)].rename(
         columns={"roto_points": "roto_points_ft", "pt_scale": "pt_scale_full",
-                "pt_scale_kind": "pt_scale_kind_full"})
+                "pt_scale_kind": "pt_scale_kind_full", **ft_cats})
     players = players.merge(ft, on=["fg_id", "role"], how="left")
     players["pt_scale"] = players["pt_scale_full"].fillna(1.0)
     players = players.drop(columns=["pt_scale_full"])
@@ -457,7 +463,7 @@ def build_board(exch: dict | None = None, positional: bool = False
     b["roto_2026"] = b["roto_2026"].fillna(0.0)
     # The projection's opinion, made subtractable. Both sides are standings
     # places in their own season, so the difference is a statement about the
-    # player rather than about denominators (FINDINGS #74).
+    # player rather than about denominators (FINDINGS #72).
     b["roto_move"] = b["roto_points"] - b["roto_2026"]
     b["keep_value"] = b["keep_value"].fillna(0.0)
     b["redraft_value"] = b["redraft_value"].fillna(0.0)

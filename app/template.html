@@ -97,7 +97,7 @@ tbody tr.sel{background:var(--sel)}
    column is added -- the list had drifted and was hiding Production $, the one
    number the comment above it names. Hidden: team, role, roto pts, contract,
    likely range, Sure?, Worth '28, if full-time. Re-counted twice: Replace $ at
-   position 11 (#70), Roto '26 at 5 (#73) and Move at 7 (#74). Replace $ stays
+   position 11 (#71.1), Roto '26 at 5 and Move at 7 (#72). Replace $ stays
    VISIBLE on a phone (it is the number the keep decision is made on); both roto
    columns are hidden as Roto pts always was, but MOVE IS VISIBLE -- it is the
    one number in the trio that stands alone, and the drawer carries the full
@@ -216,7 +216,7 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 const S = {tab:"model", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
            desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
            rosBasis: D.ros_basis_default || "ros", standSeason: "live", positional: false,
-           shades: {}, intuitionQ: "", intuitionCalculated: false};
+           shades: {}, intuitionQ: "", intuitionCalculated: false, ptBasis: "projected"};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
 const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value costs in 2027 money
 
@@ -476,7 +476,7 @@ const BOARD_COLS=[
   ["name","Player","l"],["team","Team","l"],["role","",""],
   ["PA","Playing time"],["roto_2026","Roto '26"],["roto_points","Roto '27"],
   // Sortable, because "which players does the projection most disagree with the
-  // present about" is the question this trio exists to answer (#74).
+  // present about" is the question this trio exists to answer (#72).
   ["roto_move","Move"],
   ["salary","Sal"],["contract","Yr"],["keeper_cost","Cost"],
   // "Worth '27" was one label doing two jobs (docs/ROADMAP.md item 1 Step 0):
@@ -505,7 +505,7 @@ function rosVal(r){
 // Plain-English gloss for every column header, shown on hover.
 // Plain-English gloss for every column header, shown on hover.
 //
-// THE CONTRACT, because these drifted into essays and into jargon (#76):
+// THE CONTRACT, because these drifted into essays and into jargon (#74):
 //   1. First sentence says WHAT THE NUMBER IS, in words a person who has never
 //      read a baseball stats site would understand. Under about 15 words.
 //   2. At most two more sentences: how to read it, or the one caveat that
@@ -593,7 +593,11 @@ function filtered(rows){
 function sortRows(rows){
   const k=S.sort;
   // ros_value isn't a real board-row field -- see rosVal().
-  const val = k==="ros_value" ? rosVal : (r)=>g(r,k);
+  // these columns are computed through the playing-time basis, so sorting has
+  // to go through the same helpers or the order will not match what is drawn
+  const BASIS_SORT = {roto_points: rp27, production_value: prodV, keep_value: replV,
+                      roto_move: moveV, surplus_y2027: surp27};
+  const val = k==="ros_value" ? rosVal : (BASIS_SORT[k] || ((r)=>g(r,k)));
   return rows.sort((a,b)=>{
     let x=val(a), y=val(b);
     if(typeof x==="string"||typeof y==="string"){
@@ -642,6 +646,43 @@ function marketTooltip(r){
 // Per-category breakdown for the board's Roto pts / Production $ cells --
 // native title tooltips (no custom hover component in this app), but
 // multi-line via \n works fine, same trick playerTooltip() already uses.
+// ---------- playing-time basis --------------------------------------------
+// ZiPS projects the playing time it EXPECTS: 200 plate appearances for a
+// prospect it does not expect to break camp, not the 600 he gets if the job is
+// his on opening day. Both are honest answers to different questions, so the
+// assumption belongs to the reader rather than being baked in. "full season"
+// swaps in the columns the board already computes at a full workload.
+//
+// The KEEP flags and the multi-year surplus deliberately do NOT move with this
+// toggle. They are the shipped recommendation, decided on expected playing
+// time, and silently re-deciding them behind a display switch would be a
+// different product wearing the same label. Surplus '27 does move, because it
+// is a single-season figure the reader is being invited to re-read.
+const ptFull = () => S.ptBasis === "full";
+const rp27  = r => ptFull() ? (g(r,"roto_points_ft") ?? g(r,"roto_points")) : g(r,"roto_points");
+const prodV = r => ptFull() ? (g(r,"redraft_value_ft") ?? g(r,"production_value")) : g(r,"production_value");
+function replV(r){
+  if(!ptFull()) return g(r,"keep_value");
+  const rp = rp27(r);
+  if(rp==null) return null;
+  return Math.max(0, (rp - D.constants.auction_intercept) * D.constants.usd_per_roto_point_auction);
+}
+const moveV = r => (rp27(r)==null || g(r,"roto_2026")==null) ? null : rp27(r) - g(r,"roto_2026");
+function surp27(r){
+  const v = replV(r), c = g(r,"keeper_cost");
+  return (v==null || c==null) ? null : v - c;
+}
+function ptBasisPicker(){
+  return `<label class="chk" title="How much he plays in 2027. &quot;As projected&quot; uses the `
+    + `playing time the projection expects. &quot;Full season&quot; asks what he would be worth `
+    + `with a everyday job from opening day -- the question to ask about a prospect projected `
+    + `for 200 plate appearances. Keeper flags stay on the projected basis either way.">`
+    + `playing time <select onchange="S.ptBasis=this.value;render()">`
+    + `<option value="projected"${S.ptBasis==="projected"?" selected":""}>as projected</option>`
+    + `<option value="full"${S.ptBasis==="full"?" selected":""}>full season</option>`
+    + `</select></label>`;
+}
+
 // ---------- value decomposition -------------------------------------------
 // "Where is the value coming from, home runs or steals?" is the question this
 // board gets asked most and could not answer: it showed a total and nothing
@@ -655,10 +696,6 @@ function catsFor(r){
   const role = g(r,"role");
   return role==="HIT" ? D.hit_cats : role==="PIT" ? D.pit_cats : CATS;
 }
-function catBar(v, max){
-  const n = max>0 ? Math.round(8*Math.abs(v)/max) : 0;
-  return "█".repeat(Math.max(v!==0 ? 1 : 0, n));
-}
 // Categories a player does not participate in (a starter's saves, a hitter's
 // ERA) are dropped rather than printed as "+0.0": a row of zeroes is noise
 // competing with the two lines that carry the answer.
@@ -668,15 +705,18 @@ function decompTooltip(r, suffix, total, label){
     .filter(x=>Math.abs(x.v) >= 0.05)
     .sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
   if(!rows.length) return `${label}: no category contributes anything measurable.`;
-  const max = Math.max(...rows.map(x=>Math.abs(x.v)), 0.001);
   const body = rows.map(x=>
-    `  ${(CAT_WORD[x.c]||x.c).padEnd(12)}${signed(x.v).padStart(5)}  ${catBar(x.v,max)}`
+    `  ${(CAT_WORD[x.c]||x.c).padEnd(13)}${signed(x.v).padStart(5)}`
   ).join("\n");
   return `${label}, ${nf(total)} points, comes from:\n${body}\n\n`
     + `One point is one place in the final standings.`;
 }
 function valueBreakdownTooltip(r){
-  return decompTooltip(r, "", g(r,"roto_points"), "His projected 2027");
+  // the suffix has to follow the toggle or the split would describe the other
+  // playing-time basis than the total it sits under
+  return ptFull()
+    ? decompTooltip(r, "_ft", rp27(r), "At a full season his 2027")
+    : decompTooltip(r, "", rp27(r), "His projected 2027");
 }
 function value2026Tooltip(r){
   return decompTooltip(r, "_26", g(r,"roto_2026"), "His 2026 season");
@@ -685,7 +725,7 @@ function value2026Tooltip(r){
 // side by side and sorts by the size of the CHANGE rather than the level.
 function moveTooltip(r){
   const rows = catsFor(r).map(c=>{
-    const a = g(r,"rp_"+c+"_26") || 0, b = g(r,"rp_"+c) || 0;
+    const a = g(r,"rp_"+c+"_26") || 0, b = g(r,"rp_"+c+(ptFull()?"_ft":"")) || 0;
     return {c, a, b, d: b-a};
   }).sort((x,y)=>Math.abs(y.d)-Math.abs(x.d));
   const shown = rows.filter(x=>Math.abs(x.d) >= 0.05);
@@ -703,7 +743,7 @@ function moveTooltip(r){
 // so the two are a hand-maintained pairing with nothing linking them. Adding a
 // header without its matching cell silently shifts every column right of the
 // insertion under the wrong heading. That shipped twice (Replace $ in FINDINGS
-// #70, the Roto '26 / Move trio in #74) and both times a reader found it, not a
+// #71.1, the Roto '26 / Move trio in #72) and both times a reader found it, not a
 // test: "Move" was rendering the contract-year column, which is why it showed
 // integers. This throws on load instead, and app/verify.mjs now checks the
 // rendered values against the payload column by column.
@@ -732,16 +772,16 @@ function playerRow(r){
   <td class="dim">${g(r,"role")==="PIT"?"P":g(r,"role")==="TWO"?"H/P":"H"}</td>
   <td class="dim">${ptCell(r)}</td>
   <td class="dim" title="${esc(value2026Tooltip(r))}">${nf(g(r,"roto_2026"))}</td>
-  <td title="${esc(valueBreakdownTooltip(r))}">${nf(g(r,"roto_points"))}</td>
-  <td title="${esc(moveTooltip(r))}">${sgn(g(r,"roto_move"))}</td>
+  <td title="${esc(valueBreakdownTooltip(r))}">${nf(rp27(r))}</td>
+  <td title="${esc(moveTooltip(r))}">${sgn(moveV(r))}</td>
   <td>${usd(g(r,"salary"))}</td>
   <td class="dim">${esc(g(r,"contract"))}</td>
   <td>${costCell(r)}</td>
-  <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"production_value"))}</td>
+  <td title="${esc(valueBreakdownTooltip(r))}">${money(prodV(r))}</td>
   <td title="${esc(marketTooltip(r))}">${money(g(r,"market_price"))}</td>
-  <td>${money(g(r,"keep_value"))}</td>
+  <td>${money(replV(r))}</td>
   <td>${band(r,"value_lo","value_hi")}</td>
-  <td>${sgn(adj(g(r,"surplus_y2027")),0,"$")}</td>
+  <td>${sgn(adj(surp27(r)),0,"$")}</td>
   <td>${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</td>
   <td>${conf(r)}</td>
   <td class="dim">${money(g(r,"redraft_value_2028"))}</td>
@@ -807,6 +847,7 @@ function controls(showOnly=true){
       <option value="keepable" ${S.only==="keepable"?"selected":""}>keeper-eligible</option>
       <option value="surplus" ${S.only==="surplus"?"selected":""}>positive surplus</option>
     </select>`:""}
+    ${ptBasisPicker()}
     <label class="chk"><input type="checkbox" ${S.infl?"checked":""}
       onchange="S.infl=this.checked;refilter()"> inflation-adjusted</label>
     ${rosBasisPicker()}

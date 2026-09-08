@@ -333,7 +333,7 @@ const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.bas
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
 // The tooltip layer had no coverage at all, which is how a `docs/FINDINGS.md`
-// reference and several undefined jargon terms reached users (FINDINGS #76).
+// reference and several undefined jargon terms reached users (FINDINGS #74).
 // Three cheap invariants: every column explains itself, no internal reference
 // escapes into user-facing text, and the per-category breakdown actually adds
 // up to the number it claims to explain.
@@ -364,8 +364,8 @@ if (tipBad) console.log('  TOOLTIP CHECK:', JSON.stringify(tipResult));
 
 // The board's headers (BOARD_COLS) and its cells (playerRow) are two
 // hand-maintained lists with nothing linking them, so inserting a column has
-// twice shifted every cell right of it under the wrong header (FINDINGS #70,
-// #74). Headers alone cannot catch that -- they looked correct both times. This
+// twice shifted every cell right of it under the wrong header (FINDINGS #71.1,
+// #72). Headers alone cannot catch that -- they looked correct both times. This
 // reads the RENDERED cell text for one player and checks the numeric columns
 // against the payload, which is the only check that would have failed.
 const boardCellResult = await page.evaluate(() => {

@@ -54,7 +54,8 @@ PLAYER_COLS = [
     "value_lo", "value_hi", "surplus_lo", "surplus_hi", "p_surplus_positive",
     "PA", "AB", "H", "HR", "R", "RBI", "SB", "AVG",
     "IP", "W", "SV", "K", "ER", "BB", "ERA", "WHIP",
-] + [f"rp_{c}" for c in C.CATS] + [f"rp_{c}_26" for c in C.CATS]
+] + [f"rp_{c}" for c in C.CATS] + [f"rp_{c}_26" for c in C.CATS] \
+  + [f"rp_{c}_ft" for c in C.CATS]
 
 ROS_COLS = ["AB", "H", "HR", "R", "RBI", "SB",
             "IP", "W", "SV", "K", "ER", "BB", "H_allowed"]

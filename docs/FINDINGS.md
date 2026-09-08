@@ -552,13 +552,11 @@ Baseball-Reference publishes Marcel projections per season and keeps the pages u
 The consequence for the work ahead is a warning. A backtest that scores every Marcel row as a forecast is, for a quarter of pitchers, scoring the league mean and calling it a projection. `rel` must be carried through and reported, and low-`rel` rows either weighted or excluded with the count stated.
 
 ### 68. The pool pathology is general to projections, and #65 judged its repair against the wrong benchmark
-Assessment phase, Phase B item 1, the first use of the Marcel archive (#67). Diagnostic only. No constant changed, no committed output moved, `scripts/validate.py` CHECK 5 still prints 73.7%. `scripts/marcel_pool_test.py` reproduces every number below, including four of #65's own as controls: 131/99, 139/91, 130/100, 183/47, 73.70%, 54.21% and 71.55% all come back exact.
+Phase B item 1, first use of the Marcel archive. Diagnostic only, no constant changed. `scripts/marcel_pool_test.py` reproduces every number here plus seven of #65's as controls: 131/99, 139/91, 130/100, 183/47, 73.70%, 54.21% and 71.55% all come back exact. Every arm is scored with the SAME scorer as its season's actuals, so only the stat lines differ.
 
-#65 found the 2027 calibration pool is 183 hitters / 47 pitchers where completed seasons run 125-139 / 91-105, and could not tell whether that is a property of projections in general or an artefact of ZiPS Depth Charts. Marcel is an independent ex-ante line for three seasons that have since been played, so it answers the question directly. Every arm below is scored with the SAME `RotoScorer` as its season's actuals, so only the stat lines differ.
+**1. It reproduces, and the blend is not the cause.** Top-230 pool, plus the 90th-best pitcher's roto points:
 
-**1. It reproduces. The pathology is general to projections, and the blend is not the cause.**
-
-| arm | HIT | PIT | 90th-best pitcher, roto pts |
+| arm | HIT | PIT | 90th pitcher |
 |---|---|---|---|
 | 2024 actual | 131 | 99 | 5.217 |
 | 2024 Marcel | **184** | **46** | 3.092 |
@@ -567,23 +565,13 @@ Assessment phase, Phase B item 1, the first use of the Marcel archive (#67). Dia
 | 2026 actual | 130 | 100 | 5.433 |
 | 2026 Marcel | **160** | **70** | 4.664 |
 | 2027 ZiPS blend | 183 | 47 | 3.526 |
-| 2027 ZiPS, blend weights zeroed | 191 | 39 | 3.463 |
+| 2027 ZiPS, blend zeroed | 191 | 39 | 3.463 |
 
-Marcel 2024 lands within one player of the ZiPS 2027 pool. Removing the 2026 actuals entirely makes the ZiPS pool worse, not better, so the blend is not what does it. In every completed season the 90th-best pitcher and the 140th-best hitter sit within 0.58 roto points of each other, which is why a role-blind top 230 lands near the fieldable 140/90 on realised data. Under every projection the pitcher side of that pair collapses.
+Marcel 2024 lands within one player of ZiPS 2027. Zeroing the blend makes it worse. In every completed season the 90th pitcher and the 140th hitter sit within 0.58 roto points of each other, which is why a role-blind top 230 lands near the fieldable 140/90 on realised data; under every projection the pitcher side of that pair collapses.
 
-**2. #65's proposed mechanism is refuted. Smeared innings are not what empties the pool.**
+**2. #65's smeared-innings mechanism is refuted.** Marcel carries 142-154 arms over 100 IP and 46-55 over 150, against 118-127 and 40-71 in real seasons, and 223/33 for ZiPS. Its innings distribution is close to a real season and nothing like ZiPS's, and it still produces 184/46.
 
-| arm | pitchers | IP >= 100 | IP >= 150 |
-|---|---|---|---|
-| actual 2024-2026 | 851-873 | 118-127 | 40-71 |
-| Marcel 2024-2026 | 609-750 | 142-154 | 46-55 |
-| 2027 ZiPS blend | 1,151 | 223 | 33 |
-| 2027 ZiPS, blend weights zeroed | 1,151 | 243 | 21 |
-
-Marcel's innings distribution is close to a real season and nothing like ZiPS's: it carries roughly the right number of 100-inning arms and MORE 150-inning arms than ZiPS, which is the signature of a projection that does not spread innings across a depth chart. It still produces 184/46. #65 was right that ZiPS Depth Charts smears innings and wrong that the smearing is what removes pitchers from the pool.
-
-**3. The mechanism is rate-category compression, and the category format decides which role it hits.**
-sd(projected) / sd(actual) per category, over every player carrying both a Marcel line and a realised line. No top-N filter: selecting on the projection would truncate the projected distribution from below and shrink its sd for reasons unrelated to compression.
+**3. The mechanism is rate-category compression.** sd(projected)/sd(actual) per category, over every player with both a Marcel and a realised line. No top-N filter, which would truncate one side only:
 
 | season | R | HR | RBI | SB | AVG | W | SV | K | ERA | WHIP |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -591,10 +579,9 @@ sd(projected) / sd(actual) per category, over every player carrying both a Marce
 | 2025 | 0.593 | 0.622 | 0.599 | 0.812 | 0.713 | 0.699 | 0.542 | 0.787 | **0.433** | 0.484 |
 | 2026 | 0.696 | 0.795 | 0.719 | 0.894 | 0.787 | 0.762 | 0.584 | 0.839 | 0.581 | 0.604 |
 
-ERA, WHIP and SV compress hardest in all three seasons; W and K sit with the hitter categories. **Pitchers carry three of the four most-compressed categories and hitters carry one.** Any projection regresses the least predictable stats hardest, so pitcher roto points cluster toward the middle and drop out of a pool selected on projected value. #67's reliability split (pitchers 0.47 against hitters 0.71) is the same fact stated from the projection's own side. Whole-role dispersion follows: sd ratio 0.52-0.61 for pitchers against 0.60-0.73 for hitters.
+ERA, WHIP and SV compress hardest; W and K sit with the hitter categories. **Pitchers carry three of the four most-compressed categories, hitters one.** Every projection regresses the least predictable stats hardest, so pitchers cluster and drop out of a pool selected on projected value. #67's reliability split (0.47 pitchers, 0.71 hitters) is the same fact from the projection's own side. Whole-role sd ratio: 0.52-0.61 pitchers against 0.60-0.73 hitters.
 
-**4. No pool rule reaches 63-64% under perfect foresight, so that was never the benchmark for this quantity.**
-Hitter dollar share under #65's three candidate rules. The `actual` rows are perfect foresight: the season is over and the stat lines are the real ones.
+**4. No pool rule reaches 63-64% under perfect foresight, so that was never the benchmark.** Hitter dollar share; the `actual` rows are perfect foresight.
 
 | season | arm | blind (status quo) | slot + pooled repl | slot + role repl |
 |---|---|---|---|---|
@@ -603,10 +590,9 @@ Hitter dollar share under #65's three candidate rules. The `actual` rows are per
 | 2026 | actual | 0.4642 | 0.4695 | 0.5198 |
 | 2027 | ZiPS | **0.7370** | **0.7155** | **0.5421** |
 
-The entire perfect-foresight range is 46.4% to 55.1%. #65 rejected slot-constraint-with-role-specific-replacement because its 54.21% was "as far below the league's 63-64% as the status quo is above it". **54.21% is where perfect foresight puts that rule** (52.0-55.1%, and 52.5-55.1% on the two complete seasons). It is the only one of the three candidates whose output on the projection agrees with its output on realised data; the other two miss their own perfect-foresight values by 20 points.
+The whole perfect-foresight range is 46.4-55.1%. #65 rejected slot-plus-role-replacement because 54.21% was "as far below 63-64% as the status quo is above it". **54.21% is where perfect foresight puts that rule** (52.0-55.1%). It is the only candidate whose output on the projection agrees with its output on realised data; the other two miss their own by 20 points.
 
-**5. The mis-split enters at the dollar conversion, not the projection.**
-#64's 63-64% is measured over the players this league rosters, not over the top 230 by projected points. Both quantities on both populations, from the committed 2027 board:
+**5. The mis-split enters at the dollar conversion, not the projection.** #64's 63-64% is measured over the rostered players, a different population from the top 230 by projected points:
 
 | population | quantity | hitter share |
 |---|---|---|
@@ -615,25 +601,16 @@ The entire perfect-foresight range is 46.4% to 55.1%. #65 rejected slot-constrai
 | calibration top-230 | projected roto points | 77.95% |
 | calibration top-230 | `redraft_value` | 73.70% |
 
-The projection's role split on the rostered set is 65.20% against #64's 64.11% of roto points actually delivered: right to within 1.1 points. The dollar conversion then moves it to 71.78%. Subtracting one pooled replacement level from a compressed distribution takes a larger fraction of a pitcher's value than of a hitter's, which is the same compression again, now priced. #65's 73.70% is that conversion evaluated on the hitter-skewed pool the compression itself creates, which is why it reads 8 points worse than the same conversion on the rostered set.
+The projection's role split on the rostered set is right to within 1.1 points of #64's 64.11% delivered. The conversion moves it to 71.78%: subtracting one pooled replacement level from a compressed distribution takes a larger fraction of a pitcher's value than of a hitter's.
 
-**What is not established, and why nothing ships this session.**
-- Marcel is the naive baseline (#67). The magnitudes describe the Marcel blend; only the shape transfers to the ZiPS path. The shape is what items 1-4 above turn on, and item 4's benchmark comes from realised seasons rather than from Marcel, so it does not carry that caveat.
-- Three seasons, one partial. 2026 actuals are ~75% of a season, so the perfect-foresight benchmark rests mainly on 2024 and 2025.
-- **Nothing here shows slot + role-specific replacement is the right rule.** It shows the stated reason for rejecting it does not hold. Choosing a pool rule is a valuation change and still owes the before/after keep/cut flip diff CLAUDE.md requires. That is the next session's work, not this one's.
-- The hitter/pitcher budget split stays refuted (#64). Nothing here reopens it: this is a replacement-level and pool-selection question, not an exchange-rate one.
+**Not established.** Marcel is the naive baseline (#67), so the magnitudes describe the Marcel blend; item 4's benchmark comes from realised seasons and does not carry that caveat. Three seasons, one partial. Nothing here shows slot+role is the right rule, only that the stated reason for rejecting it does not hold.
 
 ### 69. The out-of-sample keep/cut test: the model does not beat the owners
-The test #66 named as the biggest gap in the project, run for the first time. `klab/rewind.py` rebuilds a board for a past season from pre-season data only; `scripts/backtest_keepers.py` scores it against what owners did and what then happened, on 289 decisions across 2024, 2025 and 2026. No constant changed and no committed valuation moved. This is a negative result and it is the honest one.
+The test #66 named as the biggest gap in the project, run for the first time. `klab/rewind.py` rebuilds a board for a past season from pre-season data only; `scripts/backtest_keepers.py` scores it on 289 decisions across 2024-2026. Marcel coverage of decided players: 97%, 100%, 100%.
 
-**The instrument.** A rewound board takes its projection from Marcel FOR that season (#67), its dispersion from completed seasons before it, its league level and baselines from the two completed seasons before it, and its field size from the same window. The $2,600 identity and the 14/9 roster shape are league rules and are not rewound. Coverage of decided players is 97%, 100%, 100%.
-
-**Two corrections had to be made before any number meant anything.**
-
-1. **The truth scale.** Scoring a keep against `redraft_value` asks what the player would fetch in a no-keeper redraft, which is a cheaper market than the one a keeper is actually traded against. On that scale only **23%** of these 289 decisions read as correct keeps while owners kept 47-55%, so any caller that keeps less wins for free, and the model keeps less. The correct denominator is the auction opportunity cost: keeping at $S forgoes $S of budget, and $S buys `intercept + S x slope` roto points, so keeping is right exactly when realised production beats that, which is `replace_cost > salary`. On that scale **54%** of the decisions are correct keeps. This is `scripts/decision_audit.py`'s open question 3, now fixed rather than flagged.
-2. **The baseline.** Keeping EVERYTHING captures most of the available surplus in this league, because withholding 100 keepers leaves contracts cheap on average. Every dollar figure below is reported against that baseline, not against zero. A caller with a large positive total can still be destroying value.
-
-**The result, against keep-everything.**
+**Two corrections were needed before any number meant anything.**
+1. **The truth scale.** Scoring a keep against `redraft_value` asks what he would fetch in a no-keeper redraft, a cheaper market than the one a keeper is actually traded against. On that scale only **23%** of the 289 read as correct keeps while owners kept 47-55%, so any caller that keeps less wins for free, and the model keeps less. The right denominator is opportunity cost: keeping at $S forgoes $S of budget, which buys `intercept + S x slope` roto points, so keeping is right iff `replace_cost > salary`. On that scale **54%** are correct keeps. This closes `decision_audit.py`'s open question 3.
+2. **The baseline.** Keeping EVERYTHING already captures most of the available surplus in this league, because withholding 100 keepers leaves contracts cheap. Every dollar figure below is against that baseline, not against zero.
 
 | season | n | owner | model_redraft | model_replace | model_matched_k | perfect |
 |---|---|---|---|---|---|---|
@@ -641,58 +618,43 @@ The test #66 named as the biggest gap in the project, run for the first time. `k
 | 2025 | 91 | -310.8 | -180.8 | **-56.2** | -196.0 | +402.8 |
 | 2026 | 134 | +73.5 | -10.9 | **+78.6** | +0.9 | +578.2 |
 
-Accuracy on the same decisions:
+Accuracy: 2024 owner **71.9%** against 64.1 / 65.6 / 65.6; 2025 owner 50.5% against **60.4** / 57.1 / 57.1; 2026 owner **71.6%** against 68.7 / 64.9 / 62.7.
 
-| season | owner | model_redraft | model_replace | model_matched_k |
-|---|---|---|---|---|
-| 2024 | **71.9%** | 64.1% | 65.6% | 65.6% |
-| 2025 | 50.5% | **60.4%** | 57.1% | 57.1% |
-| 2026 | **71.6%** | 68.7% | 64.9% | 62.7% |
+**Owners win 2024 and 2026; the model's only clear win is 2025, the season whose labels are most biased against owners** (pre-2026 a keep is only detectable when the player was LATER thrown back, #56.4). On 2026, the only clean season, owners are 71.6% right and beat keep-everything by $73.5; the production rule is 68.7% and beats it by -$10.9. `model_matched_k`, which keeps exactly as many players as the owner and so tests ranking with the threshold removed, lands at +$0.9.
 
-**The owners win 2024 and 2026 on accuracy and 2024 on dollars; the model's only clear win is 2025, which is the season whose labels are most biased against the owners** (pre-2026 a keep is only detectable when the player was LATER thrown back, so the observed kept class is enriched for failures, #56.4). On 2026, the only season with clean labels, the owners are 71.6% right and beat keep-everything by $73.5; the production rule is 68.7% right and beats it by -$10.9. `model_matched_k`, which keeps exactly as many players as the owner and therefore tests ranking with the threshold removed, lands at +$0.9 against the owner's +$73.5.
+**This is a FLOOR, not an estimate.** Marcel is the naive baseline and the real board runs on ZiPS, so the honest claim is that the engine's decision logic, driven by a naive projection, does not beat this league's owners. The valuation machinery was held fixed, which points at the projection as the binding constraint. 2026 outcomes are also ~75% of a season.
 
-**What this does and does not establish.** It is a FLOOR, not an estimate. Marcel is the deliberately naive baseline (#67) and the real board runs on ZiPS, so the honest statement is that **the engine's decision logic, driven by a naive projection, does not beat this league's owners.** It does not show the ZiPS board fails to. It does show that the edge, if there is one, comes from the projection rather than from the valuation machinery, because the valuation machinery is what was held fixed here. 2026 outcomes are also a partial season (~75%), which favours durable players on both sides.
-
-**Two things the test settles on its own terms.**
-
-**The keep threshold is on the wrong scale.** `board.py` runs `surplus_multiyear` off `redraft_value`. Priced against the opportunity cost instead, the same board captures more in all three seasons: +$6.1 (2024), +$124.6 (2025), +$89.4 (2026). Accuracy moves the other way in 2025 and 2026 because the opportunity-cost rule keeps far more (56-62% against 20-43%), and dollars is the metric that matters. This is a candidate change to the production rule, not a shipped one; it needs the keep/cut flip diff and it interacts with #57.5, which rejected a different permissive rewire for keeping 30 players below replacement.
-
-**The pool rule question gets an independent answer, and it agrees with #68.** Scored on decisions rather than on the perfect-foresight benchmark:
+**Two things it settles on its own terms.** The keep threshold is on the wrong scale: priced against opportunity cost, the same board captures +$6.1, +$124.6 and +$89.4 more. And the pool rule gets an independent answer that agrees with #68:
 
 | pool rule | 2024 $ | 2025 $ | 2026 $ | 2026 accuracy |
 |---|---|---|---|---|
-| blind (production) | 77.7 | 318.8 | 739.0 | 61.2% |
+| blind | 77.7 | 318.8 | 739.0 | 61.2% |
 | slot_pooled | 77.7 | 318.8 | 781.8 | 62.7% |
 | **slot_role** | 63.6 | **324.3** | **857.2** | **68.7%** |
 
-`slot_role` wins the clean season by $118 and 7.5 accuracy points, wins 2025 by a hair and loses 2024. #68 argued for it from a benchmark; this argues for it from decisions, and the two agree.
+**A structural note that reorganises the open work.** The pool rule moves `redraft_value` only; `replace_cost` is set by the exchange rate and is pool-independent, so all three rules give identical `model_replace` results. **The pool rule is a PRICING question and the exchange rate is the KEEP/CUT question.** They have been treated as one problem and are two.
 
-**A structural note that reorganises the open work.** The pool rule moves `redraft_value` and therefore only affects `model_redraft`; `replace_cost` is set by the auction exchange rate and is pool-independent, so all three pool rules give identical `model_replace` results. **The pool rule is a PRICING question (what to bid) and the exchange rate is the KEEP/CUT question.** They have been treated as one problem and they are two.
+**Housekeeping.** `MAX_KEEPERS` binds on 0 of 289 decisions. `MIN_KEEPERS` is deliberately not applied: the recoverable decision set is a partial view of each team's keepable contracts. Only 1 of 289 sits below Marcel's 0.30 reliability bar.
 
-**Housekeeping.** `MAX_KEEPERS` binds on 0 of 289 decisions (the most any team keeps is 9 against a cap of 13), so the roster constraint separates nothing here. `MIN_KEEPERS` is deliberately not applied: the recoverable decision set is a partial view of each team's keepable contracts, so forcing six out of it would invent choices. Only 1 of 289 decided players sits below Marcel's 0.30 reliability bar, so #67's low-`rel` warning does not bite on this population.
+### 70. Two changes ship: opportunity-cost keep decision, and a fieldable calibration pool
+The first valuation change of the assessment phase. Both were argued in #68 and #69 and shipped together because they interact. Committed outputs moved. 64 tests and 15 app checks pass; the JS still matches pandas on all 25 quantities.
 
-### 70. Two changes ship: the keep decision moves to the opportunity-cost scale, and the pool becomes fieldable
-The first valuation change since the assessment phase began. Both were argued in #68 and #69 and are shipped here together because they interact. Committed outputs moved: `keeper_board_2027.csv`, `model_params.json`, `keeper_lab.html`, `trade_suggestions.json`, `app_reference.json`. 64 tests pass, 15 app checks pass, the JS still matches pandas on all 25 quantities.
+**`KEEP_BASIS = "replacement"`.** `surplus_multiyear` ran off `redraft_value`, a no-keeper redraft. A keeper is not traded against that market: keeping at $S forgoes $S of auction budget, so the identified comparison is `keep_value` against the keeper cost. Backtested at +$6.1 / +$124.6 / +$89.4 (#69).
 
-**Change 1: `KEEP_BASIS = "replacement"`.** `board.build_board` built `surplus_multiyear` from `redraft_value`, which is what a player fetches in a full redraft with no keepers withheld. A keeper is not traded against that market. Keeping at $S forgoes $S of auction budget, and $S buys `intercept + S x slope` roto points, so the identified comparison is `keep_value` against the keeper cost. #69 backtested it at +$6.1, +$124.6 and +$89.4 of captured surplus across 2024-2026.
-
-**Change 2: `POOL_RULE = "slot_role"`.** `value_players` calibrated the $2,600 identity on the top 230 by roto points regardless of role, which on the 2027 projection is 183 hitters and 47 pitchers (#65). It now calibrates on the fieldable top 140 hitters plus top 90 pitchers, with replacement read per role. #68 showed this reproduces perfect foresight (52.0-55.1% hitter share on completed seasons against its 54.21% here) where the old rule missed by 20 points; #69 showed it makes better keep/cut calls out of sample.
-
-**What moved.**
+**`POOL_RULE = "slot_role"`.** The $2,600 identity calibrated on the top 230 by roto points regardless of role, which on the 2027 projection is 183 hitters and 47 pitchers. It now calibrates on the fieldable top 140 hitters plus top 90 pitchers, with replacement read per role.
 
 | quantity | before | after |
 |---|---|---|
-| calibration pool | 183 HIT / 47 PIT | **140 / 90** |
+| pool | 183 HIT / 47 PIT | **140 / 90** |
 | hitter share of $2,600 | 73.70% | **54.21%** |
 | `usd_per_rp_redraft` | 6.522 | **6.213** |
 | replacement, roto points | 4.733 pooled | **5.121 HIT / 3.526 PIT** |
-| median `redraft_value`, hitters | 9.18 | **6.38** |
-| median `redraft_value`, pitchers | 0.00 | **4.09** |
-| players flagged keep | 70 | **123** |
+| median `redraft_value`, HIT / PIT | 9.18 / 0.00 | **6.38 / 4.09** |
+| flagged keep | 70 | **123** |
 
 `usd_per_rp_keep` ($10.00) is unchanged: it comes from the auction regression and never saw the pool.
 
-**The flip diff, which is the part that reaches a decision.** 47 flips on 277 rostered players, **all of them cut-to-keep, none the other way**. Decomposing the two changes shows they are complementary rather than additive:
+**The flip diff.** 47 flips on 277 rostered players, **all cut-to-keep**. The two changes are complementary rather than additive:
 
 | POOL_RULE | KEEP_BASIS | keeps | of which below replacement |
 |---|---|---|---|
@@ -701,167 +663,114 @@ The first valuation change since the assessment phase began. Both were argued in
 | slot_role | redraft | 86 | 0 |
 | **slot_role** | **replacement** | **123** | **0** |
 
-The keep-basis change alone would introduce four keeps projecting below replacement, which is the objection that sank `keep_2027_market` in #57.5. Role-specific replacement removes all four, because those players are pitchers who sit above the pitcher bar and below the pooled one. **#57.5's objection does not apply to this pair.**
+The keep-basis change alone introduces four keeps projecting below replacement, the objection that sank `keep_2027_market` in #57.5. Role-specific replacement removes all four, because they are pitchers above the pitcher bar and below the pooled one. **#57.5's objection does not apply to this pair.**
 
-The new keeps are not marginal. The largest are Logan Webb ($27 cost, $44.10 replacement cost), Pete Alonso ($27, $43.20), Acuna ($26, $41.60), Corbin Carroll ($36, $51.60), Soto ($36, $51.20) and Schwarber ($20, $34.40). **The old rule cut a $36 Soto projecting 9.1 roto points**, which is the error the change is there to fix: $36 of auction budget does not buy 9.1 roto points at this league's exchange rate.
+The new keeps are not marginal: Webb ($27 cost, $44.10 replacement cost), Alonso ($27, $43.20), Acuna ($26, $41.60), Carroll ($36, $51.60), Soto ($36, $51.20), Schwarber ($20, $34.40). **The old rule cut a $36 Soto projecting 9.1 roto points**, which is not what $36 of auction budget buys.
 
-**Feasibility, checked because a permissive rule can advise the impossible.** The new keeper sets cost a mean of $139 of the $260 cap and leave $121 across 10.7 open slots, $11.30 per slot, against $12.80 under the old rule. No team is left unable to fill its roster; the worst has $73 for eleven slots. Keeps run 12.3 per team against the league's observed 10 in 2026 and the old rule's 7.6, so the advice now brackets revealed behaviour from above where it used to sit below.
+**Feasibility.** Keeper sets cost a mean $139 of the $260 auction budget and leave $121 across 10.7 open slots, $11.30 per slot against $12.80 before; the worst team has $73 for eleven slots. 12.3 keeps per team against the league's observed 10 and the old rule's 7.6.
 
-**Three things this does not settle, recorded so they are not rediscovered as surprises.**
-1. **`MAX_KEEPERS` binds for 6 of 10 teams.** Those teams are told to keep 13 because they have 13 positive-surplus contracts, so the model is filling a cap rather than discriminating. That is a real consequence of keeping being profitable in this league, not obviously an error, but it means the marginal keeper is no longer being chosen.
-2. **The equilibrium is not closed.** The exchange rate is fitted at `KEEPERS_EXPECTED_2027 = 100`. If the league acted on this advice it would withhold ~123, thinning the auction further and raising the rate, which would raise `keep_value` again. The model advises one team against a fixed expectation; it does not solve the fixed point.
-3. **The top end is still rich on this scale.** #57 recorded Skubal at `keep_value` $78.81 against a `market_price` of $34.00 and a revealed price of $34.31. He is now $86.93 and the keep decision runs on that number. The decision only needs `keep_value > cost` and $86.93 clears $38 as decisively as $50 would, so the ordering is safe even though the level is not. Do not read `keep_value` as a price.
+**Three open consequences, recorded so they are not rediscovered as surprises.** `MAX_KEEPERS` binds for 6 of 10 teams, so the model fills a cap rather than choosing at the margin. The equilibrium is not closed: the exchange rate assumes 100 keepers withheld while the advice implies ~123. And `keep_value` runs rich at the top (Skubal $86.93 against a revealed $34.31); the decision only needs it to clear $38, so the ordering is safe but the level is not. **Do not read `keep_value` as a price.**
 
-**Not changed: the blend weights.** METHODS section 3 #9's unfitted constants were swept for the first time (`scripts/fit_blend.py`). Turning the blend off is costly, $36.1 against $98.3 of captured surplus per season, so the blend earns its place. The curve is then flat: 0.5 gives $98.3, 0.6 $100.4, 0.7 $105.8, 0.8-1.0 $103.6. Leave-one-season-out picks 0.6, 0.7 and 0.7 on the other two seasons and gains $0.0, $6.5 and $0.0 against production, a mean of $2.2 per season. The playing-time caps do worse: LOSO picks 0.15, 0.15 and 0.00 with held-out gains of +16.2, +19.9 and -55.0, a mean loss. **`BLEND_W_2026 = 0.50` sits inside the flat region and no alternative survives out of sample, so all four constants stand.** A judgment call vindicated rather than changed, as in #59.
+**Not changed: the blend weights.** Swept for the first time (`scripts/fit_blend.py`). Turning the blend off costs $36.1 against $98.3 of captured surplus per season, so it earns its place, but the curve is then flat: 0.5 gives $98.3, 0.6 $100.4, 0.7 $105.8, 0.8-1.0 $103.6. Leave-one-season-out picks 0.6, 0.7 and 0.7 and gains $0.0, $6.5 and $0.0 against production, a mean of $2.2. The playing-time caps do worse: LOSO picks 0.15, 0.15 and 0.00 with held-out gains of +16.2, +19.9 and -55.0, a net loss. **All four constants stand**, a judgment call vindicated as in #59.
 
-**One premise corrected along the way.** The ZiPS 2027 export was assumed to predate the 2026 season. It does not. Regressing its projected rates on 2025 and 2026 actual rates for the 184 players with 300+ PA in both gives 2026 coefficients of 0.162 (HR/PA, t=4.9) and 0.159 (SB/PA, t=4.5) against 2025 coefficients of 0.597 and 0.650. It carries 2026 at roughly a quarter of 2025's weight, reproducing the earlier check that found loadings of 0.107 against 0.45. Blending 2026 actuals in therefore double-counts mildly, which is a reason the blend curve flattens above 0.5 rather than a reason to change it.
+**One premise corrected.** The ZiPS 2027 export does not predate the 2026 season. Regressing its rates on 2025 and 2026 actual rates for the 184 players with 300+ PA in both gives 2026 coefficients of 0.162 (HR/PA, t=4.9) and 0.159 (SB/PA, t=4.5) against 0.597 and 0.650 for 2025. It carries 2026 at about a quarter of 2025's weight, reproducing an earlier check that found 0.107 against 0.45.
 
-### 71. Two UI defects found by the first user pass over the #70 board
-Josh opened the rebuilt app and asked two questions. Both were right, and the first was a bug this session introduced.
+### 71. Four defects found by reading the board, three of them in the presentation layer
+Recorded together because the pattern matters more than any one of them. All four were found by a reader, none by a test.
 
-**1. The surplus column had no visible arithmetic.** Zach Neto showed `Production $19.98` and a 2027 surplus of `$40.98`, which reads as broken. It is not: the surplus runs off `keep_value` ($41.98), not `production_value`, since #70 moved the keep decision to the opportunity-cost scale. The two scales differ because the league withholds ~100 keepers, so the real 2027 auction sells about 126 lots for about $1,765 and a roto point costs $10.00 there against $6.21 on the full-redraft scale.
+**71.1 The `Surplus '27` tooltip stated arithmetic the model no longer used.** It read "Production $ minus cost" after #70 moved the decision to `keep_value`. Neto showed Production $19.98 and a $40.98 surplus, which reads as a bug and is not: the surplus runs off `keep_value` $41.98. The two scales differ because the league withholds ~100 keepers, so the real auction sells ~126 lots for ~$1,765 and a roto point costs $10.00 there against $6.21 on the full-redraft scale. Fixed by adding a `Replace $` column, spelling the subtraction out in the drawer, and correcting the tooltips. **Rule: a `KEEP_BASIS` or `POOL_RULE` change is not done when the tests pass, because the app states its arithmetic in prose and prose is not covered by `verify.mjs`.**
 
-The board showed one scale and computed the decision on the other, with nothing on screen connecting them. Worse, the `Surplus '27` tooltip still read **"Production $ minus cost"**, which #70 made false and did not update: the app was stating arithmetic that does not reproduce its own number. Fixed by adding a `Replace $` column (`keep_value`, already in the payload), spelling the subtraction out in the drawer, and correcting both surplus tooltips. The phone CSS `nth-child` hide-list was re-counted for the inserted column, which shifts everything from `likely range` onward by one; `Replace $` stays visible on a phone because it is the number the decision is made on.
+**71.2 Standings and Contention were distinct but indistinguishable.** One was a point estimate, the other Monte Carlo money odds, and with a 50/25/15/breakeven payout the difference decides things. But both drew a ten-row team table and readers could not tell them apart. Merged into one Standings tab with **money odds as the second column, ahead of projected points**, so the ordering encodes which number matters. The per-place columns and the 2026/2027 scope came across; the table defaults to sorting by odds.
 
-**Rule this establishes:** a change to `KEEP_BASIS` or `POOL_RULE` is not done when the tests pass. The app states the arithmetic in prose and the prose is not covered by `app/verify.mjs`.
+**71.3 Two challenged numbers, both of which held.** Wacha's `rp_ERA = -1.66` against a 3.36 year-to-date ERA is not a fault: the board is a 2027 projection at **4.27** ERA against a 3.613 league-average staff. That 4.27 is 88% ZiPS's own 4.383, because the blend gives a pitcher's prior-season earned runs only **11.9%** weight (`0.50` cap x `RELIABILITY["ER"] = 0.176 / 0.739`). ZiPS marks him up 1.02 runs, the 85th percentile of 116 pitchers with 100+ IP where the median markup is +0.17; he turns 36. The ERA scorer was validated end to end: mean `rp_ERA` by projected-ERA bucket runs 2.39, 1.05, 0.29, -0.38, -1.04, -1.95, monotonic, crossing zero between the buckets centred on 3.498 and 3.769 which brackets the 3.613 baseline. Skubal at 2.69 scores +2.64.
 
-**2. Standings and Contention were not redundant, but were indistinguishable.** Standings was a point estimate (roll rosters forward, re-rank, show per-category detail); Contention was a Monte Carlo reporting how often each team finishes in the money. Those answer different questions, and the difference matters because the league pays 50/25/15/breakeven, so two teams tied on projected points can have very different odds depending on roster volatility. That was the whole reason Contention was built.
+Relaxing the reliability discount was then swept and rejected. Scaling `RELIABILITY` as `REL_MAX x (r/REL_MAX)**alpha` and scoring on captured keeper surplus: alpha 0.00 gives $96.1, **1.00 (production) $98.3**, 1.50 $85.6, 2.00 $73.1. Production is the maximum; the curve is flat below it and falls off above. **No evidence to trust recent ERA more.**
 
-But both rendered a ten-row team table with a projection, and a reader could not tell them apart. Merged into one Standings tab with **money odds as the second column, ahead of projected points**, so the ordering encodes which number decides something. The per-place columns (`P(1st)`, `P(2nd)`, ...) came across; the 2026/2027 scope folded into the existing season picker; the table now defaults to sorting by money odds. `app/verify.mjs` gained a check that the odds column leads both standings seasons and that the Contention tab is gone, replacing the check that tested the removed tab.
+The wins denominator runs the other way from the challenge. 9.55 projected wins scoring 2.70 roto points implies 3.54 wins per standings place, which looked generous. Adding 10 wins to each of the 30 team-seasons in 2024-2026 and counting places actually climbed gives a mean of **3.27 against the model's 2.82**: team win totals are tightly bunched (2026: 62, 72, 72, 74, 77, 79, 79, 82, 87, 91) and **the model is conservative on wins**. The same test on ERA gives 3.83 places for a 0.20 improvement against a modelled 4.64, mildly aggressive the other way.
 
-**What this costs.** One less place to look, and the odds are now one column among many rather than a view of their own. The mitigation is position: first after the team name, with the point estimate demoted to context behind it.
+**71.4 The header strip was removed.** It restated league rules the only user knows and two constants meaningless without their definitions, which are on the Home tab.
 
-### 72. A user challenge to two suspicious numbers: both hold, and the reliability discount is vindicated
-Josh read the rebuilt board and challenged two figures on Michael Wacha, plus asked for the header strip to go. No code error was found, but the audit produced one new empirical result and localises the disagreement precisely.
+### 72. `Roto '26` and `Move`: the projection gets a reference point, on its own season's scale
+The board showed a 2027 projection with nothing beside it, so every argument about that projection arrived disguised as an arithmetic bug (#71.3). It now shows the season the player is actually having, and the difference.
 
-**The ERA question, and the premise correction.** The board showed Wacha at 2.52 roto points with `rp_ERA = -1.66`, against a 2026 year-to-date ERA of 3.36. Those are different quantities: the board is a **2027 projection**, and it projects Wacha at a **4.27 ERA**, not 3.36. Against a league-average fantasy staff at 3.613 that is correctly negative.
+**The column.** `roto_2026` is the full 2026 season, banked actuals plus the ZiPS rest-of-season projection, converted to roto points. That line already existed as the projection's own "source A", built inline and thrown away; it is now `project.lines_2026_hitters()` / `lines_2026_pitchers()`, called by both. **The board was byte-identical across that refactor**: zero difference on all 58 numeric columns.
 
-The 4.27 is essentially ZiPS's own number. The blend gives a pitcher's own prior-season earned runs only **11.9%** weight (`0.50` sample-size cap times `RELIABILITY["ER"] = 0.176 / REL_MAX = 0.739`), so the projection is 88% ZiPS's 4.383 and 12% his recent 3.43 form. ZiPS marks him up 1.02 runs over his 2026 ERA, the 85th percentile of markups among the 116 pitchers with 100+ IP in 2026, where the median markup is +0.17. He turns 36 in 2027. **This is ZiPS regressing an aging pitcher who has outperformed, not an arithmetic fault.**
+**The scale decision, corrected once.** It first shipped scored on the 2027 scale, on the argument that the columns needed shared denominators to subtract. That argument is wrong. **A roto point is a standings place**, and dividing each category by its own season's denominator is exactly the operation that makes a 2026 home run and a 2027 home run commensurable. The unit is already common, so each season belongs on its own scale and the difference becomes a statement about the player rather than about denominators.
 
-**The ERA scorer itself was validated end to end.** Mean `rp_ERA` by projected-ERA bucket for starters at 120+ IP: 2.39, 1.05, 0.29, -0.38, -1.04, -1.95. Monotonic, and the zero crossing sits between the buckets centred on 3.498 and 3.769, which brackets the 3.613 baseline exactly as the formula requires. Skubal at a 2.69 ERA scores +2.64.
+**The partial-season complication.** The 2026 standings are ~88% of a season, so a full-season line scored against them would inflate every counting category. `project.season_completion_2026()` measures the banked fraction as playing time to date over to-date-plus-rest-of-season, restricted to players with a real 2026 line: **0.8849 hitters, 0.8789 pitchers**. `board.scorer_2026_full()` divides the counting levels and the volume baselines by it and leaves AVG, ERA and WHIP alone. Corroborated by the levels: 2026 sits at 0.895, 0.916, 0.893, 0.885, 0.907 of the 2024-25 mean for HR, R, RBI, W, K, bracketing 0.88. It sits at 0.798 and 0.800 for SB and SV, which is **genuine league drift and not unplayed games** -- the estimator correctly does not absorb it, where scaling by the observed level ratio would have.
 
-**New result: trusting a pitcher's recent ERA more would have made WORSE decisions.** The obvious response to the above is that 11.9% is too little weight on a full season. That is now testable. Sweeping `RELIABILITY` as `REL_MAX x (r / REL_MAX) ** alpha`, where `alpha = 1` is production and `alpha = 0` removes the discount entirely, and scoring on captured keeper surplus (#69's metric):
+**Validated by an invariance that must hold.** Roto points are scale-invariant when numerator and denominator move together, so a full-season line on a full-season scale must agree with a to-date line on a to-date scale. Over 1,445 players: **median difference -0.009, mean -0.022, correlation 0.9975.** The small negative residual on stars (Ohtani -0.85, Misiorowski -1.25) is correct: ZiPS regresses their rates over the remaining weeks.
 
-| alpha | 2024 | 2025 | 2026 | mean |
-|---|---|---|---|---|
-| 0.00 (no discount) | 162.2 | 15.7 | 110.3 | 96.1 |
-| 0.50 | 146.0 | 14.7 | 111.3 | 90.7 |
-| **1.00 (production)** | 146.0 | 21.5 | 127.3 | **98.3** |
-| 1.50 | 146.0 | 24.5 | 86.3 | 85.6 |
-| 2.00 | 146.0 | -1.0 | 74.4 | 73.1 |
-
-Production is the maximum. The curve is flat between 0 and 1 and falls off above it, so the discount is not doing much harm in either direction, but there is **no evidence it should be relaxed**. Same caveat as #70: this runs on the Marcel path, and Marcel already averages three prior seasons internally, so the prior-season blend carries less here than it would against ZiPS. Read the shape.
-
-**The wins question, and it runs the other way.** Wacha's 9.55 projected wins score 2.70 roto points, implying 3.54 wins per standings place, which Josh read as too generous. Tested directly by adding 10 wins to each of the 30 team-seasons in 2024-2026 and counting places actually climbed: **the mean is 3.27 places, against the model's 2.82.** Team win totals are tightly bunched (2026: 62, 72, 72, 74, 77, 79, 79, 82, 87, 91), so wins are a higher-leverage category than they look and **the model is conservative, not generous**. The same test on ERA gives 3.83 places for a 0.20 improvement against the model's 4.64, so ERA is mildly aggressive in the other direction. Both are inside the year-to-year spread of the raw estimators (W range/9 runs 3.22 to 5.22 across the three seasons).
-
-**Header strip removed.** `10-team 5x5 roto keeper auction - $260/team - built ... - $/roto pt - projected auction inflation` sat above every tab. It restated league rules the only user already knows and two constants that mean nothing without their definitions, which are on the Home tab where there is room for them. The `#hdr` element is gone rather than blanked, so it leaves no gap.
-
-**What this changes about the plan.** Nothing was wrong, and that is itself the finding: the scale, the denominators and the blend weights have now each been challenged and held. The disagreement that remains is with **ZiPS's projection of a 36-year-old**, which is exactly the binding constraint #69 identified. A user who thinks ZiPS is wrong about Wacha should say so in the Intuition tab rather than expect the valuation layer to disagree on his behalf.
-
-### 73. The board shows a projection with nothing beside it, so `Roto '26` ships
-Josh's request, and the right diagnosis of #72. He read Wacha's `rp_ERA = -1.66` as a scoring fault because the only number on screen was a 2027 projection with no 2026 reference next to it. Once the two sit side by side the case answers itself: **Wacha produced 7.11 roto points in 2026 and is projected for 2.52 in 2027.** The argument is with a -4.59 projection move, not with the ERA formula. No valuation changed; the board gains one column.
-
-**What the column is.** `roto_2026` is the full 2026 season, banked actuals plus the ZiPS rest-of-season projection for the weeks still to play, converted to roto points. That line is not new: it is exactly the projection's own **source A**, previously built inline inside `project_hitters` and `project_pitchers` and thrown away. It is now `project.lines_2026_hitters()` / `lines_2026_pitchers()`, called by both the projection and the new scorer, so there is one definition. The board was verified **byte-identical across that refactor**: zero difference on all 58 numeric columns.
-
-**The scale decision, which is the only real choice here.** `roto_2026` is scored with the **2027** scorer, not 2026's. The column exists to be read across against `Roto '27` and subtracted from it, and two numbers on different denominators cannot be. So it means "his 2026 production, valued in 2027 money" and it will not tie out against the 2026 standings, which the Standings tab already shows. Stated in the tooltip rather than left to be discovered.
-
-**It is immediately legible, which is the test a diagnostic column has to pass.** Largest projected declines: Misiorowski 17.17 to 7.32, Schlittler 15.14 to 6.31, Eduardo Rodriguez 9.66 to 2.13, Sale 14.23 to 6.83. Largest improvements: Crochet -0.25 to 7.92, Greene -0.78 to 4.86, Senga -2.86 to 1.97, Strider 0.23 to 4.57. Every large decline is a pitcher who just had an unsustainable season and every large improvement is one who was hurt or ineffective. That is what regression to the mean is supposed to look like, and until now none of it was visible. Median move -0.48, mean -0.62.
-
-**Placement.** `Roto '26` sits immediately left of the 2027 figure, which is renamed `Roto '27` because "Roto pts" no longer identifies which season. On a phone BOTH roto columns are hidden, as `Roto pts` always was, and the drawer carries the comparison instead as three lines (2026 production, 2027 projection, what the projection does) where a narrow screen has room. The phone CSS `nth-child` hide-list was re-counted for the second time in two sessions; it is now up to nine indices and is the standing hazard of adding a board column.
-
-**Why this matters more than one column suggests.** #69 found the model's binding constraint is the projection rather than the valuation machinery, and #72 found the only live disagreement is with ZiPS's read of a 36-year-old. Both are arguments about the 2027 line. The board previously offered no way to see that line as a MOVE from something, so every such argument arrived as a suspected arithmetic bug. `Roto '27 - Roto '26` is the projection's opinion made explicit, and it is the number to disagree with.
-
-### 74. `Roto '26` moves to 2026's own scale, and the difference gets its own column
-Josh corrected the scale decision in #73 and he is right. #73 scored 2026 production on the 2027 scale, arguing the two columns had to share denominators to be subtractable. That argument is wrong, and the reason is worth stating because it governs every cross-season comparison this project will make.
-
-**A roto point is a standings place.** Dividing each category by its own season's denominator is precisely the operation that makes a 2026 home run and a 2027 home run commensurable. The output unit is already common. So each season's production belongs on its own season's scale, the two columns still subtract, and the difference becomes a statement about the PLAYER rather than a statement about which denominators were used. Scoring 2026 production against 2027 denominators was a hybrid that was less accurate about 2026 and bought nothing.
-
-**The complication, and how it is handled.** The 2026 standings are a partial season, so scoring a full-season line against them would inflate every counting category by the missing fraction. `project.season_completion_2026()` estimates the fraction banked as playing time to date over playing time for the whole season, restricted to players who actually have a 2026 line: **0.8849 for hitters, 0.8789 for pitchers**. `board.scorer_2026_full()` divides the counting levels and the team volume baselines by it and leaves AVG, ERA and WHIP alone, since rates do not accumulate.
-
-The estimate is corroborated by the levels themselves. 2026 sits at 0.895, 0.916, 0.893, 0.885 and 0.907 of the 2024-25 mean for HR, R, RBI, W and K, which brackets 0.88. It sits at 0.798 and 0.800 for SB and SV, and that is **genuine league drift, not unplayed games** -- the estimator correctly does not absorb it, which a naive "scale everything by the observed level ratio" approach would have.
-
-**Validated by an invariance that has to hold.** Roto points are scale-invariant when numerator and denominator move together, so a full-season line on a full-season scale must agree with a to-date line on a to-date scale. Across 1,445 players: **median difference -0.009, mean -0.022, correlation 0.9975.** The small negative residual on stars (Ohtani -0.85, Misiorowski -1.25) is correct and expected: ZiPS regresses their rates over the remaining weeks, so a projected full season is slightly worse per unit than their pace to date.
-
-**`Move` ships as its own column.** Josh: "the difference is quite key." `roto_move = roto_points - roto_2026`, sortable, sitting immediately right of the pair. It answers the question the trio exists for: which players does the model most disagree with the present about?
+**`Move` ships as its own sortable column**, `roto_points - roto_2026`: which players does the model most disagree with the present about?
 
 | | Roto '26 | Roto '27 | Move |
 |---|---|---|---|
 | Misiorowski | 17.25 | 7.32 | **-9.93** |
 | Schlittler | 15.32 | 6.31 | -9.01 |
-| Eduardo Rodriguez | 10.04 | 2.13 | -7.91 |
 | Sale | 14.40 | 6.83 | -7.56 |
 | Wacha | 7.59 | 2.52 | **-5.07** |
 | Strider | 0.42 | 4.57 | +4.16 |
-| Senga | -2.32 | 1.97 | +4.29 |
 | Greene | -0.61 | 4.86 | +5.47 |
 | Crochet | -0.07 | 7.92 | **+7.99** |
 
-Every large decline is a pitcher coming off an unsustainable season and every large gain is one who was hurt or ineffective, which is what regression to the mean should look like and none of which was visible two sessions ago.
+Every large decline is a pitcher off an unsustainable season and every large gain one who was hurt or ineffective, which is what regression to the mean looks like and none of which was visible before.
 
-**Dollars stay in their own columns.** Josh: "estimating the value of 27 dollars accurately is nice, but not the main point." `Roto '26`, `Roto '27` and `Move` are roto points and nothing else; `Production $`, `Market $` and `Replace $` are the dollar columns and are separate. The #73 tooltip phrase "valued in 2027 money" was doubly wrong, since the scale question is about denominators rather than dollars, and it is gone.
+### 73. The board's headers and its cells are two lists, and they silently drifted apart twice
+A rendering bug, shipped twice, found by the reader both times. No valuation was wrong: `out/keeper_board_2027.csv` was correct throughout. The board printed correct numbers under the wrong headings.
 
-**Phone layout.** `Move` is VISIBLE on a phone, the only member of the trio that is: it stands alone without its two parents, where a bare `Roto '26` does not. Both roto columns stay hidden as `Roto pts` always was, and the drawer carries all three lines. Third `nth-child` re-count in three sessions; the hide-list is now nine indices and adding a board column without re-counting it is the standing hazard.
-
-### 75. The board's headers and its cells are two lists, and they silently drifted apart twice
-A rendering bug, shipped twice, found by the reader both times. No valuation was wrong: every number in `out/keeper_board_2027.csv` was correct throughout. The board simply printed them under the wrong headings.
-
-**The mechanism.** `boardView()` builds the header row by mapping over `BOARD_COLS`. `playerRow()` builds the cells as a hand-written positional list of `<td>` elements. Nothing links the two. Insert a column into `BOARD_COLS` without inserting the matching cell into `playerRow`, and every column to the right of the insertion renders one field too far left, under a heading that belongs to its neighbour.
-
-It happened on `Replace $` (#70) and again on the `Roto '26` / `Move` pair (#74), for three headers with no cells. What the reader saw on Max Clark:
+`boardView()` builds the header row from `BOARD_COLS`. `playerRow()` builds the cells as a hand-written positional list of `<td>` elements. Nothing links them, so inserting a header without its cell shifts every column to the right of the insertion. It happened on `Replace $` (#71.1) and again on the `Roto '26` / `Move` pair (#72):
 
 | heading | showed | should have shown |
 |---|---|---|
-| `Roto '26` | 4.3 | 1.7 (it was rendering `roto_points`) |
-| `Roto '27` | $20 | 4.3 (it was rendering `salary`) |
-| `Move` | 2 | +2.6 (it was rendering `contract`, hence the integers) |
+| `Roto '26` | 4.3 | 1.7 (rendering `roto_points`) |
+| `Roto '27` | $20 | 4.3 (rendering `salary`) |
+| `Move` | 2 | +2.6 (rendering `contract`, hence the integers) |
 
-"Why is Move only ever an integer" was the sharpest clue in the report: contract years are 1, 2, 3 or F. A dollar sign appearing in a roto-point column was the other. Both tabs that use `boardView` were affected, the keeper board and free agents.
+"Why is Move only ever an integer" was the sharpest clue: contract years are 1, 2, 3 or F. Both tabs using `boardView` were affected.
 
-**Why nothing caught it.** `app/verify.mjs` had 15 checks and none of them read a rendered board cell. The check added in #71 compared HEADER text and passed, because the headers were right; it was the cells underneath that had moved. `JS matches pandas on all 25 quantities` passed too, because it compares computed values in the payload, never what is drawn. **The app was verified everywhere except the one place a reader actually looks.**
+**Why nothing caught it.** 15 checks and none read a rendered board cell. The header check added in #71.2 passed, because the headers were right; the cells beneath had moved. `JS matches pandas on all 25 quantities` passed too, comparing payload values rather than what is drawn. **The app was verified everywhere except where a reader looks.**
 
-**Two guards, because one was clearly not enough.**
-1. `assertBoardRowShape()` throws on render if `playerRow` emits a different number of cells than `BOARD_COLS` declares. That turns a silent visual corruption into a loud failure.
-2. `app/verify.mjs` now renders a real row and compares the cell TEXT, column by column, against the payload run through the app's own formatters (`nf`, `sgn`, `usd`, `money`). Formatter-based comparison rather than numeric tolerance, because a misaligned column shows a different field entirely and an exact string check cannot be defeated by rounding. Confirmed to fail on the broken build and pass on the fixed one; the suite is now 16 checks.
+**Two guards.** `assertBoardRowShape()` throws on render if `playerRow` emits a different number of cells than `BOARD_COLS` declares. And `verify.mjs` renders a real row and compares cell TEXT against the payload run through the app's own formatters, column by column -- formatter comparison rather than numeric tolerance, because a misaligned column shows a different field entirely and an exact string check cannot be defeated by rounding. Confirmed to fail on the broken build.
 
-**The rule.** Adding a board column means four edits, not one: `BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS`, a `<td>` in `playerRow` at the same index, and the phone CSS `nth-child` hide-list. Three of the four are silent when forgotten. #70 and #74 each forgot the third.
+**The rule.** Adding a board column means four edits: `BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS`, a `<td>` in `playerRow` at the same index, and the phone CSS `nth-child` hide-list. Three of the four are silent when forgotten.
 
-**Standing back.** Three of the four defects a reader found in this app today were in the presentation layer rather than the model: a tooltip describing arithmetic the model no longer used (#71), two tabs that were distinct but looked identical (#71), and this. The engine has 64 tests and a 25-quantity JS/pandas cross-check; the layer that decides what a number MEANS to the person reading it had almost none. That is the coverage gap worth closing next, not another valuation refinement.
+### 74. The tooltip pass: a contract, a decomposition, and the first tests this layer has had
+Prose rewrite plus one real feature, after four reader-found defects of which three were presentation-layer.
 
-### 76. The tooltip pass: a contract, a decomposition, and the first tests this layer has had
-Josh's ask after four reader-found defects in two sessions, three of them in the presentation layer rather than the model. Prose rewrite plus one real feature. No valuation changed.
+**Measured, not asserted.** 46 user-facing strings were extracted and scanned. Four carried internal references into the UI (`docs/FINDINGS.md #26` twice, `docs/METHODS.md section 2.1`, `klab/standings_sim.py`). Undefined jargon included "bootstrap draws", "replacement level", "denominator", "walk-year", "dispersion estimate" and "roto points" itself, used throughout and never glossed. Several entries ran 85+ words.
 
-**What was wrong, measured rather than asserted.** 46 user-facing strings were extracted and scanned. Four carried internal references into the UI (`docs/FINDINGS.md #26` twice, `docs/METHODS.md section 2.1`, `klab/standings_sim.py`), which is a leak of the repo's own bookkeeping into a product surface. Undefined jargon included "bootstrap draws", "replacement level", "denominator", "walk-year", "dispersion estimate" and "roto points" itself, which was used throughout without ever being glossed. Several entries ran 85 words or more.
+**The contract, written above `COL_HELP` so it survives the next edit.** First sentence says what the number IS in under about 15 words, in language that assumes no baseball-stats background. At most two more sentences: how to read it, or the one caveat that would mislead, never the derivation. No unglossed jargon; "roto points" is always "places in the standings". **Never a file or finding reference.** If a number needs a breakdown to be believed, the cell carries the evidence and the header carries the explanation.
 
-**A contract, written into the code above `COL_HELP` so it survives the next edit.**
-1. First sentence says what the number IS, in words a person who has never read a baseball stats site would understand, under about 15 words.
-2. At most two more sentences: how to read it, or the one caveat that would mislead. Not the derivation.
-3. No unglossed jargon. "Roto points" is always "places in the standings". Never "replacement level", "bootstrap", "denominator", or a bare "ZiPS".
-4. Never a file or finding reference.
-5. If a number needs a breakdown to be believed, the CELL carries the evidence and the HEADER carries the explanation.
+**The feature: value decomposition.** The per-category split for 2026 was being computed and discarded. `roto_2026_lines()` now keeps `rp_<cat>_26`; the `rp_` prefix means `project_all_players` sums them for two-way players automatically. Hovering a value cell gives the split, sorted biggest-first, categories spelled out, zero rows dropped. The `Move` tooltip shows both seasons side by side sorted by size of change, which answers #71.3 in four lines: Wacha's whole -5.07 is ERA -2.6 and WHIP -1.7.
 
-**The feature, which is the part that matters: value decomposition.** The board showed totals and could not answer "is this coming from homers or steals". It can now, because the per-category split for 2026 was being computed and discarded. `roto_2026_lines()` keeps `rp_<cat>_26` alongside the total; naming them with the `rp_` prefix means `project_all_players` sums them for two-way players automatically. Hovering a value cell gives the split, sorted biggest-first, with the categories spelled out and zero rows dropped:
+**Three tests, the first this layer has had.** Every board column has non-empty help; no element's `title` contains an internal reference; and the per-category breakdown SUMS to the total it claims to explain. Verified to fail on a deliberately reintroduced blank tooltip and a deliberately reintroduced `docs/` reference. Suite went 15 to 17 checks.
 
-```
-His 2026 season, 7.6 points, comes from:
-  strikeouts   +3.0  ████████
-  wins         +2.8  ████████
-  ERA          +0.9  ██
-  WHIP         +0.9  ██
-```
+### 75. Why the dollar values look higher than draft costs: they do not, except where you are looking
+Josh could not reconcile Production $ and Replace $ with what players actually cost. The perception is correct for the players on screen and false for the population, and the difference is the point.
 
-**The `Move` tooltip is the one that pays.** It shows both seasons side by side, sorted by the size of the change, and it answers the question that started this whole thread (#72, #73, #74) in four lines:
+**In aggregate the model is not inflated.** Over all 277 rostered players, Production $ / salary = **0.74**. The model values the whole rostered population BELOW what is committed to it. Market $ / salary = 0.93; only Replace $ exceeds salary in aggregate, at 1.48, and that is the keeper discount by construction.
 
-```
-What the 2027 projection changes:
-              2026    2027   change
-  ERA           0.9    -1.7     -2.6
-  WHIP          0.9    -0.9     -1.7
-  strikeouts    3.0     2.4     -0.6
-  wins          2.8     2.7     -0.1
-```
+**By tier, sorted by Production $:**
 
-Wacha's whole -5.07 is ERA and WHIP. A reader can now see that in a hover instead of asking whether the ERA formula is broken.
+| tier | n | salary | Production $ | ratio |
+|---|---|---|---|---|
+| top 50 | 50 | $941 | $1,304 | **1.39** |
+| 51-120 | 70 | $865 | $809 | 0.93 |
+| 121-277 | 157 | $1,429 | $272 | **0.19** |
 
-**Three tests, because this layer had none.** `app/verify.mjs` gains a check that every board column has non-empty help, that no element's `title` contains an internal reference, and that the per-category breakdown SUMS to the total it claims to explain (within the slack from 1dp rounding and dropped near-zero rows). Confirmed to fail on a deliberately reintroduced blank tooltip and a deliberately reintroduced `docs/` reference before being accepted. The suite is now 17 checks, up from 15 at the start of the day.
+**The board is sorted by surplus, so a reader is always looking at the tier where value exceeds cost.** The bottom 157 cost $1,429 and produce $272; that destroyed value is what funds the top-end surplus. Cade Smith at $10 producing $40, Jhoan Duran at $4 producing $36, against a long tail of $10-15 salaries worth nothing. **Stars are underpriced and scrubs are overpriced, which is the whole reason keeping is profitable** and why the model recommends 123 keeps.
 
-**What is deliberately not done.** Native `title` tooltips render in a proportional font, so the bars are a rough magnitude cue rather than an aligned chart, and they do not exist at all on a phone. A real hover card would fix both and is a bigger change; the drawer already carries the same information for touch, so the gap is cosmetic on desktop and covered on mobile. Flagged rather than built.
+**Which column to compare against a draft price.** `market_price`, and only that one: it is fitted on 677 real purchases and calibrated so the lots the 2027 auction actually sells sum to the money in the room. `production_value` is a worth measure normalised to the league's $2,600 of cap and is not a price. `keep_value` is an opportunity cost and totals far more than $2,600 on purpose.
+
+**One structural fact that looks like a discrepancy and is not.** Rosters carry $3,235 of salary against a $2,600 league cap, a mean of $324 over 27.7 players per team. The constitution settles it: $260 is the AUCTION budget for a 23-man active roster, and reserve players (minors and injured) sit outside it. The model's $2,600 identity is over the 230 active slots, which is the right frame.
+
+### 76. Playing time becomes the reader's assumption, not the model's
+Josh's ask. ZiPS projects the playing time it EXPECTS: 200 plate appearances for a prospect it does not expect to break camp, not the 600 he gets if the job is his on opening day. Both are honest answers to different questions, so the board now carries a `playing time: as projected / full season` selector rather than baking one in.
+
+The full-workload columns already existed (`roto_points_ft`, `redraft_value_ft`); the toggle swaps them in and recomputes `Replace $`, `Move` and `Surplus '27` from the same basis, with sorting routed through the same helpers so the order always matches what is drawn. `rp_<cat>_ft` was added so the category breakdown reconciles with whichever total it sits under -- without it the toggle would flip the headline and leave the tooltip describing the other basis.
+
+Worked example, Devin Williams (`pt_scale` 2.0): as projected 4.9 points, $9 Production, -$4 surplus. At a full closer's workload 9.8 points, $40, **+$45 surplus**. The tooltip splits the 9.8 as saves +3.7, wins +3.2, strikeouts +2.8, ERA +0.3, WHIP -0.2.
+
+**The KEEP flags and the multi-year surplus deliberately do NOT move with the toggle.** They are the shipped recommendation, decided on expected playing time; silently re-deciding them behind a display switch would be a different product wearing the same label. Stated in the selector's own tooltip.
+
+**Also removed: the bars in the decomposition tooltips.** They rendered in the proportional font a native tooltip uses, so they were a rough cue at best, and the number carries it.

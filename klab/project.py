@@ -153,7 +153,7 @@ def lines_2026_hitters() -> pd.DataFrame:
     projection for the weeks still to play.
 
     This is the projection's "source A". It is extracted so the board can SHOW
-    it (docs/FINDINGS.md #73): a 2027 number with nothing to compare it against
+    it (docs/FINDINGS.md #72): a 2027 number with nothing to compare it against
     cannot be read, and the first question anyone asks of a projection is how
     far it sits from what the player just did.
     """
@@ -231,7 +231,7 @@ def lines_2026_pitchers() -> pd.DataFrame:
     """A full 2026 pitcher season: banked actuals plus ZiPS rest-of-season.
 
     The projection's "source A", extracted for the same reason as the hitter
-    version (docs/FINDINGS.md #73). `reliever` rides along because the save
+    version (docs/FINDINGS.md #72). `reliever` rides along because the save
     model needs it and it is derived from the same G/GS split.
     """
     hist = load_pitchers_history()
