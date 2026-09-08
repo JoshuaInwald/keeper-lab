@@ -52,7 +52,7 @@ Run order is fetch_chadwick -> price_features -> {keeper_revealed, price_model, 
 
 ## Next session: start here
 
-**This is an assessment phase. Read `docs/ASSESSMENT-BRIEF.md` before anything else.**
+**This is an assess-then-improve phase. Read `docs/ASSESSMENT-BRIEF.md` before anything else.** Phase A establishes what is true and changes nothing; Phase B acts on it with the usual before/after discipline. Both belong in the same session.
 
 The build phase is finished: ROADMAP items 1, 2 and 4 are closed, the loose ends
 from item 1 are resolved or decided, and `data/` is current to 2026-09-07. What
@@ -74,9 +74,10 @@ chain, how do the errors compound, and which link is load-bearing.
    lead: this project pools hitters and pitchers on one dollar scale, which
    standard SGP practice says you should not, and the measured split is 73.7/26.3
    against a league that actually spends 64/36.
-5. **Change no constant and no formula during the assessment.** Write the
-   recommendation with its evidence and expected flip count; the change is a
-   later session's deliverable. Demonstrable bugs are the exception and follow
-   the usual before/after board diff.
+5. **Two phases, in order, in the same session.** Phase A assesses and changes
+   nothing; Phase B acts on what Phase A confirmed, one change at a time, each
+   with a recorded board, a diff, and the keep/cut flip count. Do not blend
+   them: all four retractions in FINDINGS came from concluding and acting in one
+   motion. The brief carries a likely Phase B queue.
 6. Still true regardless of phase: do not touch `redraft_value`'s definition and
    do not promote `keep_2027_market` to the headline call.

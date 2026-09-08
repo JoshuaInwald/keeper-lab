@@ -14,12 +14,38 @@ answering the right question.
 
 That is this phase. **The deliverable is a judgment, not a commit.**
 
-### Ground rules
+### Two phases, in this order, and do not blend them
 
-- **Change no constant and no formula.** If the assessment concludes something
-  should change, write it down with the evidence and the expected flip count;
-  the change is a later session's deliverable. The one exception is a
-  demonstrable bug, which follows the usual before/after board diff.
+**Phase A: assess. Change nothing.** Work out what is true. Every claim goes
+through leave-one-season-out or split-half. The output is a ranked list of
+findings, each with its evidence, the constant or formula it implicates, and the
+expected keep/cut flip count if acted on. A demonstrable BUG is the only thing
+that may be fixed during Phase A, and it follows the usual before/after board
+diff.
+
+**Phase B: act on what Phase A confirmed, one change at a time.** Same session
+is fine. Per change: record the board to CSV, make the change, diff, report the
+flips in keep/cut calls rather than correlations, write the `docs/FINDINGS.md`
+entry with before/after numbers, commit. Never act on something Phase A did not
+confirm, and never batch two changes into one diff.
+
+The reason for the split is on the record. `docs/FINDINGS.md` carries four
+retractions (#16, #19, #30, #55) and the common thread is concluding and acting
+in one motion, so the error shipped with the conclusion. Phase A is what makes
+Phase B safe rather than a constraint on it.
+
+**A likely Phase B queue, if Phase A confirms these** (do not treat as
+pre-approved; each needs its own case made):
+
+1. The hitter/pitcher budget split, and whether the top-230 pool should be
+   constrained by roster slots (140 hitters, 90 pitchers) rather than taken as
+   the top 230 by roto points regardless of role. See the published-practice
+   section. Touches every dollar figure, so it goes first or not at all.
+2. `WAIVER_VALUE`, which is a live one-line question with evidence pointing both
+   ways (#62). Needs a tiebreaker, not another measurement of the same two things.
+3. Whether `keep_value`'s inverted regression should survive in its current form
+   given R^2 = 0.156 (Link 3).
+4. Anything the decision audit shows the model would have gotten wrong.
 - Anything asserted as a finding goes through leave-one-season-out or split-half
   first. #7 is the cautionary tale: a single-season exchange rate that looked
   fine and was not identified.
