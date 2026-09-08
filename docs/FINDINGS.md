@@ -622,3 +622,51 @@ The projection's role split on the rostered set is 65.20% against #64's 64.11% o
 - Three seasons, one partial. 2026 actuals are ~75% of a season, so the perfect-foresight benchmark rests mainly on 2024 and 2025.
 - **Nothing here shows slot + role-specific replacement is the right rule.** It shows the stated reason for rejecting it does not hold. Choosing a pool rule is a valuation change and still owes the before/after keep/cut flip diff CLAUDE.md requires. That is the next session's work, not this one's.
 - The hitter/pitcher budget split stays refuted (#64). Nothing here reopens it: this is a replacement-level and pool-selection question, not an exchange-rate one.
+
+### 69. The out-of-sample keep/cut test: the model does not beat the owners
+The test #66 named as the biggest gap in the project, run for the first time. `klab/rewind.py` rebuilds a board for a past season from pre-season data only; `scripts/backtest_keepers.py` scores it against what owners did and what then happened, on 289 decisions across 2024, 2025 and 2026. No constant changed and no committed valuation moved. This is a negative result and it is the honest one.
+
+**The instrument.** A rewound board takes its projection from Marcel FOR that season (#67), its dispersion from completed seasons before it, its league level and baselines from the two completed seasons before it, and its field size from the same window. The $2,600 identity and the 14/9 roster shape are league rules and are not rewound. Coverage of decided players is 97%, 100%, 100%.
+
+**Two corrections had to be made before any number meant anything.**
+
+1. **The truth scale.** Scoring a keep against `redraft_value` asks what the player would fetch in a no-keeper redraft, which is a cheaper market than the one a keeper is actually traded against. On that scale only **23%** of these 289 decisions read as correct keeps while owners kept 47-55%, so any caller that keeps less wins for free, and the model keeps less. The correct denominator is the auction opportunity cost: keeping at $S forgoes $S of budget, and $S buys `intercept + S x slope` roto points, so keeping is right exactly when realised production beats that, which is `replace_cost > salary`. On that scale **54%** of the decisions are correct keeps. This is `scripts/decision_audit.py`'s open question 3, now fixed rather than flagged.
+2. **The baseline.** Keeping EVERYTHING captures most of the available surplus in this league, because withholding 100 keepers leaves contracts cheap on average. Every dollar figure below is reported against that baseline, not against zero. A caller with a large positive total can still be destroying value.
+
+**The result, against keep-everything.**
+
+| season | n | owner | model_redraft | model_replace | model_matched_k | perfect |
+|---|---|---|---|---|---|---|
+| 2024 | 64 | **+240.9** | +199.9 | +206.0 | +219.2 | +478.1 |
+| 2025 | 91 | -310.8 | -180.8 | **-56.2** | -196.0 | +402.8 |
+| 2026 | 134 | +73.5 | -10.9 | **+78.6** | +0.9 | +578.2 |
+
+Accuracy on the same decisions:
+
+| season | owner | model_redraft | model_replace | model_matched_k |
+|---|---|---|---|---|
+| 2024 | **71.9%** | 64.1% | 65.6% | 65.6% |
+| 2025 | 50.5% | **60.4%** | 57.1% | 57.1% |
+| 2026 | **71.6%** | 68.7% | 64.9% | 62.7% |
+
+**The owners win 2024 and 2026 on accuracy and 2024 on dollars; the model's only clear win is 2025, which is the season whose labels are most biased against the owners** (pre-2026 a keep is only detectable when the player was LATER thrown back, so the observed kept class is enriched for failures, #56.4). On 2026, the only season with clean labels, the owners are 71.6% right and beat keep-everything by $73.5; the production rule is 68.7% right and beats it by -$10.9. `model_matched_k`, which keeps exactly as many players as the owner and therefore tests ranking with the threshold removed, lands at +$0.9 against the owner's +$73.5.
+
+**What this does and does not establish.** It is a FLOOR, not an estimate. Marcel is the deliberately naive baseline (#67) and the real board runs on ZiPS, so the honest statement is that **the engine's decision logic, driven by a naive projection, does not beat this league's owners.** It does not show the ZiPS board fails to. It does show that the edge, if there is one, comes from the projection rather than from the valuation machinery, because the valuation machinery is what was held fixed here. 2026 outcomes are also a partial season (~75%), which favours durable players on both sides.
+
+**Two things the test settles on its own terms.**
+
+**The keep threshold is on the wrong scale.** `board.py` runs `surplus_multiyear` off `redraft_value`. Priced against the opportunity cost instead, the same board captures more in all three seasons: +$6.1 (2024), +$124.6 (2025), +$89.4 (2026). Accuracy moves the other way in 2025 and 2026 because the opportunity-cost rule keeps far more (56-62% against 20-43%), and dollars is the metric that matters. This is a candidate change to the production rule, not a shipped one; it needs the keep/cut flip diff and it interacts with #57.5, which rejected a different permissive rewire for keeping 30 players below replacement.
+
+**The pool rule question gets an independent answer, and it agrees with #68.** Scored on decisions rather than on the perfect-foresight benchmark:
+
+| pool rule | 2024 $ | 2025 $ | 2026 $ | 2026 accuracy |
+|---|---|---|---|---|
+| blind (production) | 77.7 | 318.8 | 739.0 | 61.2% |
+| slot_pooled | 77.7 | 318.8 | 781.8 | 62.7% |
+| **slot_role** | 63.6 | **324.3** | **857.2** | **68.7%** |
+
+`slot_role` wins the clean season by $118 and 7.5 accuracy points, wins 2025 by a hair and loses 2024. #68 argued for it from a benchmark; this argues for it from decisions, and the two agree.
+
+**A structural note that reorganises the open work.** The pool rule moves `redraft_value` and therefore only affects `model_redraft`; `replace_cost` is set by the auction exchange rate and is pool-independent, so all three pool rules give identical `model_replace` results. **The pool rule is a PRICING question (what to bid) and the exchange rate is the KEEP/CUT question.** They have been treated as one problem and they are two.
+
+**Housekeeping.** `MAX_KEEPERS` binds on 0 of 289 decisions (the most any team keeps is 9 against a cap of 13), so the roster constraint separates nothing here. `MIN_KEEPERS` is deliberately not applied: the recoverable decision set is a partial view of each team's keepable contracts, so forcing six out of it would invent choices. Only 1 of 289 decided players sits below Marcel's 0.30 reliability bar, so #67's low-`rel` warning does not bite on this population.

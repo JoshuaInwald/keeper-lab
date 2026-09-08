@@ -2,6 +2,18 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (assessment phase, Phase B item 2: the out-of-sample test)
+
+| type | item |
+|---|---|
+| built | `klab/rewind.py` and `scripts/backtest_keepers.py`: the out-of-sample keep/cut test #66 named as the biggest gap in the project. A board is rebuilt for a past season from pre-season data only (Marcel projection, dispersion and levels from earlier seasons) and scored against 289 real decisions across 2024-2026 (FINDINGS #69) |
+| bug | **Negative result, and the honest one: the model does not beat the owners.** On 2026, the only season with clean labels, owners are 71.6% right and beat a keep-everything baseline by $73.5; the production rule is 68.7% right and beats it by -$10.9. The model's only clear win is 2025, the season whose labels are most biased against owners (#56.4). This is a FLOOR, since Marcel is the naive projection, not ZiPS (FINDINGS #69) |
+| bug | Two measurement errors found and fixed before the numbers meant anything: scoring keeps against `redraft_value` (a no-keeper market) makes only 23% of decisions read as correct keeps against 54% on the auction opportunity-cost scale, which would have handed the model a free win; and dollar totals are meaningless against zero because keeping everything already captures most of the surplus. This closes `decision_audit.py`'s open question 3 |
+| built | The keep threshold is on the wrong scale: priced against opportunity cost rather than `redraft_value`, the same board captures +$6.1, +$124.6 and +$89.4 more across the three seasons. Candidate change, not shipped; owed a flip diff and interacts with #57.5 |
+| built | The pool rule question gets an independent answer that agrees with #68: `slot_role` wins the clean season by $118 and 7.5 accuracy points over the production rule |
+| built | Structural split identified: the pool rule moves `redraft_value` only, and `replace_cost` is pool-independent, so **the pool rule is a pricing question and the exchange rate is the keep/cut question.** They have been treated as one problem and are two (FINDINGS #69) |
+| bug | The roster-cap variant was silently vacuous: it joined teams through `load_drafts()`, whose `fg_id` is empty on most rows, instead of `match_drafts()`. Fixed; `MAX_KEEPERS` then turns out to bind on 0 of 289 decisions anyway |
+
 ## 2026-09-08 (assessment phase, Phase B item 1)
 
 | type | item |
