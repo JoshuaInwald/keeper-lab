@@ -47,3 +47,6 @@ out/acquisition_channels_2026.csv
 out/denominator_dispersion.csv
 out/league_levels_by_season.csv
 out/auction_regression_battery.csv
+
+# Survey answers are one person's opinions and are regenerated on demand.
+out/survey_comparison.csv

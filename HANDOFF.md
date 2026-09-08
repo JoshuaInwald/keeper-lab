@@ -41,6 +41,8 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 | `marcel_pool_test.py` | the #68 pool analysis; asserts seven published numbers as controls |
 | `backtest_keepers.py` | the out-of-sample keep/cut test on 289 decisions (#69), built on `klab/rewind.py` |
 | `fit_blend.py` | sweeps the blend constants with leave-one-season-out (#70) |
+| `build_survey.py` | writes `out/keeper_survey.html`, the blind keep/cut survey for a human reviewer (#77) |
+| `ingest_survey.py` | scores returned survey answers against the model and against each other (#77) |
 | `sensitivity.py` | exports `knob()`, which overrides config and clears every cache both ways |
 | `fetch_chadwick.py`, `price_features.py`, `keeper_revealed.py`, `price_model.py`, `compare_valuations.py` | the item-1 price chain, in that order |
 | `fetch_marcel.js` | rebuilds the Marcel archive from a browser session; `data/` is gitignored so a fresh clone needs it |
