@@ -360,6 +360,37 @@ Fixed with `data/positions_2026.csv`: hitters take the primary position off the 
 
 The position file is a data asset, not a code fix, and it will go stale as rosters churn. `data/README.md` records how to rebuild it.
 
+### 62. Waiver-wire value: a fourth route to replacement level, and it disagrees with the third
+ROADMAP item 4. `scripts/waiver_value.py`. No constant was changed.
+
+Replacement level anchors every dollar figure and is not stable: it moved 4.811 to 4.599 to 4.733 across two data refreshes on one day. METHODS section 2.5 lists three routes and notes none is fitted to agree. This adds a fourth, the only behavioural one.
+
+**What teams actually do.** Two roster snapshots 3.5 weeks apart (2026-08-13, 2026-09-07) give 34 adds and 33 drops of observed waiver activity, the first transaction data in the project (transaction-log scraping is declined on the roadmap; two snapshots are a cheap substitute).
+
+| | n | 2026 roto pts, median | 2027 projection, median | above replacement (2027) |
+|---|---|---|---|---|
+| added off the wire | 34 | 4.15 | 4.42 | 41% |
+| dropped to the wire | 33 | 4.10 | 4.36 | 33% |
+
+Teams add and drop at the same level. The churn margin is **4.12 on actuals, 4.39 on projections**, and the engine's replacement is **4.733**, above both. The 300th-best projection, the `WAIVER_VALUE = "medium"` setting that has sat unused in `config.py`, is **4.381**: almost exactly the observed margin.
+
+Switching to it is tempting and would look like a fix for the top of the board. `$/rp` falls 6.522 to 5.333 and Skubal falls **$52.75 to $45.20**, landing on the league's all-time $45 ceiling, which is the exact complaint that started ROADMAP item 1 and agrees with `market_price` ($34) and `revealed_price` ($34) in direction. Eight players' single-year keep surplus changes sign, all marginal (Oneil Cruz +1.35 to -0.48, Yamamoto +3.77 to -0.69, five others inside +/- $2).
+
+**It was not switched, because the internal-consistency test points the other way.** FINDINGS #27 justified the 230th by counting unrostered players who project above it. Rerun on current data:
+
+| candidate | level | unrostered above it |
+|---|---|---|
+| auction intercept | 3.980 | 168 of 1,751 |
+| 300th (medium) | 4.381 | 106 |
+| **230th (low, current)** | **4.733** | **59** |
+| median FA pickup | 5.040 | 33 |
+
+Replacement is supposed to be what a team can have for free. At 4.381 the model claims 106 free agents beat the marginal rostered player, which cannot be true of a level that is meant to be freely available. That argues replacement is too LOW at 4.381, while the churn data argues it is too HIGH at 4.733. The two behavioural readings genuinely conflict, and 4.733 sits between them.
+
+The likely reconciliation, untested: deep free-agent projections are optimistic (playing time is assumed, prospects carry upside), which inflates the 106; and teams churn injured and slumping players rather than optimising, which drags the observed margin down. Both would need transaction logs WITH DATES to separate, so that what a team got from an add can be measured after the add. That is the one thing that would settle it and it is the roadmap's declined item.
+
+**Left at `WAIVER_VALUE = "low"`.** The change is one line and reversible; the evidence does not currently support making it.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).

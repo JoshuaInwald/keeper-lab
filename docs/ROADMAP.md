@@ -49,8 +49,10 @@ What is left worth doing, much smaller: a contend-or-punt flag on the five categ
 ## 3. Intuition tab v2 (scope needs a decision)
 Show each player's PA/IP and per-category rates; three ways to adjust (+/- buttons, direct entry, presets such as full-time); all 230 rostered players grouped by team with contract fields. Open decision: sandboxed (as now) or a propagating override that flows through the 2027 pipeline. The propagating version is a materially larger change; decide before scoping.
 
-## 4. Waiver-wire value (1 session)
-Free agents supply ~40% of roto production at $10-20 each. Quantify it to sharpen replacement level, the anchor for every dollar figure.
+## 4. Waiver-wire value [DONE 2026-09-08, no constant changed]
+Measured from two roster snapshots 3.5 weeks apart (`docs/FINDINGS.md` #62, `scripts/waiver_value.py`). Teams add and drop at the same level, a churn margin of 4.12-4.39 roto points against an engine replacement of 4.733, which favours the unused `WAIVER_VALUE = "medium"` (4.381) and would drop the top of the board to $45.20, the league ceiling. But the internal-consistency test cuts the other way: at 4.381 the model says 106 unrostered players beat replacement, which a freely-available level cannot mean. Left at `"low"`.
+
+What would settle it: transaction logs WITH DATES, so what a team actually got from an add can be measured after the add. Currently the roadmap's declined item.
 
 ## 5. Uncertainty ranges on Board/Trade/Standings tabs (design pass)
 Per-cell tooltip reusing the existing bootstrap bands.
