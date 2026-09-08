@@ -2,6 +2,17 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (assessment phase, Phase B item 1)
+
+| type | item |
+|---|---|
+| built | `scripts/marcel_pool_test.py`: answers #65's central question with the Marcel archive. The top-230 pool pathology REPRODUCES under Marcel (184/46 in 2024, 155/75, 160/70, against 183/47 for ZiPS 2027 and 131/99, 139/91, 130/100 on realised seasons), so it is general to projections and the repair belongs in the pool rule, not the projection step (FINDINGS #68) |
+| bug | #65's proposed mechanism refuted: Marcel's innings distribution is close to a real season (142-154 arms over 100 IP against 118-127 real; ZiPS has 223) and it still produces 184/46. Smeared innings are not what removes pitchers from the pool |
+| built | The mechanism located instead in rate-category compression: sd(projected)/sd(actual) is 0.43-0.60 for ERA and WHIP and 0.50-0.58 for SV, against 0.67-0.84 for W and K. Pitchers carry three of the four most-compressed categories, hitters one (FINDINGS #68) |
+| bug | #65's rejection of its own repair does not hold. Run on realised seasons, slot-constraint with role-specific replacement gives 52.0-55.1%; its 54.21% on the 2027 projection is not an overshoot but a match. No pool rule reaches 63-64% under perfect foresight; the whole range is 46-55% |
+| built | Located which step mis-splits the roles: on the rostered 276 the projection gives hitters 65.20% of roto points against #64's 64.11% delivered, and the dollar conversion moves it to 71.78%. The defect is in the conversion, not the projection (FINDINGS #68) |
+| declined | Shipping a pool-rule change this session. It is a valuation change and owes the before/after keep/cut flip diff CLAUDE.md requires; staged for the next session. CHECK 5 still prints 73.7% and no committed output moved |
+
 ## 2026-09-08 (assessment phase, Phase A)
 
 | type | item |

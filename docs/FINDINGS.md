@@ -486,6 +486,8 @@ The clearest single symptom: the projected top-90 pitchers pool to a **3.597 ERA
 
 Ranked next steps, in order: obtain two seasons of projection archives; then refit the blend and retest this; only then choose a pool rule.
 
+**Partly superseded by #68** (archive obtained, question answered). The 183/47 pool, the 73.70% share and all three candidate measurements stand and reproduce exactly. Two claims above do not. The innings-smearing mechanism is refuted: Marcel has a near-realistic innings distribution and still produces 184/46, so smearing is not what removes pitchers from the pool. And "the obvious fix overshoots" does not hold: slot-constraint with role-specific replacement gives 54.21% where perfect foresight on completed seasons gives 52.0-55.1% for the same rule. The 63-64% comparison in this entry is against a different population; see #68 item 5.
+
 ### 66. The decision audit: owners defend their throw-backs better than their keeps
 Josh's named unbuilt analysis, `scripts/decision_audit.py`, interpreted. Scores the owners, not the model. 336 decisions.
 
@@ -548,3 +550,75 @@ Baseball-Reference publishes Marcel projections per season and keeps the pages u
 **Marcel trusts a pitcher's own record about half as much as a hitter's, and a fifth to a quarter of pitcher rows are mostly league mean wearing a player's name.** This is independent corroboration, from a projection system with no connection to this project, of the pitcher-side compression #65 measured in the ZiPS blend: pitcher performance is simply less projectable, so any system regresses it harder, so pitchers cluster toward the middle and fall out of a pool selected on projected roto points. #65 diagnosed that as possibly a ZiPS artefact. It is not: it is a property of pitching.
 
 The consequence for the work ahead is a warning. A backtest that scores every Marcel row as a forecast is, for a quarter of pitchers, scoring the league mean and calling it a projection. `rel` must be carried through and reported, and low-`rel` rows either weighted or excluded with the count stated.
+
+### 68. The pool pathology is general to projections, and #65 judged its repair against the wrong benchmark
+Assessment phase, Phase B item 1, the first use of the Marcel archive (#67). Diagnostic only. No constant changed, no committed output moved, `scripts/validate.py` CHECK 5 still prints 73.7%. `scripts/marcel_pool_test.py` reproduces every number below, including four of #65's own as controls: 131/99, 139/91, 130/100, 183/47, 73.70%, 54.21% and 71.55% all come back exact.
+
+#65 found the 2027 calibration pool is 183 hitters / 47 pitchers where completed seasons run 125-139 / 91-105, and could not tell whether that is a property of projections in general or an artefact of ZiPS Depth Charts. Marcel is an independent ex-ante line for three seasons that have since been played, so it answers the question directly. Every arm below is scored with the SAME `RotoScorer` as its season's actuals, so only the stat lines differ.
+
+**1. It reproduces. The pathology is general to projections, and the blend is not the cause.**
+
+| arm | HIT | PIT | 90th-best pitcher, roto pts |
+|---|---|---|---|
+| 2024 actual | 131 | 99 | 5.217 |
+| 2024 Marcel | **184** | **46** | 3.092 |
+| 2025 actual | 139 | 91 | 4.955 |
+| 2025 Marcel | **155** | **75** | 4.081 |
+| 2026 actual | 130 | 100 | 5.433 |
+| 2026 Marcel | **160** | **70** | 4.664 |
+| 2027 ZiPS blend | 183 | 47 | 3.526 |
+| 2027 ZiPS, blend weights zeroed | 191 | 39 | 3.463 |
+
+Marcel 2024 lands within one player of the ZiPS 2027 pool. Removing the 2026 actuals entirely makes the ZiPS pool worse, not better, so the blend is not what does it. In every completed season the 90th-best pitcher and the 140th-best hitter sit within 0.58 roto points of each other, which is why a role-blind top 230 lands near the fieldable 140/90 on realised data. Under every projection the pitcher side of that pair collapses.
+
+**2. #65's proposed mechanism is refuted. Smeared innings are not what empties the pool.**
+
+| arm | pitchers | IP >= 100 | IP >= 150 |
+|---|---|---|---|
+| actual 2024-2026 | 851-873 | 118-127 | 40-71 |
+| Marcel 2024-2026 | 609-750 | 142-154 | 46-55 |
+| 2027 ZiPS blend | 1,151 | 223 | 33 |
+| 2027 ZiPS, blend weights zeroed | 1,151 | 243 | 21 |
+
+Marcel's innings distribution is close to a real season and nothing like ZiPS's: it carries roughly the right number of 100-inning arms and MORE 150-inning arms than ZiPS, which is the signature of a projection that does not spread innings across a depth chart. It still produces 184/46. #65 was right that ZiPS Depth Charts smears innings and wrong that the smearing is what removes pitchers from the pool.
+
+**3. The mechanism is rate-category compression, and the category format decides which role it hits.**
+sd(projected) / sd(actual) per category, over every player carrying both a Marcel line and a realised line. No top-N filter: selecting on the projection would truncate the projected distribution from below and shrink its sd for reasons unrelated to compression.
+
+| season | R | HR | RBI | SB | AVG | W | SV | K | ERA | WHIP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2024 | 0.639 | 0.700 | 0.646 | 0.703 | 0.714 | 0.665 | 0.504 | 0.766 | 0.576 | 0.575 |
+| 2025 | 0.593 | 0.622 | 0.599 | 0.812 | 0.713 | 0.699 | 0.542 | 0.787 | **0.433** | 0.484 |
+| 2026 | 0.696 | 0.795 | 0.719 | 0.894 | 0.787 | 0.762 | 0.584 | 0.839 | 0.581 | 0.604 |
+
+ERA, WHIP and SV compress hardest in all three seasons; W and K sit with the hitter categories. **Pitchers carry three of the four most-compressed categories and hitters carry one.** Any projection regresses the least predictable stats hardest, so pitcher roto points cluster toward the middle and drop out of a pool selected on projected value. #67's reliability split (pitchers 0.47 against hitters 0.71) is the same fact stated from the projection's own side. Whole-role dispersion follows: sd ratio 0.52-0.61 for pitchers against 0.60-0.73 for hitters.
+
+**4. No pool rule reaches 63-64% under perfect foresight, so that was never the benchmark for this quantity.**
+Hitter dollar share under #65's three candidate rules. The `actual` rows are perfect foresight: the season is over and the stat lines are the real ones.
+
+| season | arm | blind (status quo) | slot + pooled repl | slot + role repl |
+|---|---|---|---|---|
+| 2024 | actual | 0.5213 | 0.5254 | 0.5511 |
+| 2025 | actual | 0.5180 | 0.5184 | 0.5249 |
+| 2026 | actual | 0.4642 | 0.4695 | 0.5198 |
+| 2027 | ZiPS | **0.7370** | **0.7155** | **0.5421** |
+
+The entire perfect-foresight range is 46.4% to 55.1%. #65 rejected slot-constraint-with-role-specific-replacement because its 54.21% was "as far below the league's 63-64% as the status quo is above it". **54.21% is where perfect foresight puts that rule** (52.0-55.1%, and 52.5-55.1% on the two complete seasons). It is the only one of the three candidates whose output on the projection agrees with its output on realised data; the other two miss their own perfect-foresight values by 20 points.
+
+**5. The mis-split enters at the dollar conversion, not the projection.**
+#64's 63-64% is measured over the players this league rosters, not over the top 230 by projected points. Both quantities on both populations, from the committed 2027 board:
+
+| population | quantity | hitter share |
+|---|---|---|
+| rostered (276) | projected roto points | **65.20%** |
+| rostered (276) | `redraft_value` | 71.78% |
+| calibration top-230 | projected roto points | 77.95% |
+| calibration top-230 | `redraft_value` | 73.70% |
+
+The projection's role split on the rostered set is 65.20% against #64's 64.11% of roto points actually delivered: right to within 1.1 points. The dollar conversion then moves it to 71.78%. Subtracting one pooled replacement level from a compressed distribution takes a larger fraction of a pitcher's value than of a hitter's, which is the same compression again, now priced. #65's 73.70% is that conversion evaluated on the hitter-skewed pool the compression itself creates, which is why it reads 8 points worse than the same conversion on the rostered set.
+
+**What is not established, and why nothing ships this session.**
+- Marcel is the naive baseline (#67). The magnitudes describe the Marcel blend; only the shape transfers to the ZiPS path. The shape is what items 1-4 above turn on, and item 4's benchmark comes from realised seasons rather than from Marcel, so it does not carry that caveat.
+- Three seasons, one partial. 2026 actuals are ~75% of a season, so the perfect-foresight benchmark rests mainly on 2024 and 2025.
+- **Nothing here shows slot + role-specific replacement is the right rule.** It shows the stated reason for rejecting it does not hold. Choosing a pool rule is a valuation change and still owes the before/after keep/cut flip diff CLAUDE.md requires. That is the next session's work, not this one's.
+- The hitter/pitcher budget split stays refuted (#64). Nothing here reopens it: this is a replacement-level and pool-selection question, not an exchange-rate one.
