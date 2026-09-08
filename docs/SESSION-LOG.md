@@ -6,6 +6,10 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 
 | type | item |
 |---|---|
+| built | ROADMAP item 1 Steps 0, 1, 1b, 2: `production_value`/`market_price` split, Chadwick age join, ex-ante feature table, keeper decisions reconstructed, price model held out on 2026 (MAE 5.76 vs 6.84 and 7.20 baselines). Coverage fails at 38.4%/60%; `market_price` left NaN (FINDINGS #56) |
+| bug | Held-out season defaulted to the omitted season dummy, handing 2026 the 2023 price level: MAE 8.76 and an $86 hitter against a $45 ceiling (FINDINGS #56.7) |
+| bug | Age-missingness flag learned "$1" from five unmatched placeholders and applied it to eight 2026 prospects (FINDINGS #56.7) |
+| bug | Two different Max Muncys share fg_id 13301 and were both bought in 2026; a (season, fg_id) merge cartesian-joined them |
 | built | R port (`R/keeper_lab.R`) removed: duplicated the pandas core and would drift; in history at a1d156c |
 
 ## 2026-08-15

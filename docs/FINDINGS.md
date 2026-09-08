@@ -204,6 +204,49 @@ The export is rest-of-2026 (PA max 174, IP max 51, hitter dollars sum -$10,989),
 ### 55. Monte Carlo finish-odds simulator
 **Correction, same day as shipping: the first version assumed a flat top-2 payout. The real structure is 50% / 25% / 15% for 1st / 2nd / 3rd and buy-in back for 4th (`PAYOUT_SPOTS`, `PAYOUT_SHARE`); everything now keys off `PAYOUT_SPOTS`.** `simulate_finish_odds()` jitters player outcomes with one shared hot/cold draw per player scaled by `1 - reliability` per category (saves borrow wins' 0.15); playing time not jittered. Rest-of-2026: Pookie 2.0 and Spehr's Army 100% in the money, McBlocks 99.9%, Orange and Black Attack 43%, All-Stars 32%, Fighting Phils 22%, Lisbon 3% (the last four ~0% under the wrong top-2 version). A dollar-neutral swap (Julio Rodriguez $29.92 for Soto $29.93) moves Orange and Black Attack 43% to 19% and the Phils 22% to 37%: category fit, which no dollar figure captures. JS and Python agree within 0.4-1.7 points (tolerance 8). `simulate_keeper_finish_odds()` (2027, per basis): Producers and Polar Bears 74% on keeper talent alone, Pookie 2.0 21%; Orange and Black Attack 0% with the same 7 keepers as Producers. Live 2027 trade odds not built.
 
+### 56. Market price, fitted directly: it beats both baselines, and it is not shippable yet
+ROADMAP item 1 Steps 0, 1, 1b, 2. Steps 3-5 not started; `market_price` is a column of NaN on purpose.
+
+**56.1 The quantities are now separate (Step 0).** `production_value` is an exact alias of `redraft_value` (worth to a roster, budget scale); `market_price` is the auction cost and is its own column. The board's "Worth '27" label is gone. Nothing numeric moved: every shared column of `out/keeper_board_2027.csv` is byte-identical, 64 tests pass, `node app/verify.mjs` 15/15.
+
+**56.2 Age exists now, and it is the largest single coefficient (Step 1).** `scripts/fetch_chadwick.py` pulls the Chadwick register to `data/chadwick_register.csv`: 21,200 players with a FanGraphs id, 98% of the 450 in the auction history. `scripts/price_features.py` writes `out/price_features.csv`, 677 purchases with prior-two-season production, playing time, per-category prior lines, tenure, last salary, role, position group, rookie flag and age. Holding production constant, the market discounts **8.0% per year of age** (t = -5.84). METHODS section 3 #18 declined an aging curve for lack of age data; that reason no longer applies to price, though it still applies to production, where ZiPS carries age already.
+
+**56.3 The "25% of purchases have no prior MLB line" figure is 80% censoring.** The FanGraphs exports start in 2022, so 2022's 137 purchases have no prior-season line at all. The ROADMAP diagnosis counted them as rookies: 137 censored rows plus 30 genuine ones is the 167 (24.7%) it reported. On the observable window (2023-2026) the rookie rate is **5.6%, n=30**. The model set is 2023-2026; 2022 is excluded from the fit, not held out.
+
+**56.4 `keepers_2022..2025.csv` are not keeper submissions (Step 1b).** The open question from HANDOFF is settled from the data, without the commissioner. `keepers_2025.csv` shares **zero** players with the 2024 auction class, the only contracts that could have been kept for 2025. `keepers_2026.csv` (100 rows) is sound: it agrees with the roster contract codes on 31 of 35 players in the 2025 class, with no contradictions. Keeper decisions are therefore reconstructed, not read: a player under a live contract who reappears in season S's auction was thrown back (the draft files are complete), and for 2026 a player in the keeper file or on the roster under a pre-2026 contract code was kept. 133 clean 2026 decisions, 73 kept and 60 thrown back, no contradictions. Reconstructed 2023-2025 decisions (n=202) are reported separately and carry a selection bias 2026 does not: before 2026, "kept" is only detectable when the player was later thrown back, so a player kept and held reads as unlabeled.
+
+**56.5 Owners' revealed indifference price runs far below both dollar scales at the top.** `P(kept | prior roto points, salary, years of control, role)`, 2026, n=133, pseudo R^2 0.136: production +0.244 (z 3.51), salary -0.061 (z -3.04), years of control -0.819 (z -2.07). Salary at which P(kept) = 0.5, by prior-production decile, against what the engine says the same production is worth:
+
+| decile | n | prior roto pts | kept | revealed P50 price | `production_value` | `keep_value` |
+|---|---|---|---|---|---|---|
+| 2 | 13 | 3.98 | 0.23 | $5.97 | $0.00 | $0.01 |
+| 4 | 13 | 6.09 | 0.69 | $11.35 | $9.39 | $19.36 |
+| 6 | 13 | 7.81 | 0.69 | $21.34 | $20.68 | $35.14 |
+| 8 | 13 | 9.26 | 0.69 | $25.60 | $30.19 | $48.44 |
+| 10 | 14 | 13.03 | 0.86 | $38.54 | $54.92 | $83.02 |
+
+The three agree around 7-8 roto points and diverge from there. At the top decile the owners' own revealed price is **$38.54** against `production_value` $54.92 and `keep_value` $83.02, the number that decides keep-vs-cut. This is the ROADMAP's "top end too high" diagnosis confirmed from a direction that never touches an auction bid. At the bottom the sign reverses: owners pay $6 where the engine says $0.
+
+**56.6 The price model beats both baselines (Step 2).** `scripts/price_model.py`: OLS on log(salary), season fixed effects, role interaction on the production terms, Duan smearing back to dollars, P20/P80 quantile fits, capped at the realised max for the role. Production transform chosen by leave-one-season-out inside 2023-2025 (linear 6.56 MAE, sqrt 6.86, log1p 7.10); 2026 was not consulted. Fit 2023-2025 (n=428), predict 2026 (n=112):
+
+| model | MAE | RMSE | bias | Spearman |
+|---|---|---|---|---|
+| price model | **5.76** | 7.29 | -0.46 | 0.482 |
+| baseline: prior salary + trend | 6.84 | 8.19 | +2.25 | 0.471 |
+| baseline: comp estimator, training-only pool | 7.20 | 9.02 | -3.29 | 0.277 |
+
+In-sample R^2 is 0.388. Calibration by predicted-price decile is within $3.21 for deciles 3 through 9 and misses at both ends: decile 2 +$4.77, decile 10 -$5.90 (predicts $30.90, market pays $25.00). The comp estimator is run as a re-implementation over training seasons only; calling the shipped module would have leaked 2026 into its own comp pool.
+
+**56.7 Two design errors, both caught by the held-out season.** Neither is a modelling subtlety; both are worth keeping in view because each looked right and cost the model its first acceptance test.
+- *Season effects.* A held-out future season has no dummy. Defaulting it to the omitted base level handed 2026 the 2023 price level and inflated every prediction by exp(0.90): MAE 8.76 against a 6.84 baseline, and $86.49 for a hitter in a league whose all-time high is $45. An unseen season now carries the most recent training season's effect.
+- *Age missingness as a feature.* Mean-fill plus a missingness flag is the obvious design. The register misses a player only when his FanGraphs id is newer than the register: in 2023-2025 that was five unmatched $1 placeholders, in 2026 it is eight prospects and NPB imports sold for $1 to $20. The flag learned "missing age means $1" and applied it to the most expensive rookie class in the sample, predicting $1.68 against a realised $9.75. Removing the flag and imputing age from same-status players cut that segment's MAE from $8.20 to $5.96 and the overall from 5.91 to 5.76. This change is post-hoc, argued from the mechanism, and it is very slightly *worse* on leave-one-season-out inside the training seasons (6.59 vs 6.56), which is exactly what a training-period artifact looks like.
+
+**56.8 What still fails, and why `market_price` stays empty.** The acceptance test is not passed.
+- *P20-P80 coverage 38.4% against a nominal 60%.* In-sample coverage is 57.5%, so the quantile fits are fine where they were estimated and the bands do not transfer. The misses are asymmetric, 25.0% below P20 and 36.6% above P80: out of sample the upper tail is systematically underpriced, not just wide.
+- *The top-end check passes only because of the cap.* Uncapped, the model predicts $55.38 for a hitter against a $45 ceiling; two hitters are capped. A price model that needs a hard ceiling is extrapolating at the top, which is the same failure `redraft_value` has, one order of magnitude smaller.
+- *Rookies are still underpriced*, $5.29 predicted against $9.75 realised even after the age fix, on n=8.
+Half the variance is unexplained and the ROADMAP said to expect that. But a column that fails its own coverage test does not belong on the board, and the level has not been calibrated to the 2027 budget (Step 3). `market_price` is NaN until it is.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).

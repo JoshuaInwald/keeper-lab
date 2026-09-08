@@ -61,6 +61,8 @@ keep_value     = max(0, (rp - intercept) / slope)                     # auction 
 
 Current: replacement 4.81 rp, $6.56/rp redraft. Both are computed on expected playing time. `keeper.pt_scale()` / `to_full_time()` produce the counterfactual columns `redraft_value_ft` and `upside_ft` at `KEEPER_PA_FLOOR = 600`, `KEEPER_IP_FLOOR = 150`, `KEEPER_SV_FLOOR = 25`, `KEEPER_RP_IP_FLOOR = 65`, capped at `MAX_PT_SCALE = 2.0`; `keeper.pt_scale_kind()` tags each as `health` or `role` (reliever handed the closer job). `board.value_2028()` prices the out year on the same 2027 scale. `POSITIONAL_ADJUSTMENT` (off) swaps in `keeper.two_position_replacement()` for C and SS (`TWO_POS_SLOTS`); `keeper.positional_replacement()` is the full-spectrum version, disabled for lack of eligibility coverage.
 
+`board.value_players()` also emits `production_value` (an exact alias of `redraft_value`: worth to a roster, not a price) and `market_price` (the auction cost, a separate quantity). `market_price` is NaN in the committed build: `scripts/price_model.py` fits it from 677 revealed purchases and beats both baselines out of sample, but fails its own P20-P80 coverage test, and the level is not calibrated to the 2027 budget until ROADMAP item 1 Step 3 (FINDINGS #56). Do not blend the two (CONSTRAINTS.md).
+
 ### 2.5 Replacement level
 
 Three routes, none fitted to agree: the 230th projection (4.81), the auction intercept (3.98, what a $0 purchase returned), and the median 2026 free-agent pickup (5.04, survivorship-biased upward). The 230th projection is used; an internal-consistency check found only 24 of 1,714 unrostered players project above it (FINDINGS #27).
@@ -129,6 +131,10 @@ Flip counts are keep/cut changes out of 275 rostered players (`scripts/sensitivi
 | 26 | Team baselines from top-140/top-90 pools rescaled by realization | published league averages | absorbs IL days and empty slots; moderate impact |
 | 27 | Trade finder requires positive incoming value | net surplus only | Guerrero-for-Wood passed on net math while returning a $0 rental (LAB_NOTEBOOK §19) |
 | 28 | Single HTML file, data inlined | Streamlit server | needs a live Python process; unusable on a phone or at a draft table |
+
+### 2.11 Auction price model (separate, not wired in)
+
+`scripts/price_features.py` rebuilds the ex-ante information a bidder had on auction day for all 677 purchases: prior two seasons' roto points and playing time from `auction.score_season()`, per-category prior line, tenure in this league's auctions, last salary and years elapsed, role, position group, rookie flag, and age from `data/chadwick_register.csv` (`scripts/fetch_chadwick.py`, 98% join on `fg_id`). `scripts/price_model.py` fits `log(salary)` by OLS with season fixed effects, a role interaction on the production terms, Duan smearing back to dollars, P20/P80 quantile fits and a cap at the realised max for the role; an unseen future season carries the most recent training season's effect. `scripts/keeper_revealed.py` fits `P(kept)` on 133 reconstructed 2026 keeper decisions as a second, bid-free calibration. None of these is in `run_all.py` and none feeds `board.py`. Results, including two design errors the held-out season caught, are FINDINGS #56.
 
 ## 4. Validation
 
