@@ -26,6 +26,12 @@ there).
 | `fg_zips_dc_2028_hitters_projections.csv`, `fg_zips_dc_2028_pitchers_projections.csv` | ZiPS Depth Charts full-year 2028 projections (out-year, used for multi-year keeper surplus) |
 | `fg_catchers_2026.csv`, `fg_shortstops_2026.csv` | FanGraphs batting leaderboard, filtered to every player with ≥1 PA at C / at SS in 2026 — the eligibility set the positional-adjustment toggle checks membership against (`docs/FINDINGS.md` #52). No Position column; eligibility is which file a player's row appears in, not a labeled field. |
 
+## Public reference data
+
+| file | what it is |
+|---|---|
+| `chadwick_register.csv` | Chadwick Bureau player register, filtered to the ~21k players carrying a FanGraphs id. Columns: `key_fangraphs` (this repo's `fg_id`), `key_mlbam`, name, birth date. The only source of **age** in the project — no FanGraphs or CBS export here carries it (`docs/METHODS.md` section 3 #18). Feeds `scripts/price_features.py`. Unlike everything else in `data/`, this one is public and scripted: rebuild with `PYTHONPATH=.:scripts python3 scripts/fetch_chadwick.py`. Covers 98% of players in the auction history; the misses are 2026 prospects and NPB imports whose FanGraphs ids postdate the register. |
+
 ## League exports (CBS Sports, private league)
 
 Not obtainable from anywhere but this league's own CBS commissioner tools —
@@ -70,6 +76,7 @@ wiped.
 | `fg_2026_hitters.csv`, `fg_2026_pitchers.csv` | FanGraphs leaderboard export | in-season, whenever you want current standings to reflect games actually played; stale within days | manual CSV export from FanGraphs |
 | `fg_ros_hitters.csv`, `fg_ros_pitchers.csv` | FanGraphs ZiPS rest-of-season | in-season only; ROS projections drift as playing time is used up — refresh weekly-ish if you're actively trading | manual export |
 | `fg_zips_dc_2027_*`, `fg_zips_dc_2028_*` | FanGraphs ZiPS Depth Charts, full-year | FanGraphs reruns these a handful of times a year; refresh before any keeper decision or the auction itself | manual export |
+| `chadwick_register.csv` | Chadwick Bureau register on GitHub | once a season, or when a newly-drafted prospect misses the age join | `PYTHONPATH=.:scripts python3 scripts/fetch_chadwick.py` (the only scripted refresh in this table) |
 | `fg_hitters_2022_2026.csv`, `fg_pitchers_2022_2026.csv` | FanGraphs multi-year leaderboard | once a season, after it closes — append the year that just finished | manual export |
 | `fg_catchers_2026.csv`, `fg_shortstops_2026.csv` | FanGraphs batting leaderboard, filtered by position | once a season is enough — eligibility (who has played the position at all) rarely changes mid-season; refresh if a new player debuts there | manual export from FanGraphs, filtered to the position in the leaderboard query |
 | `draft_20XX.csv`, `draft_salaries_all.csv` | CBS auction results | once a year, right after the auction | manual export from CBS |
