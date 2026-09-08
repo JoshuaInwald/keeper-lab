@@ -413,6 +413,39 @@ def build_board(exch: dict | None = None, positional: bool = False
             exch, meta)
 
 
+def _market_surplus(b: pd.DataFrame, priced: pd.DataFrame, k: float) -> pd.DataFrame:
+    """Market-basis surplus columns for a given price scale."""
+    from .price import market_price_2028
+    from .keeper import multiyear_surplus
+    out = pd.DataFrame(index=b.index)
+    out["market_price"] = priced["pred"].to_numpy()
+    out["market_price_lo"] = priced["p20"].to_numpy()
+    out["market_price_hi"] = priced["p80"].to_numpy()
+    tmp = b.assign(market_price=out["market_price"])
+    out["market_price_2028"] = market_price_2028(tmp, k).to_numpy()
+    # ROADMAP item 1 Step 4: the cost of NOT keeping him is what it takes to buy
+    # him back at auction, so the arbitrage on a contract is market price minus
+    # keeper cost. `surplus_redraft`/`surplus_multiyear` keep answering the
+    # other question (what the roster spot is worth) and are left alone.
+    out["surplus_market"] = out["market_price"] - b["keeper_cost"]
+    mm = multiyear_surplus(out["market_price"], out["market_price_2028"],
+                           b["keeper_cost"], b["years_controlled"], b["salary"])
+    out["surplus_multiyear_market"] = mm["surplus_multiyear"].to_numpy()
+    out.loc[~b["keepable"], ["surplus_market", "surplus_multiyear_market"]] = 0.0
+    return out
+
+
+def _market_keeper_set(b: pd.DataFrame, priced: pd.DataFrame, k: float):
+    """Each team's best legal keeper set under the market basis."""
+    s = _market_surplus(b, priced, k)
+    sub = b.assign(surplus_multiyear_market=s["surplus_multiyear_market"])
+    sub = sub[sub["keepable"]].copy()
+    mk = mark_optimal_keepers(sub, col="surplus_multiyear_market")
+    flag = pd.Series(False, index=b.index)
+    flag.loc[mk.index] = mk["keep_2027"].to_numpy()
+    return flag.to_numpy()
+
+
 def attach_market_price(b: pd.DataFrame, players: pd.DataFrame
                        ) -> tuple[pd.DataFrame, dict]:
     """Fill `market_price` (ROADMAP item 1 Step 3, docs/FINDINGS.md #56).
@@ -427,20 +460,36 @@ def attach_market_price(b: pd.DataFrame, players: pd.DataFrame
     from .price import (apply_scale, calibrate_to_budget, raw_prices_2027,
                         role_ceiling)
 
-    kept = b[b["keep_2027"]]
-    keeper_ids = set(zip(kept["fg_id"], kept["role"]))
-    pool = players[~pd.Series(list(zip(players["fg_id"], players["role"])),
-                              index=players.index).isin(keeper_ids)].copy()
 
-    cal = calibrate_to_budget(pool, raw_prices_2027(pool), len(kept),
-                              float(kept["keeper_cost"].sum()))
+    # Fixed point: the price LEVEL depends on how much salary the keepers tie
+    # up, and once surplus is measured in market dollars the keeper set depends
+    # on the price level. Seeding with the production-based set gave 70 keepers
+    # and a set of prices implying 88, which is not a consistent answer to
+    # anything. Iterate until the keeper set stops moving.
+    raw_all = raw_prices_2027(b)
+    ceiling = role_ceiling(b["role"])
+    keys = pd.Series(list(zip(players["fg_id"], players["role"])), index=players.index)
+    kept_mask = b["keep_2027"].to_numpy().copy()
+    cal = None
+    for _ in range(10):
+        kept = b[kept_mask]
+        pool = players[~keys.isin(set(zip(kept["fg_id"], kept["role"])))]
+        cal = calibrate_to_budget(pool, raw_prices_2027(pool), len(kept),
+                                  float(kept["keeper_cost"].sum()))
+        nxt = _market_keeper_set(b, apply_scale(raw_all, ceiling, cal["meta"]["scale_k"]),
+                                 cal["meta"]["scale_k"])
+        if (nxt == kept_mask).all():
+            break
+        kept_mask = nxt
     k = cal["meta"]["scale_k"]
+    cal["meta"]["fixed_point_keepers"] = int(kept_mask.sum())
 
-    priced = apply_scale(raw_prices_2027(b), role_ceiling(b["role"]), k)
+    priced = apply_scale(raw_all, ceiling, k)
     b = b.copy()
-    b["market_price"] = priced["pred"].to_numpy()
-    b["market_price_lo"] = priced["p20"].to_numpy()
-    b["market_price_hi"] = priced["p80"].to_numpy()
+    for c, v in _market_surplus(b, priced, k).items():
+        b[c] = v
+    b["keep_2027_market"] = kept_mask
+
     return b, {"market": cal["meta"]}
 
 

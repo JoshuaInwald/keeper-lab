@@ -367,21 +367,24 @@ def calibrate_to_budget(pool: pd.DataFrame, raw: pd.DataFrame, n_keepers: int,
     ceiling = pool["role"].map(caps).astype(float)
     ceiling = ceiling.fillna(float(max(caps.values())))
 
-    # Solve for k by iteration, not in closed form: the $1 floor and the role
-    # cap are both non-linear, so a single algebraic pass left the lots summing
-    # to $1,853 against a $1,964 budget. Each pass re-solves k on the money the
-    # capped players no longer absorb, and converges in a handful of steps.
+    # Solve for k by iteration, not in closed form: the $1 floor, the role cap
+    # and the band-crossing repair in apply_scale() are all non-linear, so a
+    # single algebraic pass left the lots summing to $1,853 against a $1,964
+    # budget. Each pass re-solves k on the money the capped and floored lots no
+    # longer absorb. Scoring through apply_scale() rather than a private copy of
+    # the arithmetic is what keeps the identity exact: an earlier version solved
+    # on unclipped prices and shipped a $7 miss.
     p = raw["pred"].astype(float)
     k = 1.0
     for _ in range(50):
-        scaled = np.minimum((1.0 + (p - 1.0) * k).clip(lower=1.0), ceiling)
+        scaled = apply_scale(raw, ceiling, k)["pred"]
         top_idx = scaled.nlargest(min(lots, len(scaled))).index
         total = float(scaled.loc[top_idx].sum())
         if abs(total - budget) < 0.01:
             break
-        free = ~((scaled.loc[top_idx] >= ceiling.loc[top_idx] - 1e-9)
+        stuck = ((scaled.loc[top_idx] >= ceiling.loc[top_idx] - 1e-9)
                  | (scaled.loc[top_idx] <= 1.0 + 1e-9))
-        denom = float((p.loc[top_idx][free] - 1.0).sum())
+        denom = float((p.loc[top_idx][~stuck] - 1.0).sum())
         if denom <= 0:
             break
         k += (budget - total) / denom
@@ -403,3 +406,46 @@ def calibrate_to_budget(pool: pd.DataFrame, raw: pd.DataFrame, n_keepers: int,
             "market_inflation": float(budget / worth) if worth else float("nan"),
             "n_at_role_cap": int((out["pred"] >= ceiling - 1e-9).sum())}
     return {"prices": out, "meta": meta}
+
+
+def features_2028(board: pd.DataFrame) -> pd.DataFrame:
+    """Ex-ante features for the 2028 auction, for players under contract.
+
+    The 2027 season has not happened, so its "prior season" line is the board's
+    own 2027 projection (`roto_points`, with the projected PA/IP behind it) and
+    2026 actuals slide back to lag 2. Everything else ages by one year: the
+    player is a year older, has one more auction on his record, and his last
+    price is the 2027 keeper cost he is being carried at.
+
+    This is a projection of a price, one year further out than the projection it
+    rests on, and it inherits every bit of that uncertainty. It exists because
+    multi-year keeper surplus needs an out-year price; it is not a forecast to
+    quote on its own.
+    """
+    f = features_2027(board).copy()
+    f["season"] = 2028
+    f["rp_prior2"] = f["rp_prior1"]
+    for c in ("PA", "IP", "SV"):
+        f[f"{c}_prior2"] = f[f"{c}_prior1"]
+    f["rp_prior1"] = board["roto_points"].to_numpy(float)
+    f["PA_prior1"] = board["PA"].fillna(0.0).to_numpy(float)
+    f["IP_prior1"] = board["IP"].fillna(0.0).to_numpy(float)
+    f["SV_prior1"] = board["SV"].fillna(0.0).to_numpy(float)
+    f["played_prior1"] = 1
+    f["no_prior_line"] = 0
+    f["age"] = f["age"] + 1
+    f["auction_tenure"] = f["auction_tenure"] + 1
+    f["last_salary"] = board["keeper_cost"].to_numpy(float)
+    f["last_salary_season"] = 2027
+    f["years_since_last"] = 1
+    f["ever_bought_before"] = 1
+    return f
+
+
+def market_price_2028(board: pd.DataFrame, k: float) -> pd.Series:
+    """2028 auction price on the same calibrated scale as 2027. `k` comes from
+    the 2027 budget calibration: the 2028 budget is not knowable, so the level
+    is carried forward rather than re-solved."""
+    raw = predict(fitted_model(), features_2028(board), cap=False)
+    raw.index = board.index
+    return apply_scale(raw, role_ceiling(board["role"]), k)["pred"]
