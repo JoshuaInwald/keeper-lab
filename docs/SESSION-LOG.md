@@ -6,6 +6,8 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 
 | type | item |
 |---|---|
+| built | `docs/ASSESSMENT-BRIEF.md`: the chain link by link with a confidence claim and what would move each, Josh's questions mapped to evidence, the outside-analyst objections, and a scoped decision-quality audit. Next phase is assessment, not building |
+| bug | METHODS validation and limitations tables had gone stale (test count, replacement level, four items superseded by FINDINGS #57-#63); trued up |
 | built | Data refresh to 2026-09-07: standings, rosters and contracts re-derived from CBS pastes, ZiPS rest-of-season re-exported. 38 players added, 39 dropped, 2 contract changes. $/rp keep 9.17 to 10.86, redraft 6.56 to 7.00, replacement 4.811 to 4.599; keepers 70 to 75, 5 keep/cut flips |
 | bug | `_reference()` in build_app.py hard-coded a trade whose players had been traded away; the whole build died on refresh. Now picks the top two keepable per side |
 | bug | Two tests and one app check were pinned to data, not behaviour: a golden value on a dropped player, and two assertions on standings POINTS (ranks) that a small change legitimately leaves at zero. Re-pointed at category totals and standings levels |

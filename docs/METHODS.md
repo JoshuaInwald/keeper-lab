@@ -145,33 +145,35 @@ Two keeper bases ship. `keep_2027` is production surplus and is the recommendati
 | check | result | source |
 |---|---|---|
 | current rosters rolled over 2026 actuals vs 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale); league leader predicted 1st | `scripts/validate.py` |
-| replacement level, two independent routes | 4.81 (230th projection) vs 3.98 (auction intercept) | `out/model_params.json` |
+| replacement level, four routes, none fitted to agree | 4.733 (230th projection, used) vs 3.978 (auction intercept) vs 4.381 (300th) vs 4.12-4.39 (observed waiver churn, FINDINGS #62) | `out/model_params.json`, `scripts/waiver_value.py` |
 | budget identity | top-230 `redraft_value` sums to exactly $2,600 (caught a $3,854 build) | `scripts/audit.py`, pytest |
 | decision robustness | 92% of keep/cut calls hold across all variants (HANDOFF, 2026-08-14); recount of the committed `sensitivity_keep_flags.csv` gives 246/275 = 89% | `scripts/sensitivity.py` |
 | external: CBS roto rank | 0.893 (residual is CBS scoring OBP) | FINDINGS #21 |
 | external: FanGraphs ROS auction calculator | Spearman 0.68 to 0.84 on ordering; this scale runs flatter at the top | FINDINGS #54 |
+| held-out auction price | fit 2023-25, predict 2026: MAE $5.76 vs $6.84 (prior salary) and $7.20 (comps); band covers 68.8% against a nominal 60% | FINDINGS #56, #63 |
+| age effect, engine vs empirical | engine applies +0.621 roto pts to under-25s, empirical persistence says +0.778; indistinguishable | FINDINGS #59 |
 | reliability table | refit on every test run reproduces 10 of 10 values | `tests/test_invariants.py` |
 | browser vs pandas | 25 quantities, standings exact, dollars at 4-decimal tolerance; Monte Carlo within 8 points | `app/verify.mjs` |
 | contract codes vs acquisition year | 83% / 77% / 88% for codes 2 / 1 / F | `out/audit.txt` |
 | hand check | 10 players across the value spectrum | `scripts/validate.py` |
-| test suite | 78 pytest invariants, ~2.5 min | `tests/` |
+| test suite | 64 pytest invariants, ~2.5 min | `tests/` |
 
 Error bars: bootstrap ±34% per category denominator (2,000 resamples; the analytic ±16% assumes normality); ±13% to ±18% per-category standard errors on the app's Model tab. A denominator error leaves within-category rankings intact and moves cross-category weights.
 
 ## 5. Known limitations
 
 1. The SV-punter exclusion is the single largest lever; every closer valuation rests on it.
-2. Upside is a single counterfactual (`upside_ft`), not a probability-weighted expectation; ZiPS P10-P90 columns are unused; breakout talent upside is just the point projection.
-3. No aging curve by decision; a 3-year contract's third year reuses the 2028 figure with a flat discount.
-4. Waiver-wire value is invisible: free agents supplied ~40% of 2026 production; blocked on transaction-date data (FINDINGS #27).
+2. Upside is a single counterfactual (`upside_ft`), not a probability-weighted expectation. A comp-dispersion spread feature was tested as a price predictor and rejected (insignificant, loses on LOSO, FINDINGS #57.1); ZiPS P10-P90 remain unused in the projection.
+3. No aging curve by decision, and that decision is now empirically supported rather than merely inherited (FINDINGS #59). A 3-year contract's third year still reuses the 2028 figure with a flat discount.
+4. Waiver-wire value is now measured from two roster snapshots and disagrees with the internal-consistency route; replacement level is genuinely contested between 4.38 and 5.04 (FINDINGS #62). Transaction data WITH DATES would settle it.
 5. Rostered salary exceeds the cap ($3,194 vs $2,600) from IL and reserve artifacts; irrelevant to keeper math.
 6. Uncertainty is propagated to `redraft_value` and `surplus_multiyear` only; `keep_value` and the comp estimator are point estimates.
 7. Positional replacement covers C and SS only, off by default; 1B/2B/3B/OF lack eligibility data.
-8. `redraft_value` can exceed any price this league has ever paid ($45 overall, $34 for a pitcher; Skubal prices at $51); blending in the comp anchor is roadmap item 1.
-9. The comp estimator has no age or debut-year axis (no such data in `data/`); 17% of historical purchases lack a position; `keeper.position_map()` returns UNKNOWN for some players.
+8. `production_value` still exceeds any price this league has ever paid (Skubal $52.75 against a $45 ceiling). `market_price` now prices the other quantity and lands at $34.00, agreeing with the revealed keeper price of $34.31 (FINDINGS #57.6). The two are deliberately not blended.
+9. The comp estimator still has no age axis, though age now exists in `data/chadwick_register.csv` and is used by the price and keeper models. Position coverage is fixed: `position_map()` was blank for 48% of the roster and is now 100% (FINDINGS #61).
 10. Exchange rate is poorly identified: 2026 split halves give $6.55 and $20.38; keeper-count mechanism not separable from time (n=5 auctions).
 11. Small n everywhere: 17 to 30 team-seasons per denominator, 404 purchases, 38 closers.
-12. No in-season sequence, no category balance (roto points add linearly; the win-now lens is the only workaround), draft modelled as a price not a game, inflation fixed rather than solved as an equilibrium of the model's own advice (RESEARCH §6).
+12. No in-season sequence; roto points add linearly across categories and a per-team correction was built, measured and rejected as unestimable on ten teams (FINDINGS #60), leaving the win-now lens as the only workaround. Draft modelled as a price not a game; inflation fixed rather than solved as an equilibrium of the model's own advice (RESEARCH §6).
 13. `already_extended()` cannot tell a $5 + $5 extension from a $10 FA re-add; dormant today (FINDINGS #32.3). deGrom and Turang `F` codes do not reconcile with the draft record (FINDINGS #25). Keeper files for 2022-25 fail two accounting identities (`out/audit.txt`).
 14. `out/trade_suggestions.json` is a snapshot, rebuilt only by `scripts/build_trade_suggestions.py` (~135 s), not by `run_all.py`.
 

@@ -1,5 +1,7 @@
 # Roadmap
 
+**Status 2026-09-08: the next phase is assessment, not building. See `docs/ASSESSMENT-BRIEF.md`.** Items 1, 2 and 4 are closed. Before more is built, the chain needs a confidence audit: how the errors compound from stat line to roto points to dollars to a keep/cut call, and which link is load-bearing. The items below stay ranked for after that.
+
 Effort in focused sessions (~2 hours each). Built-and-validated inventory is in `docs/METHODS.md` section 4; history in `docs/SESSION-LOG.md`. This file is only what is next, ranked.
 
 ## 1. Market-price recalibration (3-4 sessions; the priority)

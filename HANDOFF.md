@@ -1,6 +1,6 @@
 # Session handoff (current state only; history lives in docs/SESSION-LOG.md)
 
-Last updated: 2026-09-08 (ROADMAP item 1 complete, Steps 0-5). Read `CONSTRAINTS.md` first, then "Next session: start here" at the bottom.
+Last updated: 2026-09-08. **The next session is an ASSESSMENT phase, not a build: read `docs/ASSESSMENT-BRIEF.md` first.** Read `CONSTRAINTS.md` first, then "Next session: start here" at the bottom.
 
 ## System
 - Repo: `~/PycharmProjects/keeper-lab` on the Mac, GitHub `JoshuaInwald/keeper-lab` (public, `main`), mirror at `~/Documents/Fantasy Baseball/keeper-lab/`. See `CLAUDE.md` for the three-surface rule.
@@ -51,7 +51,26 @@ Run order is fetch_chadwick -> price_features -> {keeper_revealed, price_model, 
 - **`keep_2027_market` as the headline call**: keeps 104 including 30 below replacement, and cuts Skubal. #57.5.
 
 ## Next session: start here
+
+**This is an assessment phase. Read `docs/ASSESSMENT-BRIEF.md` before anything else.**
+
+The build phase is finished: ROADMAP items 1, 2 and 4 are closed, the loose ends
+from item 1 are resolved or decided, and `data/` is current to 2026-09-07. What
+has never been done is a step back: how confident are we at each link in the
+chain, how do the errors compound, and which link is load-bearing.
+
 1. `git status`, `./check_sync.sh`, `ls data/`.
-2. The unbuilt roadmap is now items 3 (Intuition v2, needs Josh's decision), 5 (uncertainty ranges on tabs) and 6 (small contained items). Item 2's remnant is a contend-or-punt flag on K, SB, R, AVG and SV, feeding the trade evaluator rather than the dollar scale.
-3. Do not touch `redraft_value`'s definition and do not promote `keep_2027_market` to the headline call.
-4. Before the next data refresh, consider one pass over the suite for assertions still pinned to specific players or to standings POINTS rather than category totals; four broke on the 2026-09-07 refresh and were fixed, but the pattern may not be exhausted.
+2. `docs/ASSESSMENT-BRIEF.md` frames the whole phase: the chain link by link
+   with a confidence claim and what would move it, Josh's questions mapped to
+   where the evidence is or is not, the objections an outside analyst raises
+   first, and a list of what NOT to re-litigate.
+3. The single highest-value unbuilt analysis is scoped in that brief: a
+   decision-quality audit of who was kept versus let go and how those players
+   turned out. It is the only test of the thing this project actually sells, and
+   every input for it already exists.
+4. **Change no constant and no formula during the assessment.** Write the
+   recommendation with its evidence and expected flip count; the change is a
+   later session's deliverable. Demonstrable bugs are the exception and follow
+   the usual before/after board diff.
+5. Still true regardless of phase: do not touch `redraft_value`'s definition and
+   do not promote `keep_2027_market` to the headline call.
