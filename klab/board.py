@@ -45,7 +45,8 @@ from .denoms import (RotoScorer, denominators_for_level,
                      teams_per_category)
 from .io import  load_rosters
 from .project import (fit_save_model, lines_2026_hitters, lines_2026_pitchers,
-                      project_hitters, project_pitchers, projected_2027_levels)
+                      project_hitters, project_pitchers, projected_2027_levels,
+                      season_completion_2026)
 
 
 @cached
@@ -110,22 +111,52 @@ def fit_exchange_rate(sigma=None, seasons=None):
 
 
 @cached
+def scorer_2026_full():
+    """The 2026 roto scale, projected to a full season.
+
+    A roto point is a STANDINGS PLACE, which is already a common unit across
+    seasons: dividing each category by its own season's denominator is exactly
+    what makes a 2026 home run and a 2027 home run comparable. So each season's
+    production belongs on its own scale, and the difference between the two is
+    then a real statement about the player (FINDINGS #74).
+
+    The complication is that the 2026 standings are ~88% of a season. Scoring a
+    full-season line against them would inflate every counting category by the
+    missing fraction, so the counting levels and the team volume baselines are
+    divided by `season_completion_2026()`. The three rate categories are left
+    alone: AVG, ERA and WHIP are already per-unit and do not accumulate.
+    """
+    comp_h, comp_p = season_completion_2026()
+    lv = season_levels()
+    l26 = lv[lv["season"] == 2026].set_index("category")["level"].to_dict()
+    hit_count, pit_count = {"R", "HR", "RBI", "SB"}, {"W", "SV", "K"}
+    scaled = {c: (v / comp_h if c in hit_count else
+                  v / comp_p if c in pit_count else v)
+              for c, v in l26.items()}
+    D = denominators_for_level(pooled_relative_dispersion(), scaled,
+                               n_by_cat=teams_per_category())
+    b = team_baselines([2026]).set_index("season").loc[2026].to_dict()
+    for k in ("team_AB", "team_H"):
+        b[k] /= comp_h
+    for k in ("team_IP", "team_ER", "team_WH"):
+        b[k] /= comp_p
+    return RotoScorer(D, b)
+
+
+@cached
 def roto_2026_lines() -> pd.DataFrame:
-    """What each player is producing in 2026, in roto points, ON THE 2027 SCALE.
+    """What each player is producing in 2026, in 2026 roto points.
 
     The line is the full 2026 season: banked actuals plus the ZiPS
     rest-of-season projection for the weeks still to play, which is exactly the
-    projection's own "source A". Scored with the 2027 scorer ON PURPOSE, not
-    2026's: the whole point is to sit beside the 2027 figure and be subtracted
-    from it, and two numbers on different denominators cannot be. It is
-    therefore "his 2026 production, valued in 2027 money", not his contribution
-    to the 2026 standings, which the Standings tab already shows.
-
-    See docs/FINDINGS.md #73: a projection with nothing beside it cannot be
-    read, and every question about a surprising 2027 number turns out to be a
-    question about how far it sits from what the player just did.
+    projection's own "source A". It is scored on **2026's own scale**, not
+    2027's, because the point of the column is that each season's roto figure
+    should be as accurate as possible WITHIN that season. Roto points are
+    standings places either way, so the two columns still subtract, and the
+    difference is then a statement about the player rather than about which
+    denominators were used (FINDINGS #74).
     """
-    scorer, _, _, _ = build_2027_scorer()
+    scorer = scorer_2026_full()
     H = lines_2026_hitters()
     P = lines_2026_pitchers()
     H = H[H["PA"].fillna(0) > 0].copy()
@@ -411,6 +442,11 @@ def build_board(exch: dict | None = None, positional: bool = False
     b["name"] = b["name"].fillna(b["roster_name"])
     b["role"] = b["role"].fillna(b["roster_role"])
     b["roto_points"] = b["roto_points"].fillna(0.0)
+    b["roto_2026"] = b["roto_2026"].fillna(0.0)
+    # The projection's opinion, made subtractable. Both sides are standings
+    # places in their own season, so the difference is a statement about the
+    # player rather than about denominators (FINDINGS #74).
+    b["roto_move"] = b["roto_points"] - b["roto_2026"]
     b["keep_value"] = b["keep_value"].fillna(0.0)
     b["redraft_value"] = b["redraft_value"].fillna(0.0)
     # Alias, so it must survive the same fillna. market_price is filled later

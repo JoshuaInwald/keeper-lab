@@ -2,6 +2,16 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (scale correction: each season on its own denominators)
+
+| type | item |
+|---|---|
+| bug | #73 scored 2026 production on the 2027 scale, arguing the columns had to share denominators to subtract. Wrong: a roto point IS a standings place, so the unit is already common and each season belongs on its own scale. Corrected; the difference is now a statement about the player, not about denominators (FINDINGS #74) |
+| built | `project.season_completion_2026()` and `board.scorer_2026_full()`: the 2026 standings are ~88% of a season (0.8849 hitters, 0.8789 pitchers, measured from playing time to date over to-date-plus-ROS), so counting levels and team volume baselines are scaled to a full year before anything is measured against them. Rates left alone |
+| built | Validated by scale invariance: full-season line on full-season scale vs to-date line on to-date scale agrees at median -0.009, correlation 0.9975 over 1,445 players. The estimator correctly does NOT absorb genuine league drift (SB and SV are at 0.80 of the 2024-25 mean because the league runs less, not because games are unplayed) |
+| built | `Move` column (`roto_2027 - roto_2026`), sortable, answering "which players does the model most disagree with the present about". Wacha -5.07, Misiorowski -9.93, Crochet +7.99. VISIBLE on a phone, unlike the two roto columns it is derived from |
+| bug | Removed the #73 tooltip phrase "valued in 2027 money": the scale question is about denominators, not dollars, and roto columns carry no dollar conversion at all |
+
 ## 2026-09-08 (Roto '26 ships: the projection gets a reference point)
 
 | type | item |

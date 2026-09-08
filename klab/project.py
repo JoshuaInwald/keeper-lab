@@ -117,6 +117,37 @@ def _safe_div(a, b):
 # --- hitters ----------------------------------------------------------------
 
 @cached
+def season_completion_2026() -> tuple[float, float]:
+    """How much of 2026 is already banked, for hitters and for pitchers.
+
+    Playing time to date over playing time for the whole season (to date plus
+    the ZiPS rest-of-season projection), restricted to players who actually
+    have a 2026 line so that ROS rows for players who never appeared cannot
+    inflate the denominator.
+
+    Needed because the 2026 STANDINGS are a partial season. Scoring a
+    full-season stat line against partial-season denominators would inflate
+    every counting category by the missing fraction. Checks out against the
+    observed levels: 2026 sits at 0.885-0.916 of the 2024-25 mean for HR, R,
+    RBI, W and K, which brackets this estimate. SB and SV sit at 0.80 because
+    the league is genuinely running fewer of both, which is exactly the drift
+    this estimator must NOT absorb, and does not.
+    """
+    h = load_hitters_history()
+    h26 = h[h["season"] == 2026]
+    rh = load_ros_hitters()
+    pa_now = float(h26["PA"].sum())
+    pa_ros = float(rh[rh["fg_id"].isin(set(h26["fg_id"]))]["PA"].sum())
+
+    p = load_pitchers_history()
+    p26 = p[p["season"] == 2026]
+    rp = load_ros_pitchers()
+    ip_now = float(p26["IP"].sum())
+    ip_ros = float(rp[rp["fg_id"].isin(set(p26["fg_id"]))]["IP"].sum())
+    return pa_now / (pa_now + pa_ros), ip_now / (ip_now + ip_ros)
+
+
+@cached
 def lines_2026_hitters() -> pd.DataFrame:
     """A full 2026 hitter season: banked actuals plus the ZiPS rest-of-season
     projection for the weeks still to play.

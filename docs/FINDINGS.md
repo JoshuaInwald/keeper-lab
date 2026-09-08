@@ -770,3 +770,34 @@ Josh's request, and the right diagnosis of #72. He read Wacha's `rp_ERA = -1.66`
 **Placement.** `Roto '26` sits immediately left of the 2027 figure, which is renamed `Roto '27` because "Roto pts" no longer identifies which season. On a phone BOTH roto columns are hidden, as `Roto pts` always was, and the drawer carries the comparison instead as three lines (2026 production, 2027 projection, what the projection does) where a narrow screen has room. The phone CSS `nth-child` hide-list was re-counted for the second time in two sessions; it is now up to nine indices and is the standing hazard of adding a board column.
 
 **Why this matters more than one column suggests.** #69 found the model's binding constraint is the projection rather than the valuation machinery, and #72 found the only live disagreement is with ZiPS's read of a 36-year-old. Both are arguments about the 2027 line. The board previously offered no way to see that line as a MOVE from something, so every such argument arrived as a suspected arithmetic bug. `Roto '27 - Roto '26` is the projection's opinion made explicit, and it is the number to disagree with.
+
+### 74. `Roto '26` moves to 2026's own scale, and the difference gets its own column
+Josh corrected the scale decision in #73 and he is right. #73 scored 2026 production on the 2027 scale, arguing the two columns had to share denominators to be subtractable. That argument is wrong, and the reason is worth stating because it governs every cross-season comparison this project will make.
+
+**A roto point is a standings place.** Dividing each category by its own season's denominator is precisely the operation that makes a 2026 home run and a 2027 home run commensurable. The output unit is already common. So each season's production belongs on its own season's scale, the two columns still subtract, and the difference becomes a statement about the PLAYER rather than a statement about which denominators were used. Scoring 2026 production against 2027 denominators was a hybrid that was less accurate about 2026 and bought nothing.
+
+**The complication, and how it is handled.** The 2026 standings are a partial season, so scoring a full-season line against them would inflate every counting category by the missing fraction. `project.season_completion_2026()` estimates the fraction banked as playing time to date over playing time for the whole season, restricted to players who actually have a 2026 line: **0.8849 for hitters, 0.8789 for pitchers**. `board.scorer_2026_full()` divides the counting levels and the team volume baselines by it and leaves AVG, ERA and WHIP alone, since rates do not accumulate.
+
+The estimate is corroborated by the levels themselves. 2026 sits at 0.895, 0.916, 0.893, 0.885 and 0.907 of the 2024-25 mean for HR, R, RBI, W and K, which brackets 0.88. It sits at 0.798 and 0.800 for SB and SV, and that is **genuine league drift, not unplayed games** -- the estimator correctly does not absorb it, which a naive "scale everything by the observed level ratio" approach would have.
+
+**Validated by an invariance that has to hold.** Roto points are scale-invariant when numerator and denominator move together, so a full-season line on a full-season scale must agree with a to-date line on a to-date scale. Across 1,445 players: **median difference -0.009, mean -0.022, correlation 0.9975.** The small negative residual on stars (Ohtani -0.85, Misiorowski -1.25) is correct and expected: ZiPS regresses their rates over the remaining weeks, so a projected full season is slightly worse per unit than their pace to date.
+
+**`Move` ships as its own column.** Josh: "the difference is quite key." `roto_move = roto_points - roto_2026`, sortable, sitting immediately right of the pair. It answers the question the trio exists for: which players does the model most disagree with the present about?
+
+| | Roto '26 | Roto '27 | Move |
+|---|---|---|---|
+| Misiorowski | 17.25 | 7.32 | **-9.93** |
+| Schlittler | 15.32 | 6.31 | -9.01 |
+| Eduardo Rodriguez | 10.04 | 2.13 | -7.91 |
+| Sale | 14.40 | 6.83 | -7.56 |
+| Wacha | 7.59 | 2.52 | **-5.07** |
+| Strider | 0.42 | 4.57 | +4.16 |
+| Senga | -2.32 | 1.97 | +4.29 |
+| Greene | -0.61 | 4.86 | +5.47 |
+| Crochet | -0.07 | 7.92 | **+7.99** |
+
+Every large decline is a pitcher coming off an unsustainable season and every large gain is one who was hurt or ineffective, which is what regression to the mean should look like and none of which was visible two sessions ago.
+
+**Dollars stay in their own columns.** Josh: "estimating the value of 27 dollars accurately is nice, but not the main point." `Roto '26`, `Roto '27` and `Move` are roto points and nothing else; `Production $`, `Market $` and `Replace $` are the dollar columns and are separate. The #73 tooltip phrase "valued in 2027 money" was doubly wrong, since the scale question is about denominators rather than dollars, and it is gone.
+
+**Phone layout.** `Move` is VISIBLE on a phone, the only member of the trio that is: it stands alone without its two parents, where a bare `Roto '26` does not. Both roto columns stay hidden as `Roto pts` always was, and the drawer carries all three lines. Third `nth-child` re-count in three sessions; the hide-list is now nine indices and adding a board column without re-counting it is the standing hazard.

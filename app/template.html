@@ -97,21 +97,23 @@ tbody tr.sel{background:var(--sel)}
    column is added -- the list had drifted and was hiding Production $, the one
    number the comment above it names. Hidden: team, role, roto pts, contract,
    likely range, Sure?, Worth '28, if full-time. Re-counted twice: Replace $ at
-   position 11 (#70) and Roto '26 at position 5 (#73). Replace $ stays VISIBLE
-   on a phone (it is the number the keep decision is made on); BOTH roto columns
-   are hidden, as Roto pts always was, and the drawer carries the 2026-to-2027
-   comparison instead, where a narrow screen has room for it. */
+   position 11 (#70), Roto '26 at 5 (#73) and Move at 7 (#74). Replace $ stays
+   VISIBLE on a phone (it is the number the keep decision is made on); both roto
+   columns are hidden as Roto pts always was, but MOVE IS VISIBLE -- it is the
+   one number in the trio that stands alone, and the drawer carries the full
+   comparison. Hidden: team, role, Roto '26, Roto '27, Yr, likely range, Sure?,
+   Worth '28, if full-time. */
 @media(max-width:700px){
   main{padding:14px 10px 60px}
   #tbl th:nth-child(2),#tbl td:nth-child(2),
   #tbl th:nth-child(3),#tbl td:nth-child(3),
   #tbl th:nth-child(5),#tbl td:nth-child(5),
   #tbl th:nth-child(6),#tbl td:nth-child(6),
-  #tbl th:nth-child(8),#tbl td:nth-child(8),
-  #tbl th:nth-child(13),#tbl td:nth-child(13),
-  #tbl th:nth-child(16),#tbl td:nth-child(16),
+  #tbl th:nth-child(9),#tbl td:nth-child(9),
+  #tbl th:nth-child(14),#tbl td:nth-child(14),
   #tbl th:nth-child(17),#tbl td:nth-child(17),
-  #tbl th:nth-child(18),#tbl td:nth-child(18){display:none}
+  #tbl th:nth-child(18),#tbl td:nth-child(18),
+  #tbl th:nth-child(19),#tbl td:nth-child(19){display:none}
   .wrap{max-height:none}
   input[type=search]{min-width:0;flex:1 1 100%}
 }
@@ -473,6 +475,9 @@ $("foot").innerHTML = `Values are 2027 projections priced off this league's own 
 const BOARD_COLS=[
   ["name","Player","l"],["team","Team","l"],["role","",""],
   ["PA","Playing time"],["roto_2026","Roto '26"],["roto_points","Roto '27"],
+  // Sortable, because "which players does the projection most disagree with the
+  // present about" is the question this trio exists to answer (#74).
+  ["roto_move","Move"],
   ["salary","Sal"],["contract","Yr"],["keeper_cost","Cost"],
   // "Worth '27" was one label doing two jobs (docs/ROADMAP.md item 1 Step 0):
   // production_value is worth-to-a-roster, market_price is auction cost. Both
@@ -511,18 +516,20 @@ const COL_HELP = {
     +"A ×N.NN tag means it's been scaled up from a shorter observed season -- hover the tag "
     +"for whether that's a health bet (nothing keeps him off the field) or a role bet "
     +"(handed the closer job outright).",
-  roto_2026:"What he is PRODUCING in 2026: the season he is actually having (banked "
-    +"stats plus the ZiPS projection for the weeks still to play), converted to roto points. "
-    +"Scored on the 2027 scale so it can be read straight across against Roto '27 -- so it is "
-    +"his 2026 production valued in 2027 money, not his line in the 2026 standings. "
-    +"Roto '27 minus Roto '26 is what the projection is doing to him: a big drop means the "
-    +"model expects decline or thinks this year overstated him, and the drop is the thing to "
-    +"argue with, not the 2027 number on its own.",
-  roto_points:"Projected 2027 standings points he adds, all ten categories. Compare it with "
-    +"Roto '26 in the column to its left: that gap is the projection's opinion, not a fact.",
-  production_value:"What he is worth to a roster in 2027, in dollars: roto points above "
-    +"replacement on the league's $2,600 budget scale. This is NOT a forecast of his auction "
-    +"price -- the market pays for youth, name and last year's contract too.",
+  roto_2026:"What he is PRODUCING in 2026, in 2026 roto points: the season he is actually "
+    +"having (banked stats plus the ZiPS projection for the weeks still to play). Scored on "
+    +"2026's OWN scale, projected to a full season -- about 88% of 2026 is in the books, so "
+    +"the counting denominators are scaled up to a whole year before he is measured against "
+    +"them. A roto point is a standings place in either season, which is why this and Roto '27 "
+    +"can be read straight across.",
+  roto_points:"Projected 2027 standings points he adds, all ten categories, on 2027's own "
+    +"scale. Read it against Roto '26 to its left: the gap is the projection's opinion, not "
+    +"a fact.",
+  roto_move:"Roto '27 minus Roto '26: what the projection does to him. Negative means it "
+    +"expects decline, or thinks this season overstated him. Sort by this column to find every "
+    +"player the model most disagrees with the present about -- the big movers are where a "
+    +"projection is worth arguing with, and the number to argue with is this one, not the "
+    +"2027 figure on its own.",
   market_price:"What he will COST at the 2027 auction, not what he is worth. Fitted on 677 real "
     +"purchases from what a bidder could see on auction day (last two seasons, age, tenure, his last "
     +"contract), then scaled so the lots this auction actually sells add up to the money that will be "
