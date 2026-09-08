@@ -382,16 +382,22 @@ const intuitionResult = await page.evaluate(() => {
   const id = g(r, 'fg_id');
   const boardRosBefore = g(r, 'ros_R');
   const projTotalBefore = TEAMS.reduce((s, t) => s + PROJ_PTS[t].TOTAL, 0);
+  const catsBefore = catTotals(rosterAgg(null, buildShadeCols()))[g(r, 'team')];
 
   addShadedPlayer(id);
   bumpTalent(id, 1); bumpTalent(id, 1); bumpTalent(id, 1);  // +15%
   toggleHealthShade(id);
   recalcIntuition();
 
-  const shadeCols = buildShadeCols();
-  const after = rotoPoints(catTotals(rosterAgg(null, shadeCols)));
+  // Assert on the team's CATEGORY TOTALS, not its standings points. Points are
+  // ranks: a 15% bump to one hitter moves real counting stats but often flips no
+  // rank at all, so keying on points made this test pass or fail on which roster
+  // the league happened to have that week. Category totals moving is the actual
+  // claim -- the shade propagated into the standings recompute.
   const team = g(r, 'team');
-  const standingsChanged = after[team].TOTAL !== PROJ_PTS[team].TOTAL;
+  const catsAfter = catTotals(rosterAgg(null, buildShadeCols()))[team];
+  const standingsChanged = Object.keys(catsBefore)
+    .some(c => catsBefore[c] !== catsAfter[c]);
 
   const shaded = shaded2027(r, S.shades[id]);
   const dollarChanged = shaded.shadedVal !== g(r, 'redraft_value');

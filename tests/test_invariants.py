@@ -242,7 +242,6 @@ GOLDEN = [
     ("Elly De La Cruz", None, 20,  50),
     ("Julio Rodríguez", None, 15,  40),
     ("Pete Alonso",   None, 10,  35),
-    ("Christian Scott", None, 0,  12),   # good rates, tiny sample
     ("Kevin Gausman", None,  0,  12),   # replacement level
 ]
 
@@ -256,6 +255,20 @@ def test_golden_player_values(board, name, role, lo, hi):
     assert len(row) == 1, f"{name}{' ' + role if role else ''} not found exactly once"
     v = float(row["redraft_value"].iloc[0])
     assert lo <= v <= hi, f"{name} valued at ${v:.1f}, expected ${lo}-${hi}"
+
+
+def test_golden_value_christian_scott_free_agent(fa):
+    """Good rates on a tiny sample must not inflate into a real value.
+
+    Lived in the rostered golden list until he was dropped mid-2026; the guard
+    is the point, not the roster slot, so it follows him to the free-agent
+    board (docs/FINDINGS.md #8: a flat 50/50 blend carried his 3-17 record
+    forward and this is the case that catches it)."""
+    row = fa[fa["name"] == "Christian Scott"]
+    if not len(row):
+        pytest.skip("Christian Scott not in the current player pool")
+    v = float(row["redraft_value"].iloc[0])
+    assert 0 <= v <= 12, f"Christian Scott valued at ${v:.1f}, expected $0-12"
 
 
 # --- free agents and the public API ----------------------------------------
@@ -376,8 +389,19 @@ def test_evaluate_trade_ros_basis_changes_win_now_numbers(board):
                         usd_per_point=100.0, ros_basis="ros")
     r2 = evaluate_trade(b, teams[0], teams[1], [a_name], [b_name],
                         usd_per_point=100.0, ros_basis="blend")
-    assert (r1["a"]["d_standings_points_2026"] != pytest.approx(r2["a"]["d_standings_points_2026"])
-           or r1["b"]["d_standings_points_2026"] != pytest.approx(r2["b"]["d_standings_points_2026"]))
+    # Assert the basis moves the standings LEVELS. The trade DELTA is a
+    # difference of ranks and is legitimately 0.0 under both bases when the
+    # swap flips nobody, which is what the arbitrary "top player on the first
+    # two teams" pair happened to be after a mid-season roster refresh. The
+    # levels differing is the actual claim: ros_basis feeds the win-now math.
+    p1, p2 = r1["win_now"]["points_before"], r2["win_now"]["points_before"]
+    assert any(p1[t] != pytest.approx(p2[t]) for t in p1), \
+        "ros_basis did not change the win-now standings at all"
+    if abs(r1["a"]["d_standings_points_2026"]) > 0.01:
+        assert (r1["a"]["d_standings_points_2026"]
+                != pytest.approx(r2["a"]["d_standings_points_2026"])
+                or r1["b"]["d_standings_points_2026"]
+                != pytest.approx(r2["b"]["d_standings_points_2026"]))
 
 
 # --- ros_value_over_replacement: rest-of-season value, not a full year ----

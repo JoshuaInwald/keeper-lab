@@ -506,7 +506,15 @@ def _reference() -> dict:
     s = snapshot()
     # Deliberately avoids unkeepable players: their `surplus_multiyear` is NaN
     # by design, which is correct on the board and useless as a reference value.
-    a_sends, b_sends = ["Cade Smith", "Nico Hoerner"], ["Mike Trout", "Byron Buxton"]
+    # Chosen from the current board rather than hard-coded: the names that used
+    # to sit here (Cade Smith, Nico Hoerner) were traded away mid-season and the
+    # whole build died on a data refresh. Top two keepable by roto points per
+    # side is deterministic, so the reference stays stable between refreshes.
+    def _two(team):
+        g = s.board[(s.board["team"] == team) & s.board["keepable"]]
+        return list(g.nlargest(2, "roto_points")["name"])
+
+    a_sends, b_sends = _two("Pookie 2.0"), _two("All-Stars")
     res = evaluate_trade(s.board, "Pookie 2.0", "All-Stars", a_sends, b_sends,
                          usd_per_point=s.constants["usd_per_roto_point_auction"])
     w = res["win_now"]
