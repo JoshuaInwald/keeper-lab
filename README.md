@@ -46,7 +46,6 @@ app/             template.html + verify.mjs (headless Chromium diffs the JS re-i
 out/             keeper_lab.html, model_params.json, keeper_board_2027.csv, auction_sample.csv,
                  trade_suggestions.json, app_reference.json, audit.txt, sensitivity_*.csv
 docs/            METHODS, FINDINGS, ROADMAP, WORKFLOWS, SESSION-LOG, constitution.txt
-R/               tidyverse port of the statistical core (illustrative; reads out/player_values_2027.csv after run_all)
 ```
 
 ## Documentation

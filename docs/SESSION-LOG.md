@@ -2,6 +2,12 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08
+
+| type | item |
+|---|---|
+| built | R port (`R/keeper_lab.R`) removed: duplicated the pandas core and would drift; in history at a1d156c |
+
 ## 2026-08-15
 
 | type | item |

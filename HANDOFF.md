@@ -21,5 +21,6 @@ Last updated: 2026-09-07 (compaction pass). Read `CONSTRAINTS.md` first, then "N
 
 ## Next session: start here
 1. `git status`, `./check_sync.sh`, `ls data/`.
+0. Open question for Josh before Step 1b: were keeper limits different in 2022-2025 (files show 2-6 keepers per team) or are those files partial? Answer decides whether historical keeper decisions are usable as revealed-preference data.
 2. If starting ROADMAP item 1: begin at Step 0 (rename columns) and Step 1 (feature table). The diagnostic script that produced the numbers in the ROADMAP is not committed; rebuild it as `scripts/price_diagnostics.py` from `out/auction_sample.csv` plus `klab.auction.score_season` for prior-season roto points, and commit it with its output.
 3. Do not touch `redraft_value`'s definition until Step 2's held-out test exists; add columns beside it.
