@@ -801,3 +801,28 @@ Every large decline is a pitcher coming off an unsustainable season and every la
 **Dollars stay in their own columns.** Josh: "estimating the value of 27 dollars accurately is nice, but not the main point." `Roto '26`, `Roto '27` and `Move` are roto points and nothing else; `Production $`, `Market $` and `Replace $` are the dollar columns and are separate. The #73 tooltip phrase "valued in 2027 money" was doubly wrong, since the scale question is about denominators rather than dollars, and it is gone.
 
 **Phone layout.** `Move` is VISIBLE on a phone, the only member of the trio that is: it stands alone without its two parents, where a bare `Roto '26` does not. Both roto columns stay hidden as `Roto pts` always was, and the drawer carries all three lines. Third `nth-child` re-count in three sessions; the hide-list is now nine indices and adding a board column without re-counting it is the standing hazard.
+
+### 75. The board's headers and its cells are two lists, and they silently drifted apart twice
+A rendering bug, shipped twice, found by the reader both times. No valuation was wrong: every number in `out/keeper_board_2027.csv` was correct throughout. The board simply printed them under the wrong headings.
+
+**The mechanism.** `boardView()` builds the header row by mapping over `BOARD_COLS`. `playerRow()` builds the cells as a hand-written positional list of `<td>` elements. Nothing links the two. Insert a column into `BOARD_COLS` without inserting the matching cell into `playerRow`, and every column to the right of the insertion renders one field too far left, under a heading that belongs to its neighbour.
+
+It happened on `Replace $` (#70) and again on the `Roto '26` / `Move` pair (#74), for three headers with no cells. What the reader saw on Max Clark:
+
+| heading | showed | should have shown |
+|---|---|---|
+| `Roto '26` | 4.3 | 1.7 (it was rendering `roto_points`) |
+| `Roto '27` | $20 | 4.3 (it was rendering `salary`) |
+| `Move` | 2 | +2.6 (it was rendering `contract`, hence the integers) |
+
+"Why is Move only ever an integer" was the sharpest clue in the report: contract years are 1, 2, 3 or F. A dollar sign appearing in a roto-point column was the other. Both tabs that use `boardView` were affected, the keeper board and free agents.
+
+**Why nothing caught it.** `app/verify.mjs` had 15 checks and none of them read a rendered board cell. The check added in #71 compared HEADER text and passed, because the headers were right; it was the cells underneath that had moved. `JS matches pandas on all 25 quantities` passed too, because it compares computed values in the payload, never what is drawn. **The app was verified everywhere except the one place a reader actually looks.**
+
+**Two guards, because one was clearly not enough.**
+1. `assertBoardRowShape()` throws on render if `playerRow` emits a different number of cells than `BOARD_COLS` declares. That turns a silent visual corruption into a loud failure.
+2. `app/verify.mjs` now renders a real row and compares the cell TEXT, column by column, against the payload run through the app's own formatters (`nf`, `sgn`, `usd`, `money`). Formatter-based comparison rather than numeric tolerance, because a misaligned column shows a different field entirely and an exact string check cannot be defeated by rounding. Confirmed to fail on the broken build and pass on the fixed one; the suite is now 16 checks.
+
+**The rule.** Adding a board column means four edits, not one: `BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS`, a `<td>` in `playerRow` at the same index, and the phone CSS `nth-child` hide-list. Three of the four are silent when forgotten. #70 and #74 each forgot the third.
+
+**Standing back.** Three of the four defects a reader found in this app today were in the presentation layer rather than the model: a tooltip describing arithmetic the model no longer used (#71), two tabs that were distinct but looked identical (#71), and this. The engine has 64 tests and a 25-quantity JS/pandas cross-check; the layer that decides what a number MEANS to the person reading it had almost none. That is the coverage gap worth closing next, not another valuation refinement.

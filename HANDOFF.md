@@ -131,6 +131,9 @@ Phase B is complete. #68 and #69 diagnosed, #70 shipped. This is a fresh-context
 
 **4. The projection-source toggle.** Build last. `PROJECTION_BASIS` is the precedent. **Marcel 2027 does not exist** (Baseball-Reference publishes after a season ends), so the toggle is backward-facing only and the 2027 board stays ZiPS.
 
+### Adding a board column takes FOUR edits (#75)
+`BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS` in `app/template.html`, a `<td>` in `playerRow()` **at the same index**, and the phone CSS `nth-child` hide-list. Three of the four fail silently. Forgetting the `<td>` shifts every column to its right under the wrong heading, which shipped twice (#70, #74). `assertBoardRowShape()` now throws on render and `app/verify.mjs` compares rendered cell text against the payload, but the four-edit rule is still the thing to remember.
+
 ### A rule the first user pass added (#71)
 **A `KEEP_BASIS` or `POOL_RULE` change is not done when the tests pass.** The app explains its own arithmetic in prose tooltips and that prose is not covered by `app/verify.mjs`. #70 shipped with a `Surplus '27` tooltip still reading "Production $ minus cost", which it had just made false. Grep `app/template.html` for the affected labels whenever a dollar scale changes hands.
 

@@ -332,6 +332,40 @@ const keeper2027Result = await page.evaluate(() => {
 const keeper2027Bad = keeper2027Result.rowsShown !== 10 || !keeper2027Result.basisAware;
 if (keeper2027Bad) console.log('  2027 KEEPER STANDINGS MISMATCH:', JSON.stringify(keeper2027Result));
 
+// The board's headers (BOARD_COLS) and its cells (playerRow) are two
+// hand-maintained lists with nothing linking them, so inserting a column has
+// twice shifted every cell right of it under the wrong header (FINDINGS #70,
+// #74). Headers alone cannot catch that -- they looked correct both times. This
+// reads the RENDERED cell text for one player and checks the numeric columns
+// against the payload, which is the only check that would have failed.
+const boardCellResult = await page.evaluate(() => {
+  go('board'); S.team = ''; S.q = ''; render();
+  const headers = [...document.querySelectorAll('#tbl thead th')].map(t => t.textContent.trim());
+  const row = document.querySelector('#tbl tbody tr');
+  const name = row.querySelector('.name').textContent.trim();
+  const rec = BOARD.find(r => g(r, 'name') === name);
+  const cells = [...row.querySelectorAll('td')].map(t => t.textContent.trim());
+  // field -> the number it must render, for the columns that are a bare number
+  const want = {
+    roto_2026: nf(g(rec, 'roto_2026')), roto_points: nf(g(rec, 'roto_points')),
+    roto_move: sgn(g(rec, 'roto_move')), salary: usd(g(rec, 'salary')),
+    production_value: money(g(rec, 'production_value')),
+    keep_value: money(g(rec, 'keep_value')),
+  };
+  const bad = [];
+  const plain = h => String(h).replace(/<[^>]*>/g, '').trim();
+  BOARD_COLS.forEach(([field], i) => {
+    if (!(field in want)) return;
+    if (cells[i] !== plain(want[field])) {
+      bad.push(`${field} (col ${i + 1} "${headers[i]}") shows "${cells[i]}" want "${plain(want[field])}"`);
+    }
+  });
+  return { name, nCells: cells.length, nHeaders: headers.length, bad };
+});
+const boardCellBad = boardCellResult.bad.length > 0
+  || boardCellResult.nCells !== boardCellResult.nHeaders;
+if (boardCellBad) console.log('  BOARD CELL/HEADER MISALIGNMENT:', JSON.stringify(boardCellResult));
+
 // Money odds moved INTO the Standings tab (the Contention tab is gone: it
 // showed the same ten teams and readers could not tell the two apart). Both
 // standings seasons must now carry a "Money odds" column, it must lead the
@@ -457,6 +491,8 @@ console.log(historyBad ? 'FAIL  historical standings did not render or did not r
                        : 'PASS  historical standings render and return to the live view cleanly');
 console.log(keeper2027Bad ? 'FAIL  2027 keeper standings missing teams or ignores projection basis'
                           : 'PASS  2027 keeper standings render all 10 teams and track projection basis');
+console.log(boardCellBad ? 'FAIL  Board cells do not line up with their headers'
+                         : 'PASS  Board cells match their headers and the payload, column by column');
 console.log(contention2027Bad ? 'FAIL  Standings/odds merge: missing teams, odds not leading, or basis ignored'
                               : 'PASS  Money odds lead both standings seasons, 10 teams, basis-aware, Contention tab gone');
 console.log(upsideKindBad ? 'FAIL  upside_ft role/health split missing a case or not tagged correctly'

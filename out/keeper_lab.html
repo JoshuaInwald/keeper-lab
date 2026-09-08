@@ -656,6 +656,22 @@ function valueBreakdownTooltip(r){
     + lines.join("\n");
 }
 
+// playerRow emits its cells POSITIONALLY while BOARD_COLS declares the headers,
+// so the two are a hand-maintained pairing with nothing linking them. Adding a
+// header without its matching cell silently shifts every column right of the
+// insertion under the wrong heading. That shipped twice (Replace $ in FINDINGS
+// #70, the Roto '26 / Move trio in #74) and both times a reader found it, not a
+// test: "Move" was rendering the contract-year column, which is why it showed
+// integers. This throws on load instead, and app/verify.mjs now checks the
+// rendered values against the payload column by column.
+function assertBoardRowShape(rows){
+  if (!rows || !rows.length) return;
+  const tds = (playerRow(rows[0]).match(/<td/g) || []).length;
+  if (tds !== BOARD_COLS.length) {
+    throw new Error(`board table misaligned: playerRow emits ${tds} cells but `
+      + `BOARD_COLS declares ${BOARD_COLS.length} headers. Add the missing cell.`);
+  }
+}
 function playerRow(r){
   const keep=g(r,"keep_2027"), il=g(r,"il");
   const opt=g(r,"extension_option")>0, used=g(r,"extension_used"),
@@ -672,12 +688,15 @@ function playerRow(r){
   <td class="l dim">${esc(g(r,"team"))} <span class="mlbteam">${esc(g(r,"mlb_team"))}</span></td>
   <td class="dim">${g(r,"role")==="PIT"?"P":g(r,"role")==="TWO"?"H/P":"H"}</td>
   <td class="dim">${ptCell(r)}</td>
+  <td class="dim">${nf(g(r,"roto_2026"))}</td>
   <td title="${esc(valueBreakdownTooltip(r))}">${nf(g(r,"roto_points"))}</td>
+  <td>${sgn(g(r,"roto_move"))}</td>
   <td>${usd(g(r,"salary"))}</td>
   <td class="dim">${esc(g(r,"contract"))}</td>
   <td>${costCell(r)}</td>
   <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"production_value"))}</td>
   <td title="${esc(marketTooltip(r))}">${money(g(r,"market_price"))}</td>
+  <td>${money(g(r,"keep_value"))}</td>
   <td>${band(r,"value_lo","value_hi")}</td>
   <td>${sgn(adj(g(r,"surplus_y2027")),0,"$")}</td>
   <td>${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</td>
@@ -721,6 +740,7 @@ function boardView(rows,title){
     `<th class="${c||""} ${S.sort===k?"on":""}" onclick="sortBy('${k}')"`
     + ` title="${esc(COL_HELP[k]||"")} — click to sort">`
     + `${l}${S.sort===k?(S.desc?" ↓":" ↑"):""}</th>`).join("");
+  assertBoardRowShape(rows);
   const body=rows.map(playerRow).join("");
   return `<div id="tbl"><div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>
     <div class="note">${rows.length} players${title?" · "+title:""}. Click a name for the full arithmetic.</div></div>`;

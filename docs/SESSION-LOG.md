@@ -2,6 +2,15 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (board rendering bug: headers and cells drifted apart)
+
+| type | item |
+|---|---|
+| bug | **The board printed correct numbers under the wrong headings.** `boardView()` builds headers from `BOARD_COLS`; `playerRow()` builds cells as a hand-written positional list, with nothing linking them. Three headers were added (#70's `Replace $`, #74's `Roto '26` and `Move`) without their cells, shifting everything to the right of the insertion. `Move` was rendering contract years (hence integers), `Roto '27` was rendering salary. Both `boardView` tabs affected: keeper board and free agents. No valuation was wrong; the CSV was correct throughout (FINDINGS #75) |
+| built | `assertBoardRowShape()` throws on render when the cell count does not match `BOARD_COLS`, turning silent visual corruption into a loud failure |
+| built | `app/verify.mjs` now renders a real board row and compares cell TEXT column by column against the payload run through the app's own formatters. Confirmed to fail on the broken build. Suite is now 16 checks |
+| bug | Root cause of the miss: 15 existing checks and none read a rendered board cell. The #71 header check passed because the headers were right. Adding a board column takes four edits (`BOARD_FIELDS`, `BOARD_COLS`, the `<td>`, the phone CSS) and three are silent when forgotten |
+
 ## 2026-09-08 (scale correction: each season on its own denominators)
 
 | type | item |
