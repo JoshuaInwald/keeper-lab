@@ -45,6 +45,12 @@ def main():
         "denominators_2027": meta["denominators"],
         "league_avg_team_2027": meta["baseline"],
         "replacement_rp": meta["replacement_rp"],
+        # Under POOL_RULE = "slot_role" replacement is a pair, not a scalar
+        # (FINDINGS #68, #69); `replacement_rp` is the lower of the two and is
+        # what the app's free-agent and simulation code reads.
+        "replacement_by_role": meta["replacement_by_role"],
+        "pool_rule": meta["pool_rule"],
+        "budget_check_pool": meta["budget_check_top230"],
         "usd_per_rp_keep": meta["usd_per_rp_keep"],
         "usd_per_rp_redraft": meta["usd_per_rp_redraft"],
         "config": {k: v for k, v in vars(C).items()

@@ -670,3 +670,48 @@ Accuracy on the same decisions:
 **A structural note that reorganises the open work.** The pool rule moves `redraft_value` and therefore only affects `model_redraft`; `replace_cost` is set by the auction exchange rate and is pool-independent, so all three pool rules give identical `model_replace` results. **The pool rule is a PRICING question (what to bid) and the exchange rate is the KEEP/CUT question.** They have been treated as one problem and they are two.
 
 **Housekeeping.** `MAX_KEEPERS` binds on 0 of 289 decisions (the most any team keeps is 9 against a cap of 13), so the roster constraint separates nothing here. `MIN_KEEPERS` is deliberately not applied: the recoverable decision set is a partial view of each team's keepable contracts, so forcing six out of it would invent choices. Only 1 of 289 decided players sits below Marcel's 0.30 reliability bar, so #67's low-`rel` warning does not bite on this population.
+
+### 70. Two changes ship: the keep decision moves to the opportunity-cost scale, and the pool becomes fieldable
+The first valuation change since the assessment phase began. Both were argued in #68 and #69 and are shipped here together because they interact. Committed outputs moved: `keeper_board_2027.csv`, `model_params.json`, `keeper_lab.html`, `trade_suggestions.json`, `app_reference.json`. 64 tests pass, 15 app checks pass, the JS still matches pandas on all 25 quantities.
+
+**Change 1: `KEEP_BASIS = "replacement"`.** `board.build_board` built `surplus_multiyear` from `redraft_value`, which is what a player fetches in a full redraft with no keepers withheld. A keeper is not traded against that market. Keeping at $S forgoes $S of auction budget, and $S buys `intercept + S x slope` roto points, so the identified comparison is `keep_value` against the keeper cost. #69 backtested it at +$6.1, +$124.6 and +$89.4 of captured surplus across 2024-2026.
+
+**Change 2: `POOL_RULE = "slot_role"`.** `value_players` calibrated the $2,600 identity on the top 230 by roto points regardless of role, which on the 2027 projection is 183 hitters and 47 pitchers (#65). It now calibrates on the fieldable top 140 hitters plus top 90 pitchers, with replacement read per role. #68 showed this reproduces perfect foresight (52.0-55.1% hitter share on completed seasons against its 54.21% here) where the old rule missed by 20 points; #69 showed it makes better keep/cut calls out of sample.
+
+**What moved.**
+
+| quantity | before | after |
+|---|---|---|
+| calibration pool | 183 HIT / 47 PIT | **140 / 90** |
+| hitter share of $2,600 | 73.70% | **54.21%** |
+| `usd_per_rp_redraft` | 6.522 | **6.213** |
+| replacement, roto points | 4.733 pooled | **5.121 HIT / 3.526 PIT** |
+| median `redraft_value`, hitters | 9.18 | **6.38** |
+| median `redraft_value`, pitchers | 0.00 | **4.09** |
+| players flagged keep | 70 | **123** |
+
+`usd_per_rp_keep` ($10.00) is unchanged: it comes from the auction regression and never saw the pool.
+
+**The flip diff, which is the part that reaches a decision.** 47 flips on 277 rostered players, **all of them cut-to-keep, none the other way**. Decomposing the two changes shows they are complementary rather than additive:
+
+| POOL_RULE | KEEP_BASIS | keeps | of which below replacement |
+|---|---|---|---|
+| blind | redraft | 76 | 0 |
+| blind | replacement | 123 | **4** |
+| slot_role | redraft | 86 | 0 |
+| **slot_role** | **replacement** | **123** | **0** |
+
+The keep-basis change alone would introduce four keeps projecting below replacement, which is the objection that sank `keep_2027_market` in #57.5. Role-specific replacement removes all four, because those players are pitchers who sit above the pitcher bar and below the pooled one. **#57.5's objection does not apply to this pair.**
+
+The new keeps are not marginal. The largest are Logan Webb ($27 cost, $44.10 replacement cost), Pete Alonso ($27, $43.20), Acuna ($26, $41.60), Corbin Carroll ($36, $51.60), Soto ($36, $51.20) and Schwarber ($20, $34.40). **The old rule cut a $36 Soto projecting 9.1 roto points**, which is the error the change is there to fix: $36 of auction budget does not buy 9.1 roto points at this league's exchange rate.
+
+**Feasibility, checked because a permissive rule can advise the impossible.** The new keeper sets cost a mean of $139 of the $260 cap and leave $121 across 10.7 open slots, $11.30 per slot, against $12.80 under the old rule. No team is left unable to fill its roster; the worst has $73 for eleven slots. Keeps run 12.3 per team against the league's observed 10 in 2026 and the old rule's 7.6, so the advice now brackets revealed behaviour from above where it used to sit below.
+
+**Three things this does not settle, recorded so they are not rediscovered as surprises.**
+1. **`MAX_KEEPERS` binds for 6 of 10 teams.** Those teams are told to keep 13 because they have 13 positive-surplus contracts, so the model is filling a cap rather than discriminating. That is a real consequence of keeping being profitable in this league, not obviously an error, but it means the marginal keeper is no longer being chosen.
+2. **The equilibrium is not closed.** The exchange rate is fitted at `KEEPERS_EXPECTED_2027 = 100`. If the league acted on this advice it would withhold ~123, thinning the auction further and raising the rate, which would raise `keep_value` again. The model advises one team against a fixed expectation; it does not solve the fixed point.
+3. **The top end is still rich on this scale.** #57 recorded Skubal at `keep_value` $78.81 against a `market_price` of $34.00 and a revealed price of $34.31. He is now $86.93 and the keep decision runs on that number. The decision only needs `keep_value > cost` and $86.93 clears $38 as decisively as $50 would, so the ordering is safe even though the level is not. Do not read `keep_value` as a price.
+
+**Not changed: the blend weights.** METHODS section 3 #9's unfitted constants were swept for the first time (`scripts/fit_blend.py`). Turning the blend off is costly, $36.1 against $98.3 of captured surplus per season, so the blend earns its place. The curve is then flat: 0.5 gives $98.3, 0.6 $100.4, 0.7 $105.8, 0.8-1.0 $103.6. Leave-one-season-out picks 0.6, 0.7 and 0.7 on the other two seasons and gains $0.0, $6.5 and $0.0 against production, a mean of $2.2 per season. The playing-time caps do worse: LOSO picks 0.15, 0.15 and 0.00 with held-out gains of +16.2, +19.9 and -55.0, a mean loss. **`BLEND_W_2026 = 0.50` sits inside the flat region and no alternative survives out of sample, so all four constants stand.** A judgment call vindicated rather than changed, as in #59.
+
+**One premise corrected along the way.** The ZiPS 2027 export was assumed to predate the 2026 season. It does not. Regressing its projected rates on 2025 and 2026 actual rates for the 184 players with 300+ PA in both gives 2026 coefficients of 0.162 (HR/PA, t=4.9) and 0.159 (SB/PA, t=4.5) against 2025 coefficients of 0.597 and 0.650. It carries 2026 at roughly a quarter of 2025's weight, reproducing the earlier check that found loadings of 0.107 against 0.45. Blending 2026 actuals in therefore double-counts mildly, which is a reason the blend curve flattens above 0.5 rather than a reason to change it.

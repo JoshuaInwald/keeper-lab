@@ -130,6 +130,108 @@ def rewound_points(season: int) -> pd.DataFrame:
     return out[["fg_id", "name", "role", "rel", "roto_points"]]
 
 
+def _prior_actuals(season: int, role: str) -> pd.DataFrame:
+    """Season T-1's realised line, the analogue of the production blend's
+    "source A" (2026 actuals plus rest-of-season)."""
+    from .io import load_hitters_history, load_pitchers_history
+
+    prev = season - 1
+    if role == "HIT":
+        h = load_hitters_history()
+        d = h[(h["season"] == prev) & (h["PA"].fillna(0) > 0)]
+        cols = ["PA", "AB", "H", "HR", "R", "RBI", "SB"]
+    else:
+        p = load_pitchers_history()
+        d = p[(p["season"] == prev) & (p["IP"].fillna(0) > 0)]
+        cols = ["IP", "W", "SV", "K", "ER", "BB", "H"]
+    out = d.groupby("fg_id", as_index=False)[cols].sum()
+    out["fg_id"] = out["fg_id"].astype(int)
+    return out
+
+
+def blended_points(season: int, w_cap: float = C.BLEND_W_2026,
+                   pt_cap_hit: float = C.PT_BLEND_CAP_HITTER,
+                   pt_cap_pit: float = C.PT_BLEND_CAP_PITCHER) -> pd.DataFrame:
+    """Marcel-for-`season` blended with season T-1 actuals, weights as arguments.
+
+    This mirrors `project.project_hitters` / `project_pitchers`: source A is the
+    prior season's realised line, source B the projection, the weight on A rises
+    with A's own sample size and is capped, playing time carries its OWN lower
+    cap (#51), and each counting rate's weight is discounted by that stat's
+    year-over-year reliability (#28). Only the caps are parameters, which is
+    what makes `BLEND_W_2026` and the `PT_BLEND_CAP_*` constants fittable.
+
+    THE CAVEAT THAT LIMITS WHAT A FIT HERE MEANS. Marcel already averages three
+    prior seasons internally, so blending T-1 actuals back in double-counts them
+    harder than blending into ZiPS would (ZiPS 2027 loads 2026 at roughly a
+    quarter of 2025's weight). Read the SHAPE of the curve, never the level.
+    """
+    from .project import RELIABILITY, REL_MAX, SHRINK_IP, SHRINK_PA, _safe_div
+
+    def wcap(pt_a, shrink, cap):
+        w = pt_a.fillna(0.0) / (pt_a.fillna(0.0) + shrink)
+        return w.clip(upper=cap)
+
+    def rel(stat, base):
+        return base * (RELIABILITY.get(stat, REL_MAX) / REL_MAX)
+
+    frames = []
+    for role in ("HIT", "PIT"):
+        A = _prior_actuals(season, role)
+        B = marcel_fg_ids(season, role).dropna(subset=["fg_id"]).copy()
+        B["fg_id"] = B["fg_id"].astype(int)
+        pt, shrink = ("PA", SHRINK_PA) if role == "HIT" else ("IP", SHRINK_IP)
+        cats = (["HR", "R", "RBI", "SB"] if role == "HIT"
+                else ["W", "SV", "K", "ER", "BB"])
+        keep_b = ["fg_id", "name", "rel", pt] + cats + (
+            ["AB", "H"] if role == "HIT" else ["H"])
+
+        m = A.merge(B[keep_b], on="fg_id", how="outer", suffixes=("_a", "_b"))
+        has_a, has_b = m[f"{pt}_a"].fillna(0) > 0, m[f"{pt}_b"].fillna(0) > 0
+        cap = pt_cap_hit if role == "HIT" else pt_cap_pit
+
+        w = wcap(m[f"{pt}_a"], shrink, w_cap).where(has_b, 1.0).where(has_a, 0.0)
+        w_pt = wcap(m[f"{pt}_a"], shrink, cap).where(has_b, 1.0).where(has_a, 0.0)
+        m[pt] = w_pt * m[f"{pt}_a"].fillna(0) + (1 - w_pt) * m[f"{pt}_b"].fillna(0)
+
+        for c in cats:
+            ra = _safe_div(m[f"{c}_a"], m[f"{pt}_a"]).fillna(0.0)
+            rb = _safe_div(m[f"{c}_b"], m[f"{pt}_b"]).fillna(0.0)
+            wc = rel(c, w).where(has_a, 0.0).where(has_b, 1.0)
+            m[c] = (wc * ra + (1 - wc) * rb) * m[pt]
+
+        if role == "HIT":
+            ab_rate = (w * _safe_div(m["AB_a"], m["PA_a"]).fillna(0.91)
+                       + (1 - w) * _safe_div(m["AB_b"], m["PA_b"]).fillna(0.91))
+            m["AB"] = m["PA"] * ab_rate
+            ha = _safe_div(m["H_a"], m["AB_a"]).fillna(0.0)
+            hb = _safe_div(m["H_b"], m["AB_b"]).fillna(0.0)
+            wavg = rel("AVG", w).where(has_a, 0.0).where(has_b, 1.0)
+            m["H"] = (wavg * ha + (1 - wavg) * hb) * m["AB"]
+            m = m[m["PA"] > 20.0]
+        else:
+            ha = _safe_div(m["H_a"], m["IP_a"]).fillna(0.0)
+            hb = _safe_div(m["H_b"], m["IP_b"]).fillna(0.0)
+            wh = rel("H", w).where(has_a, 0.0).where(has_b, 1.0)
+            m["H"] = (wh * ha + (1 - wh) * hb) * m["IP"]
+            m = m[m["IP"] > 5.0]
+
+        m["role"] = role
+        frames.append(m)
+
+    sc = rewound_scorer(season)
+    H, P = frames[0], frames[1]
+    Hs = H[["fg_id", "name", "role", "rel"]].join(sc.hitters(H)[["roto_points"]])
+    Ps = P[["fg_id", "name", "role", "rel"]].join(sc.pitchers(P)[["roto_points"]])
+    out = pd.concat([Hs, Ps], ignore_index=True)
+    out["is_hit"] = (out["role"] == "HIT").astype(int)
+    out = out.groupby("fg_id", as_index=False).agg(
+        {"roto_points": "sum", "rel": "max", "name": "first", "is_hit": "max"})
+    out["role"] = np.where(out["is_hit"] > 0, "HIT", "PIT")
+    out["fg_id"] = out["fg_id"].astype(int)
+    return out[["fg_id", "name", "role", "rel", "roto_points"]]
+
+
 def _pool_and_replacement(pts: pd.DataFrame, pool_rule: str):
     """The calibration pool and each player's replacement level, per rule.
 
@@ -171,7 +273,18 @@ def rewound_board(season: int, pool_rule: str = "blind") -> pd.DataFrame:
     pool gets the $1 minimum bid and the remaining $2,600 - $230 is spread in
     proportion to roto points above replacement.
     """
-    pts = rewound_points(season).copy()
+    return price_points(rewound_points(season), season, pool_rule)
+
+
+def price_points(points: pd.DataFrame, season: int,
+                 pool_rule: str = "blind") -> pd.DataFrame:
+    """The dollar conversion on its own, so any projection can be priced.
+
+    Split out of `rewound_board` because the blend-weight sweep prices dozens of
+    candidate projections for one season and must hold the pricing arithmetic
+    exactly constant while it does.
+    """
+    pts = points.copy()
     pool, repl, repl_meta = _pool_and_replacement(pts, pool_rule)
 
     surplus = (pool["roto_points"] - repl.loc[pool.index]).clip(lower=0.0)

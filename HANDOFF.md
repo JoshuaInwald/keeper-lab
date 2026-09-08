@@ -1,6 +1,6 @@
 # Session handoff (current state only; history lives in docs/SESSION-LOG.md)
 
-Last updated: 2026-09-08 (assessment phase, Phase B item 1 complete). Read `CONSTRAINTS.md` first, then "Next session: start here" at the bottom.
+Last updated: 2026-09-08 (assessment phase, Phase B complete; two valuation changes shipped). Read `CONSTRAINTS.md` first, then "Next session: start here" at the bottom.
 
 ## What this project is for
 
@@ -35,12 +35,13 @@ The assessment phase's Phase A is done and its results are in FINDINGS #64, #65,
 - Repo: `~/PycharmProjects/keeper-lab` on the Mac, GitHub `JoshuaInwald/keeper-lab` (public, `main`), mirror at `~/Documents/Fantasy Baseball/keeper-lab/`. See `CLAUDE.md` for the three-surface rule.
 - Build: `PYTHONPATH=.:scripts python3 scripts/run_all.py`; tests: `PYTHONPATH=. python3 -m pytest tests/ -q` (64 pass, 2026-09-07); app check: `node app/verify.mjs` (15 pass).
 - Data: `data/` current as of 2026-08-15 exports (2026 season ~75% complete at that pull). ZiPS 2027 and 2028 Depth Charts loaded. Refresh cadence in `data/README.md`.
-- Committed build numbers: $9.17 per roto point (keeper-adjusted auction scale), $6.56 (redraft scale), replacement 4.81 roto pts, +33% projected 2027 inflation, Spearman 0.851 vs 2026 standings. Every one moves on a rebuild; quote from `out/model_params.json`.
+- Committed build numbers, AFTER #70: **$10.00** per roto point (keeper-adjusted auction scale), **$6.21** (redraft scale), replacement **5.12 HIT / 3.53 PIT**, 123 players flagged keep. Every one moves on a rebuild; quote from `out/model_params.json`.
 
 ## State of the model
 - `docs/ROADMAP.md` item 1 is complete (FINDINGS #56, #57). Five dollar figures now exist and `out/valuation_comparison.csv` puts them side by side.
 - `production_value` is an exact alias of `redraft_value` (worth to a roster). `market_price` is live: fitted on 677 revealed purchases, calibrated so the 126 lots the 2027 auction sells sum to $1,765. Held-out MAE 5.76 vs 6.84 (prior salary) and 7.20 (comps); P20-P80 coverage 55.4% against a nominal 60%.
-- **`keep_2027` is still the production basis and has not moved.** Step 4's market-arbitrage rewire (`surplus_market`, `keep_2027_market`) keeps 104 against 70, of which 30 project below replacement, and cuts Skubal. It ships as a second lens. Do not promote it without fixing what it measures (FINDINGS #57.5).
+- **`keep_2027` now runs on `keep_value`, not `redraft_value`** (`KEEP_BASIS = "replacement"`, #70). The old basis is still selectable.
+- **`keep_2027` was the production basis and has now moved once, in #70.** Step 4's market-arbitrage rewire (`surplus_market`, `keep_2027_market`) keeps 104 against 70, of which 30 project below replacement, and cuts Skubal. It ships as a second lens. Do not promote it without fixing what it measures (FINDINGS #57.5).
 - The two league-anchored measures agree where the model does not: Skubal `market_price` $34.00, `revealed_price` $34.31, against `production_value` $51.91 and `keep_value` $78.81. The 2026-08-15 reviewer was right about the top end.
 - Age now exists in the project: `data/chadwick_register.csv`, rebuilt by `scripts/fetch_chadwick.py`. The market discounts 8.0% per year of age holding production constant. This does not reopen the aging-curve decision for *production*, which CONSTRAINTS.md still declines.
 - The comp-based auction estimator (`klab/auction_estimator.py`) is anchored to comps' real salaries and shown in the player drawer; it is a separate estimate, not blended in.
@@ -93,38 +94,42 @@ Run order is fetch_chadwick -> price_features -> {keeper_revealed, price_model, 
 - **An aging curve on the projection**: the engine already applies +0.621 roto points to under-25s against an empirical +0.778. CONSTRAINTS.md's decision is vindicated, not merely inherited. #59.
 - **`keep_2027_market` as the headline call**: keeps 104 including 30 below replacement, and cuts Skubal. #57.5.
 - **A hitter/pitcher budget split**: the league pays the same per realised roto point for both roles (2.092 against 2.114, ratio 0.99). Refuted on the league's own data, not deferred. #64.
-- **Slot-constraining the calibration pool on its own**: #65 measured 54.2% against a 63-64% target and rejected it. **#68 withdraws that reason**: 63-64% is the league's spend share over a different population, and 54.2% is what the same rule produces on realised seasons. The rule is now a live candidate rather than a rejected one, and it is the next session's work. It is listed here because the old entry is cited elsewhere.
+- **Slot-constraining the calibration pool on its own**: #65 rejected it at 54.2%. **#68 withdrew that reason and #70 SHIPPED the rule.** This entry is retained only because the old one is cited elsewhere; it is no longer a "not built" item.
+- **Changing the blend weights**: `BLEND_W_2026` and the three `PT_BLEND_CAP_*` constants were swept for the first time in #70. Turning the blend off costs $62/season, so it earns its place, but the curve is flat from 0.5 to 1.0 and leave-one-season-out gains $2.2/season on the rate cap and loses on the playing-time caps. All four stand. `scripts/fit_blend.py` is the harness; do not re-sweep without new seasons.
+
 
 ## Next session: start here
 
-Phase B items 1 and 2 are done (#68, #69). This is a fresh-context session: read `CONSTRAINTS.md`, then "What this project is for" above, then #64, #65, #66, #67, #68, #69, then this.
+Phase B is complete. #68 and #69 diagnosed, #70 shipped. This is a fresh-context session: read `CONSTRAINTS.md`, then "What this project is for" above, then #64, #65, #66, #67, #68, #69, #70, then this.
 
-**The headline you must not lose.** The model was tested out of sample for the first time and **it does not beat the owners** (#69). On 2026, the only season with clean labels, owners are 71.6% right and beat a keep-everything baseline by $73.5; the production rule is 68.7% right and beats it by -$10.9. This is a floor, not an estimate, because the test runs on Marcel rather than ZiPS. But the valuation machinery was held fixed, so whatever edge exists is coming from the projection, not from the machinery. Plan accordingly: the next gains are more likely in the projection and in the decision rule than in another dollar scale.
+**Two things happened that change the picture, and they point opposite ways.**
+
+1. **The model was tested out of sample for the first time and did not beat the owners (#69).** On 2026, the only season with clean labels, owners were 71.6% right and beat a keep-everything baseline by $73.50; the then-production rule was 68.7% right and beat it by -$10.90. That test ran on Marcel, the naive projection, so it is a FLOOR. But the valuation machinery was held constant, which points at the projection as the binding constraint.
+2. **Two valuation changes then shipped (#70)** and both were argued from that same evidence: the keep decision moved to the opportunity-cost scale, and the calibration pool became fieldable. 47 keep/cut flips, all cut-to-keep, keeps 70 to 123.
+
+**#70 has NOT been re-backtested.** The backtest in #69 measured each change in isolation on past seasons; the shipped combination on the 2027 board has not been scored, because there is nothing to score it against yet. Re-running `scripts/backtest_keepers.py` with the new production defaults is the cheapest first thing a next session can do.
 
 ### What is already built and verified
-- `klab/marcel.py` reads the archive (three traps encoded, #67). `scripts/validate_marcel.py` is the smoke test: run it first.
-- `klab/rewind.py` builds a board for a past season from pre-season data only. `rewound_board(season, pool_rule)`, `realised_board(season, pool_rule)`, `rewound_exchange(season)`. This is the instrument; extend it rather than rebuilding it.
-- `scripts/backtest_keepers.py` is the out-of-sample test. `out/backtest_keepers.csv` holds all 289 decisions with every caller's call.
-- `scripts/marcel_pool_test.py` answers #65 and asserts seven published numbers as controls.
-- `scripts/sensitivity.py` exports `knob()` for config sweeps; it clears caches on the way in and out.
+- `klab/marcel.py` reads the projection archive; `scripts/validate_marcel.py` is the smoke test. Run it first.
+- `klab/rewind.py` rebuilds a board for a past season from pre-season data only. `rewound_board`, `realised_board`, `rewound_exchange`, `blended_points`, `price_points`. This is the measurement instrument; extend it rather than rebuilding it.
+- `scripts/backtest_keepers.py` scores model against owner on 289 past decisions. `scripts/fit_blend.py` sweeps the blend constants. `scripts/marcel_pool_test.py` asserts seven published numbers as controls.
+- `scripts/validate.py` CHECK 5 now reads the SHIPPED pool. It must print 140/90, a $2,600 identity and a 54.2% hitter share; it warns if the share leaves the 52-58% band.
 
 ### Four standing cautions
-1. **Marcel is not ZiPS.** Fitted levels describe the Marcel blend. Report shapes, not transferred constants.
-2. **Score keeps on the opportunity-cost scale, never on `redraft_value`.** `redraft_value` is a no-keeper market and makes only 23% of past decisions read as correct keeps, against 54% on the right scale. #69 fixes this; do not reintroduce it.
-3. **Read every dollar total against keep-everything, not against zero.** Contracts are cheap in this league and the naive baseline captures most of the surplus.
-4. **2024-2025 keeper labels are reconstructed and biased against the owners** (#56.4); **2026 outcomes are a partial season**. There is no season with both clean labels and complete outcomes. Never pool them.
+1. **Marcel is not ZiPS.** Constants fitted against it describe the Marcel blend. Report shapes.
+2. **Score keeps on the opportunity-cost scale, never on `redraft_value`** (#69). `redraft_value` is a no-keeper market and makes only 23% of past decisions read as correct keeps against 54% on the right scale.
+3. **Read dollar totals against keep-everything, not zero.** Contracts are cheap here and the naive baseline captures most of the surplus.
+4. **2024-2025 keeper labels are reconstructed and biased against the owners** (#56.4); **2026 outcomes are a partial season**. No season has both. Never pool them.
 
 ### The work, in the order that pays
 
-**1. Attack the projection, not the dollar scales.** #69 localises the gap: the valuation machinery was held constant and the model still lost, so the projection is where the edge has to come from. Two concrete, testable things:
-   - **Fit the blend weights.** `BLEND_W_2026 = 0.50` and the three `PT_BLEND_CAP_*` constants have never been fitted (METHODS section 3 #9 admits it). `klab/rewind.py` now makes this scorable: blend season T-1 actuals into Marcel-for-T, sweep the weights, score on KEEP/CUT DOLLARS rather than on correlation, leave-one-season-out over 2024-2026. Caveat: Marcel already weights three prior seasons internally, so it double-counts more than ZiPS would. The shape transfers, the level does not.
-   - **Verify Josh's claim that the ZiPS 2027 export predates the 2026 season.** If true, `BLEND_W_2026` is carrying almost all of the 2026 information and its value matters enormously. Check the export's vintage in `data/README.md` and the file itself before fitting anything.
+**1. Watch what #70 did, then re-score it.** Re-run `scripts/backtest_keepers.py` with `POOL_RULE`/`KEEP_BASIS` at their new defaults and confirm the shipped pair still wins on past decisions. Then look hard at the three open consequences #70 records: `MAX_KEEPERS` now binds for 6 of 10 teams, the keeper-count equilibrium is not closed (the exchange rate assumes 100 keepers withheld while the advice implies ~123), and `keep_value` is known to be rich at the top (Skubal $86.93 against a revealed $34.31). None is obviously an error; all three are now load-bearing.
 
-**2. Move the keep threshold to the opportunity-cost scale.** #69 shows the same board captures more in all three seasons when it keeps iff replacement cost beats salary, rather than iff `redraft_value` does: +$6.1, +$124.6, +$89.4. **This is a valuation change**, so CLAUDE.md's protocol is mandatory: record the board first, change, diff, report KEEP/CUT FLIPS. It will keep materially more players, so check it against #57.5, which rejected a different permissive rewire for keeping 30 players below replacement. If it fails that check, say so and stop.
+**2. Attack the projection.** #69 localises the gap there and #70 removed the two machinery defects, so what is left is the forecast. The blend constants are already fitted and flat (#70), so the gains are in the projection SOURCE, not its weights: a better 2027 ZiPS pull, Steamer or THE BAT as a second opinion, or an explicit playing-time model. Note that a fresh ZiPS 2027 export incorporating the finished 2026 season is the single highest-value data refresh available before the auction.
 
-**3. Ship the pool rule (`slot_role`).** Two independent lines now agree: the perfect-foresight benchmark (#68) and decision quality (#69, +$118 and +7.5 accuracy points on the clean season). Same protocol as item 2; update `scripts/validate.py` CHECK 5's expected share and say in the commit message that committed outputs moved. **Note the split #69 found: the pool rule moves `redraft_value` and is therefore a PRICING question (what to bid at auction); the exchange rate is the KEEP/CUT question.** Do not expect item 3 to move keep/cut once item 2 has landed.
+**3. `WAIVER_VALUE` is still open and now matters more.** Replacement is no longer one number: #70 made it a per-role pair read off the fieldable pool. The #62 tie (4.381 from waiver churn against the internal-consistency objection) should be re-asked in that frame, because the pitcher bar moved to 3.526 and the hitter bar to 5.121.
 
-**4. The projection-source toggle.** Build last. `PROJECTION_BASIS` in `config.py` is the precedent. **Marcel 2027 does not exist yet** (Baseball-Reference publishes after a season ends), so the toggle is backward-facing only and the 2027 board stays ZiPS. Do not add a knob implying otherwise.
+**4. The projection-source toggle.** Build last. `PROJECTION_BASIS` is the precedent. **Marcel 2027 does not exist** (Baseball-Reference publishes after a season ends), so the toggle is backward-facing only and the 2027 board stays ZiPS.
 
 ### Still true regardless
-Do not build a hitter/pitcher budget split (#64). Do not touch `redraft_value`'s definition as a quantity (items 2 and 3 change what CONSUMES it, not what it is) or promote `keep_2027_market` (#57.5). `scripts/validate.py` CHECK 5 prints the role split every run; until item 3 ships it must read 73.7%.
+Do not build a hitter/pitcher budget split (#64). Do not promote `keep_2027_market` (#57.5). Do not read `keep_value` as a price: it is an opportunity cost and is known to run rich at the top end (#57, #70). `redraft_value` remains the fair-value/trade scale and its DEFINITION is unchanged; #70 changed what consumes it, not what it is.

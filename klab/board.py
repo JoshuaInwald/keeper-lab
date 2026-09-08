@@ -210,6 +210,28 @@ def value_players(exch: dict | None = None, positional: bool = False
     # Replacement level must be position-specific for every eligible player;
     # min(pooled, pos) silently no-op'd since C/SS sit ABOVE pooled (FINDINGS #52).
     repl_series = pd.Series(repl_rp, index=base_players.index)
+
+    # A projection ranks 183 hitters into the top 230, so a role-blind pool
+    # prices pitchers against 47 slots when the league fields 90 (FINDINGS
+    # #65, #68). Under "slot_role" the pool is the fieldable 140/90 and each
+    # role is priced against its own bar. `role_of` folds the "TWO" label in
+    # rather than dropping it: a two-way player occupies a hitter slot here.
+    role_of = np.where(base_players["role"] == "PIT", "PIT", "HIT")
+    repl_by_role: dict = {}
+    if C.POOL_RULE == "slot_role" and C.WAIVER_VALUE != "high":
+        hit = base_players[role_of == "HIT"].nlargest(
+            C.N_TEAMS * C.N_HIT_SLOTS, "roto_points")
+        pit = base_players[role_of == "PIT"].nlargest(
+            C.N_TEAMS * C.N_PIT_SLOTS, "roto_points")
+        repl_by_role = {"HIT": float(hit["roto_points"].min()),
+                        "PIT": float(pit["roto_points"].min())}
+        repl_series = pd.Series(
+            np.where(role_of == "HIT", repl_by_role["HIT"], repl_by_role["PIT"]),
+            index=base_players.index)
+        # Downstream consumers (the app's free agents, the finish-odds sim,
+        # validate.py) read one scalar. Keep the pooled 230th there so those
+        # stay on a defined bar; `replacement_by_role` carries the real pair.
+        repl_rp = float(min(repl_by_role.values()))
     pos_repl: dict = {}
     if positional:
         from .io import load_position_eligibility
@@ -224,7 +246,10 @@ def value_players(exch: dict | None = None, positional: bool = False
             any_mask = any_mask | mask
         repl_series = repl_series.where(~any_mask, override)
 
-    top = base_players.nlargest(n_rostered, "roto_points")
+    if repl_by_role:
+        top = pd.concat([hit, pit])
+    else:
+        top = base_players.nlargest(n_rostered, "roto_points")
     # clip(lower=0) must roughly match dollars()'s $0 floor: under positional
     # adjustment a top-230 player can sit below his own bar (FINDINGS #52; ~1%).
     pool_rp = float((top["roto_points"] - repl_series.loc[top.index]).clip(lower=0.0).sum())
@@ -267,8 +292,13 @@ def value_players(exch: dict | None = None, positional: bool = False
             "usd_per_rp_redraft": usd_per_rp,
             "usd_per_rp_keep": exch["usd_per_point"],
             "positional_replacement": pos_repl,
+            "pool_rule": C.POOL_RULE,
+            "replacement_by_role": repl_by_role,
+            # The identity is over the CALIBRATION pool, which under
+            # "slot_role" is the fieldable 140/90 rather than the top 230.
+            # Checking the top 230 instead would fail an identity that holds.
             "budget_check_top230": float(
-                players.nlargest(n_rostered, "roto_points")["redraft_value"].sum())}
+                players.loc[top.index, "redraft_value"].sum())}
     return players, exch, {"denominators": D, "denominators_se": D_se, "baseline": base, **meta}
 
 
@@ -329,6 +359,10 @@ def value_2028(exch: dict, meta: dict, saves_2027: pd.Series,
 
     out["redraft_value_2028"] = (
         (out["roto_points_2028"] - repl) * scale + 1.0).clip(lower=0.0)
+    # The out-year on the opportunity-cost scale too, so a multi-year surplus
+    # can be built on one scale end to end (config.KEEP_BASIS, FINDINGS #69).
+    out["keep_value_2028"] = (
+        (out["roto_points_2028"] - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
     return out
 
 
@@ -366,6 +400,7 @@ def build_board(exch: dict | None = None, positional: bool = False
     b = pd.concat([b_normal, b_split], ignore_index=True)
     b["roto_points_2028"] = b["roto_points_2028"].fillna(0.0)
     b["redraft_value_2028"] = b["redraft_value_2028"].fillna(0.0)
+    b["keep_value_2028"] = b["keep_value_2028"].fillna(0.0)
 
     # Commissioner-resolved contracts ("?" in the export), applied before
     # anything is priced off them.
@@ -382,8 +417,17 @@ def build_board(exch: dict | None = None, positional: bool = False
     b["surplus_redraft"] = b["redraft_value"] - b["keeper_cost"]
 
     from .keeper import already_extended, multiyear_surplus
-    my = multiyear_surplus(b["redraft_value"], b["redraft_value_2028"],
-                           b["keeper_cost"], b["years_controlled"], b["salary"])
+    # Which scale the keep decision is made on (config.KEEP_BASIS). A keep is
+    # traded against the auction, not against a no-keeper redraft: keeping at
+    # $S forgoes $S of budget, which buys intercept + S*slope roto points, so
+    # the identified comparison is keep_value against the keeper cost. Scoring
+    # on redraft_value under-keeps; backtested in FINDINGS #69.
+    if C.KEEP_BASIS == "replacement":
+        v27, v28 = b["keep_value"], b["keep_value_2028"]
+    else:
+        v27, v28 = b["redraft_value"], b["redraft_value_2028"]
+    my = multiyear_surplus(v27, v28, b["keeper_cost"],
+                           b["years_controlled"], b["salary"])
     # One extension per contract. A live contract that has spent it keeps only
     # the years it has; an `F` player in the same position cannot be kept at all.
     used = (b["fg_id"].isin(already_extended())

@@ -5,6 +5,7 @@
 3. Does the auction sample reconcile with the league's actual cap?
 5. Is the pool that sets the dollar scale one the league could actually field?
 """
+import numpy as np
 import pandas as pd
 
 import klab.config as C
@@ -88,9 +89,16 @@ def check_budget(board, exch, meta):
     tot_sal = board["salary"].sum()
     print(f"salary committed across all 275 rostered players: ${tot_sal:,.0f}")
     print(f"league cap (10 x $260):                           ${C.N_TEAMS*C.BUDGET:,.0f}")
-    print(f"BUDGET IDENTITY top-230 redraft_value:            "
+    print(f"BUDGET IDENTITY over the calibration pool:        "
           f"${meta['budget_check_top230']:,.0f}  (must equal $2,600)")
-    print(f"replacement roto points (230th player):           {meta['replacement_rp']:.2f}")
+    # Under "slot_role" replacement is a pair (140th hitter, 90th pitcher) and
+    # this scalar is the lower of the two, so the comparison to the auction
+    # intercept below is against the pitcher bar (FINDINGS #68, #69).
+    if meta.get("replacement_by_role"):
+        rr = meta["replacement_by_role"]
+        print(f"replacement roto points, per role:                "
+              f"HIT {rr['HIT']:.2f} / PIT {rr['PIT']:.2f}")
+    print(f"replacement roto points (scalar used downstream):  {meta['replacement_rp']:.2f}")
     print(f"auction regression intercept (free production):   {exch['intercept']:.2f}")
     print("  -> these two estimate the same quantity from independent data;")
     print("     agreement within ~0.8 roto points is the key validation.")
@@ -112,37 +120,54 @@ LEAGUE_HITTER_SHARE = 0.634      # 4 independent measures span 0.629-0.641 (#64)
 def check_role_split():
     """CHECK 5: is the pool that sets `usd_per_rp` one the league could field?
 
-    The budget identity is calibrated on the top 230 by roto points regardless of
-    role. On the 2027 projection that pool is 183 hitters and 47 pitchers, which
-    no ten teams could roster, and it allocates 73.7% of the $2,600 to hitters
-    where every measure of the league says 63-64% (FINDINGS #64, #65). Completed
-    seasons do not show this, so the defect is latent in the code and activated
-    by the projection. Tracked rather than fixed: the obvious repair overshoots
-    to 54.2%, because the projected pitcher pool is itself smeared (#65).
+    Under the old "blind" rule the pool was the top 230 by roto points
+    regardless of role, which on a projection is 183 hitters and 47 pitchers, a
+    set no ten teams could roster, allocating 73.7% of the $2,600 to hitters
+    (FINDINGS #64, #65). `POOL_RULE = "slot_role"` now calibrates on the
+    fieldable 140/90 with replacement read per role (#68, #69).
+
+    This reads the pool off the SHIPPED board rather than recomputing it. The
+    earlier version reimplemented the selection inline and therefore kept
+    reporting 183/47 after the rule changed: a check that cannot see the thing
+    it checks is worse than no check.
     """
-    from klab.board import project_all_players
+    from klab.board import value_players
 
-    print("\n=== CHECK 5: role split of the calibration pool (FINDINGS #64, #65) ===")
-    base, _, _, _ = project_all_players(full_time=False)
-    n_rost = C.N_TEAMS * C.N_ACTIVE
-    rank = C.WAIVER_RANK.get(C.WAIVER_VALUE, n_rost)
-    repl = float(base.nlargest(rank, "roto_points")["roto_points"].min())
-    top = base.nlargest(n_rost, "roto_points")
-    usd = (C.N_TEAMS * C.BUDGET - n_rost) / (top["roto_points"] - repl).clip(lower=0).sum()
-    val = (top["roto_points"] - repl) * usd + 1.0
-    n_h = int((top["role"] == "HIT").sum())
-    share = float(val[top["role"] == "HIT"].sum() / val.sum())
+    print("\n=== CHECK 5: role split of the calibration pool (#64, #65, #68, #69) ===")
+    players, _, meta = value_players()
+    n_rost = meta["n_rostered"]
+    role = np.where(players["role"] == "PIT", "PIT", "HIT")
+    if meta.get("replacement_by_role"):
+        pool_idx = pd.concat([
+            players[role == "HIT"].nlargest(C.N_TEAMS * C.N_HIT_SLOTS, "roto_points"),
+            players[role == "PIT"].nlargest(C.N_TEAMS * C.N_PIT_SLOTS, "roto_points"),
+        ]).index
+    else:
+        pool_idx = players.nlargest(n_rost, "roto_points").index
+    pool = players.loc[pool_idx]
+    is_hit = np.where(pool["role"] == "PIT", "PIT", "HIT") == "HIT"
+    n_h = int(is_hit.sum())
+    share = float(pool.loc[is_hit, "redraft_value"].sum()
+                  / pool["redraft_value"].sum())
 
-    print(f"pool composition:      {n_h} hitters / {n_rost - n_h} pitchers")
+    print(f"pool rule:             {meta.get('pool_rule')}")
+    print(f"pool composition:      {n_h} hitters / {len(pool) - n_h} pitchers")
     print(f"league fields:         {C.N_TEAMS*C.N_HIT_SLOTS} hitters / "
           f"{C.N_TEAMS*C.N_PIT_SLOTS} pitchers (by rule)")
+    print(f"budget identity:       ${pool['redraft_value'].sum():,.2f} "
+          f"(must be ${C.N_TEAMS * C.BUDGET:,})")
     print(f"hitter share of $2,600: {share:6.1%}")
     print(f"league's revealed share: {LEAGUE_HITTER_SHARE:6.1%}  "
           f"(auction spend, roster salary, and roto points delivered all agree)")
     print(f"gap:                    {share - LEAGUE_HITTER_SHARE:+6.1%}")
-    if abs(share - LEAGUE_HITTER_SHARE) > 0.03:
-        print("  KNOWN OPEN DEFECT (#65). Blocked on projection archives, not on a")
-        print("  decision. Do not 'fix' by splitting the budget: #64 refutes that.")
+    # The league's 63-64% is its share of AUCTION SPEND over the players it
+    # rosters. The pool's share is model dollars over the calibration pool, a
+    # different population: #68 item 5 measured the two and they are not the
+    # same quantity. Perfect foresight on completed seasons puts this rule at
+    # 52.0-55.1%, so that band, not 63-64%, is where it should sit.
+    if not 0.50 <= share <= 0.58:
+        print("  OFF THE PERFECT-FORESIGHT BAND (52.0-55.1%, #68). Find out what")
+        print("  changed before shipping. Do not 'fix' by splitting the budget: #64.")
     return {"n_hitters": n_h, "hitter_dollar_share": share}
 
 

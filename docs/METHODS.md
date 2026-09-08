@@ -53,13 +53,16 @@ stat_2027    = [w_rate x rate_A + (1-w_rate) x rate_B] x [w_pt x PT_A + (1-w_pt)
 `board.project_all_players()` scores every projected player; `board.value_players()` produces two scales, both floored at $0:
 
 ```
-replacement_rp = roto points of the 230th-best projection            # WAIVER_VALUE="low"; "medium"=300th; "high"=5.04
-usd_per_rp     = (10 x 260 - 230 x 1) / sum(top-230 rp - replacement_rp)
-redraft_value  = max(0, (rp - replacement_rp) x usd_per_rp + 1)      # headline; top 230 sum to exactly $2,600
-keep_value     = max(0, (rp - intercept) / slope)                     # auction opportunity cost, $9.17/pt
+pool           = top 140 hitters + top 90 pitchers                   # POOL_RULE="slot_role"; "blind"=top 230 any role
+replacement_rp = per role: 140th hitter, 90th pitcher                # WAIVER_VALUE="low"; "medium"=300th; "high"=5.04
+usd_per_rp     = (10 x 260 - 230 x 1) / sum(pool rp - replacement_rp)
+redraft_value  = max(0, (rp - replacement_rp) x usd_per_rp + 1)      # headline; the pool sums to exactly $2,600
+keep_value     = max(0, (rp - intercept) / slope)                     # auction opportunity cost, $10.00/pt
 ```
 
-Current: replacement 4.81 rp, $6.56/rp redraft. Both are computed on expected playing time. `keeper.pt_scale()` / `to_full_time()` produce the counterfactual columns `redraft_value_ft` and `upside_ft` at `KEEPER_PA_FLOOR = 600`, `KEEPER_IP_FLOOR = 150`, `KEEPER_SV_FLOOR = 25`, `KEEPER_RP_IP_FLOOR = 65`, capped at `MAX_PT_SCALE = 2.0`; `keeper.pt_scale_kind()` tags each as `health` or `role` (reliever handed the closer job). `board.value_2028()` prices the out year on the same 2027 scale. `POSITIONAL_ADJUSTMENT` (off) swaps in `keeper.two_position_replacement()` for C and SS (`TWO_POS_SLOTS`); `keeper.positional_replacement()` is the full-spectrum version, disabled for lack of eligibility coverage.
+The pool is role-constrained because a projection ranks 183 hitters and 47 pitchers into a role-blind top 230, a set no ten teams could field, which handed hitters 73.7% of the budget against a perfect-foresight 52-55% (FINDINGS #65, #68, #69). `meta["replacement_by_role"]` carries the pair; `meta["replacement_rp"]` stays the lower of the two for the downstream consumers that read one scalar (the app's free agents, the finish-odds sim).
+
+Current: replacement 5.12 HIT / 3.53 PIT, $6.21/rp redraft. Both are computed on expected playing time. `keeper.pt_scale()` / `to_full_time()` produce the counterfactual columns `redraft_value_ft` and `upside_ft` at `KEEPER_PA_FLOOR = 600`, `KEEPER_IP_FLOOR = 150`, `KEEPER_SV_FLOOR = 25`, `KEEPER_RP_IP_FLOOR = 65`, capped at `MAX_PT_SCALE = 2.0`; `keeper.pt_scale_kind()` tags each as `health` or `role` (reliever handed the closer job). `board.value_2028()` prices the out year on the same 2027 scale. `POSITIONAL_ADJUSTMENT` (off) swaps in `keeper.two_position_replacement()` for C and SS (`TWO_POS_SLOTS`); `keeper.positional_replacement()` is the full-spectrum version, disabled for lack of eligibility coverage.
 
 `board.value_players()` also emits `production_value` (an exact alias of `redraft_value`: worth to a roster, not a price) and `market_price` (the auction cost, a separate quantity, filled by `board.attach_market_price()` from `klab/price.py`). Do not blend the two (CONSTRAINTS.md); see section 2.11 and FINDINGS #56, #57.
 
@@ -78,6 +81,8 @@ y2029 = max(0, (value_2028 - cost) x 0.85^2)    if years >= 3
 ext   = code-1 only: max over 1 or 2 extra years of max(0, (value_2028 - salary - 5) x 0.85^k); reports extension_years in {0,1,2}
 surplus_multiyear = y2027 + y2028 + y2029 + ext
 ```
+
+`value_2027` / `value_2028` are `keep_value` and `keep_value_2028` under `KEEP_BASIS = "replacement"`, and `redraft_value` / `redraft_value_2028` under `"redraft"`. The replacement basis is the identified one: keeping at $S forgoes $S of auction budget, which buys `intercept + S x slope` roto points, so the comparison is against what replacing him costs, not against a no-keeper redraft. Backtested at +$6.1 / +$124.6 / +$89.4 of captured keeper surplus across 2024-2026 (FINDINGS #69, #70).
 
 Later years clip at zero because a contract is an option, not an obligation. A retained-but-unused extension right on a code-2 or code-3 contract is worth $0 (FINDINGS #36).
 
@@ -145,8 +150,8 @@ Two keeper bases ship. `keep_2027` is production surplus and is the recommendati
 | check | result | source |
 |---|---|---|
 | current rosters rolled over 2026 actuals vs 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale); league leader predicted 1st | `scripts/validate.py` |
-| replacement level, four routes, none fitted to agree | 4.733 (230th projection, used) vs 3.978 (auction intercept) vs 4.381 (300th) vs 4.12-4.39 (observed waiver churn, FINDINGS #62) | `out/model_params.json`, `scripts/waiver_value.py` |
-| budget identity | top-230 `redraft_value` sums to exactly $2,600 (caught a $3,854 build) | `scripts/audit.py`, pytest |
+| replacement level, four routes, none fitted to agree | 5.121 HIT / 3.526 PIT (fieldable pool, used) vs 3.978 (auction intercept) vs 4.381 (300th) vs 4.12-4.39 (observed waiver churn, FINDINGS #62) | `out/model_params.json`, `scripts/waiver_value.py` |
+| budget identity | the calibration pool's `redraft_value` sums to exactly $2,600 (caught a $3,854 build) | `scripts/audit.py`, pytest |
 | budget identity, role split | FAILS by +10.3 points: the top-230 pool is 183 hitters / 47 pitchers and allocates 73.7% to hitters where the league's revealed share is 63-64%. Known open defect, blocked on projection archives (FINDINGS #65); do not fix with a budget split (#64) | `scripts/validate.py` CHECK 5 |
 | dollars per realised roto point, by role | hitters $2.092, pitchers $2.114 (ratio 0.99, 668 purchases, every season inside +/-15%): one dollar scale across roles is correct for this league | FINDINGS #64 |
 | owners' keeper decisions, 336 scored | 2026 keeps 73.0% right ex ante and 55.4% realised; throw-backs 61.7% and 73.3%. Realised surplus $6.75 against $6.39 | FINDINGS #66, `scripts/decision_audit.py` |

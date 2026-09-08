@@ -129,6 +129,26 @@ WAIVER_VALUE = "low"
 WAIVER_RANK = {"low": 230, "medium": 300}
 WAIVER_HIGH_RP = 5.04
 
+# Which pool the $2,600 identity is calibrated on, and how replacement is read
+# off it. "blind": the top 230 by roto points regardless of role, which on a
+# projection is 183 hitters and 47 pitchers, a set no ten teams could field
+# (FINDINGS #65). "slot_role": the top 140 hitters and top 90 pitchers the
+# league actually rosters, with replacement taken per role.
+# Two independent lines chose slot_role: it reproduces perfect foresight on
+# completed seasons where "blind" misses by 20 points (#68), and it makes
+# better keep/cut calls out of sample (#69). It moves redraft_value, so it is
+# a PRICING change; keep/cut runs off keep_value and does not see it (#69).
+POOL_RULE = "slot_role"
+
+# Which dollar scale the keep-or-cut decision compares against the keeper cost.
+# "redraft": redraft_value, what he would fetch in a full redraft with no
+# keepers withheld. "replacement": keep_value, what replacing him would cost at
+# this league's auction, which is the market a keeper is actually traded
+# against. Keeping at $S forgoes $S of budget, and $S buys intercept + S*slope
+# roto points, so "replacement" is the identified comparison. Backtested at
+# +$6.1 / +$124.6 / +$89.4 of captured surplus across 2024-2026 (FINDINGS #69).
+KEEP_BASIS = "replacement"
+
 # --- Positional adjustment --------------------------------------------------
 # Full-spectrum positional adjustment is OFF and unimplemented (FanGraphs'
 # 13-system test: largest adjustments finished last). Reported in settings only.

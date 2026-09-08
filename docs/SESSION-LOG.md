@@ -2,6 +2,19 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (assessment phase, Phase B item 3: two valuation changes ship)
+
+| type | item |
+|---|---|
+| built | `KEEP_BASIS = "replacement"`: the keep decision now compares `keep_value` (what replacing him costs at this league's auction) against the keeper cost, not `redraft_value` (a no-keeper redraft, the wrong market). Backtested at +$6.1 / +$124.6 / +$89.4 of captured surplus across 2024-2026 (FINDINGS #69, #70) |
+| built | `POOL_RULE = "slot_role"`: the $2,600 identity calibrates on the fieldable top 140 hitters plus top 90 pitchers with replacement per role, not the top 230 regardless of role. Pool 183/47 to 140/90, hitter share 73.7% to 54.2%, `usd_per_rp_redraft` 6.522 to 6.213, replacement 4.733 pooled to 5.121 HIT / 3.526 PIT (FINDINGS #70) |
+| built | Flip diff: 47 flips on 277 rostered players, all cut-to-keep, keeps 70 to 123. The two changes are complementary, not additive: the keep-basis alone introduces 4 keeps below replacement (the objection that sank #57.5) and role-specific replacement removes all 4. The old rule was cutting a $36 Soto projecting 9.1 roto points |
+| built | Feasibility checked: keeper sets cost a mean $139 of $260 and leave $11.30 per open slot against $12.80 before; no team can fail to fill a roster. 12.3 keeps per team against the league's observed 10 and the old rule's 7.6 |
+| declined | Changing the blend weights. `scripts/fit_blend.py` sweeps `BLEND_W_2026` and the `PT_BLEND_CAP_*` constants for the first time. Turning the blend off costs $62/season so it earns its place, but the curve is flat from 0.5 to 1.0 and leave-one-season-out gains only $2.2/season on the rate cap and LOSES on the playing-time caps. All four constants stand (FINDINGS #70) |
+| bug | `scripts/validate.py` CHECK 5 reimplemented the pool selection inline, so it kept printing 183/47 and 73.7% after the rule changed. Now reads the shipped board; a check that cannot see what it checks is worse than no check |
+| bug | Premise corrected: the ZiPS 2027 export does NOT predate the 2026 season. Regressing its rates on 2025 and 2026 actuals gives 2026 coefficients of 0.16 (t~5) against 0.60 for 2025, so it carries 2026 at about a quarter weight |
+| built | `model_params.json` now carries `pool_rule`, `replacement_by_role` and `budget_check_pool`; `replacement_rp` stays a scalar (the lower of the pair) because the app's free-agent and simulation code reads one number |
+
 ## 2026-09-08 (assessment phase, Phase B item 2: the out-of-sample test)
 
 | type | item |
