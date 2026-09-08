@@ -9,7 +9,8 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 | built | Data refresh to 2026-09-07: standings, rosters and contracts re-derived from CBS pastes, ZiPS rest-of-season re-exported. 38 players added, 39 dropped, 2 contract changes. $/rp keep 9.17 to 10.86, redraft 6.56 to 7.00, replacement 4.811 to 4.599; keepers 70 to 75, 5 keep/cut flips |
 | bug | `_reference()` in build_app.py hard-coded a trade whose players had been traded away; the whole build died on refresh. Now picks the top two keepable per side |
 | bug | Two tests and one app check were pinned to data, not behaviour: a golden value on a dropped player, and two assertions on standings POINTS (ranks) that a small change legitimately leaves at zero. Re-pointed at category totals and standings levels |
-| open | `fg_hitters_2022_2026.csv` / `fg_pitchers_2022_2026.csv` NOT refreshed: the new leaderboard exports lack AB and H (hitters) and K, ER, BB, H (pitchers). 2026 actuals remain as of 2026-08-12 |
+| built | 2026 actuals refreshed from Standard-view exports (hitters 1373 to 1447 rows, pitchers 795 to 851). $/rp keep 10.86 to 10.01, redraft 7.00 to 6.53, replacement 4.599 to 4.733; keepers 75 to 76, 9 more keep/cut flips |
+| bug | FOUND, NOT YET FIXED: FanGraphs writes IP in thirds notation (132.1 = 132 1/3) and `denoms.py` sums and divides it raw. ZiPS projections use true decimals (.3/.7), so actuals and projections are blended on different conventions |
 | bug | `F` players showed a $0 keeper cost, which read as "free to keep" rather than "cannot be kept"; Cost is now blank for them on the board and in the drawer |
 | built | "Market $" board column and drawer block, with the P20-P80 range and the production-minus-price gap on hover |
 | bug | Phone CSS nth-child list had drifted and was hiding Production $, the column its own comment names as one the phone keeps |

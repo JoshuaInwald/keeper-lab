@@ -7,10 +7,10 @@
  ],
  "b_sends": [
   "Oneil Cruz",
-  "Otto Lopez"
+  "Miguel Vargas"
  ],
  "points_before": {
-  "All-Stars": 56.5,
+  "All-Stars": 55.5,
   "Lisbon Long Balls": 56.5,
   "McBlocks": 63.5,
   "NPB No Stars": 24.5,
@@ -18,24 +18,24 @@
   "Orange and Black Attack": 58.5,
   "Pookie 2.0": 73.5,
   "Producers": 40.5,
-  "Spehr's Army": 68.5,
+  "Spehr's Army": 69.5,
   "The Fighting Phils": 55.0
  },
  "points_after": {
-  "All-Stars": 56.5,
+  "All-Stars": 57.5,
   "Lisbon Long Balls": 55.0,
   "McBlocks": 65.5,
   "NPB No Stars": 24.5,
   "New York Polar Bears": 53.0,
   "Orange and Black Attack": 58.5,
-  "Pookie 2.0": 70.0,
+  "Pookie 2.0": 69.0,
   "Producers": 40.5,
-  "Spehr's Army": 68.5,
-  "The Fighting Phils": 58.0
+  "Spehr's Army": 67.5,
+  "The Fighting Phils": 59.0
  },
- "a_dS": -17.966237,
- "b_dS": 17.966237,
- "a_dMY": -38.860366,
- "a_dP": -3.5,
- "b_dP": 0.0
+ "a_dS": -9.458563,
+ "b_dS": 9.458563,
+ "a_dMY": -24.691041,
+ "a_dP": -4.5,
+ "b_dP": 2.0
 }
