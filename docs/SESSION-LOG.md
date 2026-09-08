@@ -6,6 +6,8 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 
 | type | item |
 |---|---|
+| built | "Market $" board column and drawer block, with the P20-P80 range and the production-minus-price gap on hover |
+| bug | Phone CSS nth-child list had drifted and was hiding Production $, the column its own comment names as one the phone keeps |
 | built | ROADMAP item 1 Steps 3, 4, 5: market_price calibrated to the 2027 budget (126 lots, $1,765, identity exact); market keeper lens shipped alongside, not instead; five-system comparison in out/valuation_comparison.csv (FINDINGS #57) |
 | bug | Quantile crossing put P20 above P80 (Crow-Armstrong $41.53 vs $39.73); band ends now sorted |
 | bug | Budget identity missed by $7 because the band repair clipped the point estimate after the solve; solver now scores through the same function the output uses |

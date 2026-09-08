@@ -91,19 +91,22 @@ tbody tr.sel{background:var(--sel)}
 .qbtn .qt{font-size:14px;font-weight:600}
 .qbtn .qd{color:var(--dim);font-size:12px;margin-top:4px;line-height:1.35}
 @media(max-width:900px){.grid2{grid-template-columns:1fr}}
-/* On a phone the board keeps the six columns a keeper decision actually needs:
-   who, what he costs, what he is worth, and the two surplus figures. */
+/* On a phone the board keeps the columns a keeper decision actually needs: who,
+   what he costs, what he is worth, what he will cost at auction, and the two
+   surplus figures. Indices track BOARD_COLS and must be re-counted whenever a
+   column is added -- the list had drifted and was hiding Production $, the one
+   number the comment above it names. Hidden: team, role, roto pts, contract,
+   likely range, Sure?, Worth '28, if full-time. */
 @media(max-width:700px){
   main{padding:14px 10px 60px}
   #tbl th:nth-child(2),#tbl td:nth-child(2),
   #tbl th:nth-child(3),#tbl td:nth-child(3),
   #tbl th:nth-child(5),#tbl td:nth-child(5),
   #tbl th:nth-child(7),#tbl td:nth-child(7),
-  #tbl th:nth-child(9),#tbl td:nth-child(9),
-  #tbl th:nth-child(10),#tbl td:nth-child(10),
-  #tbl th:nth-child(13),#tbl td:nth-child(13),
+  #tbl th:nth-child(11),#tbl td:nth-child(11),
   #tbl th:nth-child(14),#tbl td:nth-child(14),
-  #tbl th:nth-child(15),#tbl td:nth-child(15){display:none}
+  #tbl th:nth-child(15),#tbl td:nth-child(15),
+  #tbl th:nth-child(16),#tbl td:nth-child(16){display:none}
   .wrap{max-height:none}
   input[type=search]{min-width:0;flex:1 1 100%}
 }
@@ -473,7 +476,7 @@ const BOARD_COLS=[
   // production_value is worth-to-a-roster, market_price is auction cost. Both
   // ship in the payload; market_price stays hidden until Step 3 calibrates its
   // level (showing it needs the nth-child list in the phone CSS reindexed).
-  ["production_value","Production $"],
+  ["production_value","Production $"],["market_price","Market $"],
   ["value_lo","likely range"],
   ["surplus_y2027","Surplus '27"],["surplus_multiyear","Surplus, all yrs"],
   ["p_surplus_positive","Sure?"],
@@ -504,6 +507,11 @@ const COL_HELP = {
   production_value:"What he is worth to a roster in 2027, in dollars: roto points above "
     +"replacement on the league's $2,600 budget scale. This is NOT a forecast of his auction "
     +"price -- the market pays for youth, name and last year's contract too.",
+  market_price:"What he will COST at the 2027 auction, not what he is worth. Fitted on 677 real "
+    +"purchases from what a bidder could see on auction day (last two seasons, age, tenure, his last "
+    +"contract), then scaled so the lots this auction actually sells add up to the money that will be "
+    +"in the room. Production $ minus Market $ is the buy/sell signal: positive means he produces more "
+    +"than he costs. Hover a cell for his likely price range.",
   value_lo:"80% of bootstrap draws landed inside this range.",
   surplus_y2027:"Production $ minus cost -- the surplus value you get by keeping him for 2027.",
   surplus_multiyear:"The same surplus summed over every year you control him, "
@@ -576,6 +584,17 @@ function refilter(){
 }
 function money(v){ return usd(adj(v)); }
 
+// Market price is a different quantity from every other dollar figure here, so
+// its cell says so on hover rather than relying on the header gloss alone.
+function marketTooltip(r){
+  const mp=g(r,"market_price"), pv=g(r,"production_value");
+  if(mp==null||!isFinite(mp)) return "No fitted auction price for this player.";
+  const gap=pv-mp;
+  return `Projected 2027 auction PRICE: ${usd(mp)}\n`
+    +`Likely range (P20-P80): ${usd(g(r,"market_price_lo"))} to ${usd(g(r,"market_price_hi"))}\n`
+    +`Worth to a roster (Production $): ${usd(pv)}\n`
+    +`Gap: ${gap>=0?"+":""}${usd(gap)} -- ${gap>=0?"produces more than he costs (BUY)":"costs more than he produces (SELL)"}`;
+}
 // Per-category breakdown for the board's Roto pts / Production $ cells --
 // native title tooltips (no custom hover component in this app), but
 // multi-line via \n works fine, same trick playerTooltip() already uses.
@@ -616,6 +635,7 @@ function playerRow(r){
   <td class="dim">${esc(g(r,"contract"))}</td>
   <td>${usd(g(r,"keeper_cost"))}</td>
   <td title="${esc(valueBreakdownTooltip(r))}">${money(g(r,"production_value"))}</td>
+  <td title="${esc(marketTooltip(r))}">${money(g(r,"market_price"))}</td>
   <td>${band(r,"value_lo","value_hi")}</td>
   <td>${sgn(adj(g(r,"surplus_y2027")),0,"$")}</td>
   <td>${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</td>
@@ -824,6 +844,12 @@ function showPlayer(id){
         <div class="k">value, redraft scale</div><div class="v">${money(g(r,"redraft_value"))}</div>
         <div class="k">&nbsp;&nbsp;${D.band.lo}–${D.band.hi}% range</div>
         <div class="v">${band(r,"value_lo","value_hi")}</div>
+        <div class="k" style="color:var(--ink)">auction price, 2027</div>
+        <div class="v">${money(g(r,"market_price"))}</div>
+        <div class="k">&nbsp;&nbsp;P20-P80 range</div>
+        <div class="v">${money(g(r,"market_price_lo"))}–${money(g(r,"market_price_hi"))}</div>
+        <div class="k">&nbsp;&nbsp;production minus price</div>
+        <div class="v">${sgn(adj(g(r,"production_value")-g(r,"market_price")),1,"$")}</div>
         <div class="k">value, 2028</div><div class="v">${money(g(r,"redraft_value_2028"))}</div>
         <div class="k">full-time upside${g(r,"upside_kind")==="role"?" · if he's the closer":""}</div>
         <div class="v">${upsideCell(r)}</div>
