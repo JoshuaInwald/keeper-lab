@@ -57,9 +57,12 @@ def revealed_price_curve():
     p = m.params
     yrs_bar = float(clean["years_control_left"].mean())
 
-    def price(rp, is_pit):
+    age_bar = float(clean["age"].mean())
+
+    def price(rp, is_pit, age=None):
         lin = (p["const"] + p["rp_prior"] * rp + p["played_prior"] * 1.0
-               + p["years_control_left"] * yrs_bar + p["is_pit"] * is_pit)
+               + p["years_control_left"] * yrs_bar + p["is_pit"] * is_pit
+               + p["age"] * (age_bar if age is None or age != age else age))
         return -lin / p["keeper_salary"]
     return price
 
@@ -82,8 +85,13 @@ def main() -> int:
 
     b = b.copy()
     b["comp_price"] = comp_prices(b)
-    b["revealed_price"] = [max(0.0, price(rp, 1 if role == "PIT" else 0))
-                           for rp, role in zip(b["roto_points"], b["role"])]
+    ages = dict(zip(pd.read_csv(C.DATA / "chadwick_register.csv")
+                    .rename(columns={"key_fangraphs": "fg_id"})
+                    .dropna(subset=["birth_year"]).astype({"fg_id": int})["fg_id"],
+                    2027 - pd.read_csv(C.DATA / "chadwick_register.csv")
+                    .dropna(subset=["birth_year"])["birth_year"]))
+    b["revealed_price"] = [max(0.0, price(rp, 1 if role == "PIT" else 0, ages.get(int(f))))
+                           for rp, role, f in zip(b["roto_points"], b["role"], b["fg_id"])]
 
     b["gap_prod_minus_market"] = b["production_value"] - b["market_price"]
     cols = ["team", "name", "role", "salary", "contract", "keeper_cost",

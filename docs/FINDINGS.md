@@ -295,6 +295,31 @@ Fixed at the loader: `IP = floor(IP) + frac x 10/3`. The check that it is right 
 
 **Impact is small and is reported as small.** Mean absolute change in projected roto points: pitchers 0.0069, hitters 0.0000. Max change in `production_value` $0.15. Zero keep/cut flips. `$/rp` keep 10.010 to 10.003, redraft 6.526 to 6.522, replacement 4.7333 unchanged. The error largely cancelled: it shrank each pitcher's innings and the league denominator built from those same innings by the same proportion. Fixed because it is wrong, not because it moved a decision.
 
+### 59. Young breakouts: the projection already handles them, the keeper model did not
+Josh's question, 2026-09-08: a 22-year-old and a 31-year-old with the same big 2026 are not the same 2027 bet, and ZiPS 2027 was pulled mid-season. Two separate questions, opposite answers.
+
+**59.1 How much of a season carries forward, by age.** `scripts/age_persistence.py`, 3,038 player-seasons 2022-2025 with a real line (200+ PA or 40+ IP) and a known age, next season scored on its own denominators, a missing next season counted as zero roto points rather than dropped (survivor-only persistence is the classic way to overrate prospects; 8.5% of 33+ seasons have no next year against 7.0% at 23 and under).
+
+Persistence `rp_next = a + b x rp_this` by age band, all-population:
+
+| age | n | slope b | se | intercept | R^2 | survives |
+|---|---|---|---|---|---|---|
+| <=23 | 129 | 0.628 | 0.085 | 1.82 | 0.301 | 93.0% |
+| 24-26 | 697 | 0.457 | 0.034 | 1.57 | 0.210 | 92.5% |
+| 27-29 | 932 | 0.492 | 0.026 | 0.96 | 0.273 | 91.4% |
+| 30-32 | 707 | 0.537 | 0.032 | 0.71 | 0.285 | 91.2% |
+| 33+ | 573 | 0.504 | 0.032 | 0.23 | 0.308 | 85.2% |
+
+The slope does NOT vary with age: a linear age interaction is +0.0010 (t=0.22, p=0.83), and a young-dummy interaction fails at every cutoff tested (age<=23 p=0.18, <=24 p=0.46, <=25 p=0.59). What varies is the LEVEL. Controlling for production, volume and role, being 25 or under is worth **+0.778 roto points** next season (t=3.31, p=0.0009). Restricting to top-quartile seasons, the share of production retained is 82.8% at 23 and under against 62.7% at 27-29, but that gap is intercept, not slope: young players are better on average, not better at holding a spike.
+
+**59.2 The engine already applies almost exactly that premium, so nothing changed.** The same regression run on the engine's own 2027 projection against 2026 actuals gives a young-player coefficient of **+0.621** (age<=25, t=3.34) against the empirical **+0.778** (t=3.31). The two are within each other's standard errors. At age<=24 the engine is if anything generous: +0.755 against an empirical +0.633. Retention of a top-quartile 2026 season, engine against empirical: 24-26 74.9% / 69.3%, 27-29 75.0% / 62.7%, 30-32 67.1% / 68.8%, 33+ 64.2% / 57.2%.
+
+This vindicates CONSTRAINTS.md's 2026-08-14 decision to decline an aging curve. ZiPS carries age, the blend inherits it, and the number it inherits is the right one. **No projection change was made.** The reviewer's "young players read too cheap" (ROADMAP item 1) is therefore not a projection error: it is the market paying more for youth than the production is worth, which is exactly what `market_price` now shows (#57.7 lists young pitchers as the whole sell side).
+
+**59.3 Owners do price age, and the revealed-price model was blind to it.** In the 2026 keeper decisions (n=134, 74 kept), age carries **-0.127 per year** (t=-2.13, p=0.033) after production, salary, years of control and role; pseudo R^2 rises 0.144 to 0.169. Age belongs in THIS model and not in the board's keeper logic, and the distinction is the whole point: `keeper_revealed.py` is fit on last season's actuals, which carry no age information, so the effect is real signal; `production_value` gets its age adjustment from ZiPS, so a second one there would double-count. Age is now a term in the revealed-price curve.
+
+Owners look close to binary on the young: of the 11 decisions on players 25 and under, the 5 with above-median prior production went 4 kept, and the 6 below-median went 0 kept. Suggestive of a "produce or be cut" rule that a continuous production scale cannot express, and far too small a cell (n=11) to claim; recorded as a thing to re-test when the 2027 decisions land.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).

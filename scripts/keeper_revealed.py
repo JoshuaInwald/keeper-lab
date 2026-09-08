@@ -148,6 +148,12 @@ def fit(d: pd.DataFrame, label: str):
         "keeper_salary": d["keeper_salary"],
         "years_control_left": d["years_control_left"],
         "is_pit": d["is_pit"],
+        # Age belongs here and not in the board's keeper logic. This model is
+        # fit on last season's ACTUALS, which carry no age information, so the
+        # owners' age effect is real signal. `production_value` gets its age
+        # adjustment from ZiPS already, which is why CONSTRAINTS.md declines a
+        # second aging curve there (docs/FINDINGS.md #59).
+        "age": d["age"].fillna(d["age"].mean()),
     })
     m = sm.Logit(d["kept"], X).fit(disp=0)
     print(f"\n--- P(kept) logit, {label} (n={len(d)}, "
@@ -173,7 +179,8 @@ def implied_prices(m, d: pd.DataFrame, nbins: int = 10) -> pd.DataFrame:
         lin = (p["const"] + p["rp_prior"] * g["rp_prior"].mean()
                + p["played_prior"] * g["played_prior"].mean()
                + p["years_control_left"] * g["years_control_left"].mean()
-               + p["is_pit"] * g["is_pit"].mean())
+               + p["is_pit"] * g["is_pit"].mean()
+               + p["age"] * g["age"].fillna(g["age"].mean()).mean())
         out.append({
             "decile": int(b) + 1, "n": len(g),
             "mean_rp_prior": round(g["rp_prior"].mean(), 2),
