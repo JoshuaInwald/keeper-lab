@@ -787,3 +787,23 @@ Josh's ask, built rather than advised. `docs/EXPERT-REVIEW.md` had the right que
 **`scripts/ingest_survey.py` turns the returned JSON into a comparison**, and the interesting output is not an agreement rate but three things: disagreements ranked by dollars at stake, price calibration **split by role**, and reviewer against reviewer. The role split is the point. Tested against two synthetic reviewers, one built with a deliberate 1.35x pitcher-price bias and one without: the tool reported +$4.1 pitcher-minus-hitter bias for the first and -$0.0 for the second, and states the reading explicitly. **If the reviewer's pitcher prices come in above the model's while hitters come in level, the "this league underpays for pitching" claim is dead and the board is overvaluing arms. If they come in level, the edge is real.**
 
 Answers live in `data/` (gitignored: one person's private opinions). `out/survey_comparison.csv` is regenerated on demand and gitignored too.
+
+### 78. What this session got right and wrong, recorded because the failures rhymed
+Fourteen commits on 2026-09-08. Written at Josh's request while it is still checkable. The successes are worth less than the pattern in the failures.
+
+**What worked, and why.**
+- **Controls before conclusions.** `scripts/marcel_pool_test.py` reproduced seven of #65's published figures exactly (131/99, 139/91, 130/100, 183/47, 73.70%, 54.21%, 71.55%) before it was allowed to say anything new. That is the only reason #68's reversal of #65 is trustworthy rather than just a second opinion.
+- **Finding the confound before reporting the result.** #69's first pass scored keeps against `redraft_value` and would have handed the model a free win, because that scale makes only 23% of past decisions read as correct keeps while owners kept 47-55%, and the model keeps less than owners. Catching that before publishing is the single most valuable thing done today. The `keep everything` baseline was the second.
+- **Shipping a negative result intact.** #69 says the model does not beat the owners. Nothing was softened.
+- **Measuring instead of arguing, once it finally happened.** `Roto '26`, `Move`, the category decomposition and the survey each turned a dispute into a number, and each was faster and better than the explanation that preceded it.
+
+**What was wasted, and the pattern is the point: every defect Josh found was in the presentation layer, and every one came from changing the model without chasing the change through to what a reader sees.**
+
+1. **A broken board shipped twice** (#73). `Replace $`, then `Roto '26` and `Move`, added to `BOARD_COLS` without the matching `<td>` in `playerRow`. Three commits went out with the board printing correct numbers under the wrong headings, and Josh found it, not the 15 checks. Cost: a full round trip and a chunk of the trust the day had earned.
+2. **A tooltip that stated arithmetic the model no longer performed** (#71.1). `KEEP_BASIS` moved the decision to `keep_value` and the `Surplus '27` help still read "Production $ minus cost". Nobody grepped the app for prose describing the old behaviour.
+3. **A confident wrong argument, shipped** (#72). 2026 was scored on the 2027 scale on the reasoning that the columns had to share denominators to subtract. Roto points are standings places and were already a common unit. Josh corrected it. The invariance check that settles it (correlation 0.9975) took ten minutes and was run **after** shipping rather than before.
+4. **Three rounds to answer one question.** The Wacha ERA question was answered with an explanation (#71.3), then a better explanation (#72), then finally an instrument (#74's decomposition tooltip) that made it self-evident. The instrument was available from the first round.
+
+**The rule that would have prevented all four:** a change to a dollar scale, a column, or a decision basis is not finished when the tests pass. It is finished when the thing a reader sees has been looked at. Three guards now exist that did not this morning: `assertBoardRowShape()`, the rendered-cell check, and the three tooltip checks. The app went from 15 verification checks to 17 plus a separate survey check, and all of them exist because of a defect a human found first.
+
+**A cheaper lesson.** Findings written long had to be compacted the same day (#68 alone was 72 lines). Write them at the width they will be read.

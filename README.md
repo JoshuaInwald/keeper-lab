@@ -2,6 +2,18 @@
 
 Player-valuation engine for a private 10-team 5x5 roto keeper auction league (CBS Sports). It prices every player in dollars from the league's own auction and standings history, ranks 2027 keeper decisions by multi-year contract surplus, evaluates trades on two lenses (this season's standings, future assets), and simulates each team's odds of finishing in the money. Public repo: [github.com/JoshuaInwald/keeper-lab](https://github.com/JoshuaInwald/keeper-lab).
 
+## Start here next session
+
+Ranked by value per hour. Full context in `HANDOFF.md`; evidence in `docs/FINDINGS.md`.
+
+1. **Run the survey, both of you.** `out/keeper_survey.html` collects blind keep/cut calls and auction prices; `scripts/ingest_survey.py` scores them. The model does NOT beat this league's owners out of sample (#69), so a good owner is a benchmark, not a reviewer. Recipe in `docs/WORKFLOWS.md` 6b. **Doable today, and nothing else on this list is.**
+2. **Re-score what shipped.** #70 changed the keep basis and the calibration pool; #69 measured each in isolation and the combination has never been run through `scripts/backtest_keepers.py` at the new defaults. One command, and it validates or indicts the day's biggest change.
+3. **October: refresh completed 2026 actuals.** The blend already knows what to do with them and they are currently ~88% of a season. A free improvement needing no new projection.
+4. **November onward: a fresh ZiPS or Steamer 2027.** #69 localised the binding constraint to the projection rather than the valuation machinery, and the current ZiPS export is a mid-2026 vintage. This is the highest-value data refresh before the auction, which follows a keeper deadline a few weeks before opening day.
+5. **Watch the three load-bearing consequences of #70:** `MAX_KEEPERS` binds for 6 of 10 teams, the keeper-count equilibrium is unclosed (the exchange rate assumes 100 withheld, the advice implies ~123), and `keep_value` runs rich at the top.
+
+**The standing trap** (#73, #78): a change to a dollar scale, a column, or a decision basis is not finished when the tests pass. It is finished when the thing a reader sees has been looked at. Four defects shipped today because of this; three guards now exist because of them.
+
 ## Quickstart
 
 ```bash

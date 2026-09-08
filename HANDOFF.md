@@ -49,14 +49,14 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 
 ## Open, in priority order
 
+0. **Run the survey (`docs/WORKFLOWS.md` 6b). It is the only item here that can be done today.** `out/keeper_survey.html` collects blind keep/cut calls from Pookie 2.0's owner and from Josh; `scripts/ingest_survey.py` scores them against the model and each other. #69 makes a good owner a benchmark rather than a reviewer, and the role-split price calibration is the test of the model's most falsifiable claim (20 of its 25 biggest bargains are pitchers).
 1. **The model does not beat the owners out of sample (#69), and #70 has not been re-scored.** #69 measured each change in isolation; the shipped combination has never been run through `backtest_keepers.py` at the new defaults. Cheapest first move of any session.
 2. **Attack the projection.** The blend constants are fitted and flat (#70), so the gains are in the SOURCE: a fresh ZiPS 2027 export incorporating the finished 2026 season is the highest-value data refresh available before the auction. Steamer or THE BAT as a second opinion is the next step after that.
 3. **Three consequences of #70 are now load-bearing.** `MAX_KEEPERS` binds for 6 of 10 teams, so the model fills a cap rather than choosing at the margin. The keeper-count equilibrium is not closed: the exchange rate assumes 100 withheld while the advice implies ~123. And `keep_value` is rich at the top. None is obviously an error; all three now carry weight.
 4. **`WAIVER_VALUE` is open and now matters more.** Replacement is a per-role pair since #70 (5.121 HIT / 3.526 PIT). The #62 tie (4.381 from waiver churn against the internal-consistency objection) should be re-asked in that frame. Transaction logs WITH DATES would settle it.
 5. **The projection-source toggle.** Build last; `PROJECTION_BASIS` is the precedent. Backward-facing only, since Marcel 2027 does not exist.
 6. **`data/positions_2026.csv` goes stale.** A roster-time snapshot; rebuild when comp pools look wrong.
-7. **An expert review is scoped and unrun.** `docs/EXPERT-REVIEW.md` holds the question set for Pookie 2.0's owner, blind-first so the answers are scoreable rather than a review. Highest-value question is playing time (44 keeper calls flip on it alone); biggest testable claim is that 20 of the model's 25 largest bargains are pitchers.
-8. **Intuition tab v2 is blocked on Josh, not on work**: sandboxed overrides, or overrides that propagate through the 2027 pipeline. The propagating version is materially larger.
+7. **Intuition tab v2 is blocked on Josh, not on work**: sandboxed overrides, or overrides that propagate through the 2027 pipeline. The propagating version is materially larger.
 
 ## Deliberately NOT built, with the evidence
 - **A hitter/pitcher budget split.** The league pays the same per realised roto point for both roles (2.092 against 2.114). Refuted on its own data. #64.
@@ -68,6 +68,12 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 - **Changing the blend weights.** Swept in #70: the curve is flat from 0.5 to 1.0 and no alternative survives leave-one-season-out. `scripts/fit_blend.py` is the harness; do not re-sweep without new seasons.
 - **Relaxing the reliability discount** so recent ERA counts for more. Swept; production is the maximum. #71.3.
 - **A custom hover card** for the tooltips. Native tooltips use a proportional font and there is no hover on a phone; the drawer covers touch. #76.
+
+## How this session went wrong, four times (#78)
+
+**Every defect Josh found on 2026-09-08 was in the presentation layer, and every one came from changing the model without chasing the change through to what a reader sees.** A board shipped twice with correct numbers under the wrong headings; a tooltip stated arithmetic the model no longer performed; a confident wrong scale argument shipped and was corrected by the reader; and one question took three rounds to answer with an explanation when an instrument was available from the first.
+
+Three guards now exist because of them (`assertBoardRowShape()`, the rendered-cell check, the tooltip checks), and the app went from 15 verification checks to 17 plus a survey check. **The rule: a change to a dollar scale, a column, or a decision basis is not finished when the tests pass. It is finished when the thing a reader sees has been looked at.**
 
 ## Rules that bite
 - **Adding a board column takes FOUR edits** (#73): `BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS`, a `<td>` in `playerRow()` **at the same index**, and the phone CSS `nth-child` hide-list. Three of the four fail silently; forgetting the `<td>` shifts every column right of it under the wrong heading, which shipped twice.

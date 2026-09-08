@@ -170,14 +170,16 @@ Error bars: bootstrap ±34% per category denominator (2,000 resamples; the analy
 
 ## 5. Known limitations
 
+0. **The biggest one: the model does not beat this league's owners out of sample.** On 289 past keeper decisions, on the only season with clean labels, the owners are 71.6% right and beat a keep-everything baseline by $73.50 while the production rule is 68.7% and beats it by -$10.90. That test runs on a naive projection so it is a floor rather than a verdict, but the valuation machinery was held fixed, which points at the forecast rather than the pricing as the binding constraint (FINDINGS #69).
+0b. Three consequences of the #70 changes are load-bearing and unresolved: `MAX_KEEPERS` binds for 6 of 10 teams so the model fills a cap rather than choosing at the margin; the keeper-count equilibrium is unclosed (the exchange rate assumes 100 withheld while the advice implies ~123); and `keep_value` runs rich at the top (Skubal $86.93 against a revealed $34.31).
 1. The SV-punter exclusion is the single largest lever; every closer valuation rests on it.
 2. Upside is a single counterfactual (`upside_ft`), not a probability-weighted expectation. A comp-dispersion spread feature was tested as a price predictor and rejected (insignificant, loses on LOSO, FINDINGS #57.1); ZiPS P10-P90 remain unused in the projection.
 3. No aging curve by decision, and that decision is now empirically supported rather than merely inherited (FINDINGS #59). A 3-year contract's third year still reuses the 2028 figure with a flat discount.
 4. Waiver-wire value is now measured from two roster snapshots and disagrees with the internal-consistency route; replacement level is genuinely contested between 4.38 and 5.04 (FINDINGS #62). Transaction data WITH DATES would settle it.
-5. Rostered salary exceeds the cap ($3,194 vs $2,600) from IL and reserve artifacts; irrelevant to keeper math.
+5. Rostered salary ($3,235) exceeds the league cap ($2,600) because $260 is the AUCTION budget for 23 active slots and reserve players sit outside it (constitution, roster composition). Not a discrepancy; the $2,600 identity is over the 230 active slots, which is the right frame (FINDINGS #75).
 6. Uncertainty is propagated to `redraft_value` and `surplus_multiyear` only; `keep_value` and the comp estimator are point estimates.
 7. Positional replacement covers C and SS only, off by default; 1B/2B/3B/OF lack eligibility data.
-8. `production_value` still exceeds any price this league has ever paid (Skubal $52.75 against a $45 ceiling). `market_price` now prices the other quantity and lands at $34.00, agreeing with the revealed keeper price of $34.31 (FINDINGS #57.6). The two are deliberately not blended.
+8. `production_value` exceeds market prices at the TOP and falls short of them everywhere else: over all 277 rostered players it is 0.74x committed salary, but 1.39x across the top 50 and 0.19x across the bottom 157. Stars are underpriced and scrubs overpriced, which is why keeping is profitable. `market_price` is the only column comparable to a draft price (FINDINGS #75).
 9. The comp estimator still has no age axis, though age now exists in `data/chadwick_register.csv` and is used by the price and keeper models. Position coverage is fixed: `position_map()` was blank for 48% of the roster and is now 100% (FINDINGS #61).
 10. Exchange rate is poorly identified: 2026 split halves give $6.55 and $20.38; keeper-count mechanism not separable from time (n=5 auctions).
 11. Small n everywhere: 17 to 30 team-seasons per denominator, 404 purchases, 38 closers.
@@ -221,7 +223,8 @@ Every published tool (FanGraphs Auction Calculator, RotoWire Custom Auction Valu
 | `scripts/team_reports.py` | per-team keeper recommendations and 2026 acquisition channels |
 | `scripts/leaderboard_2026.py` | 2026 realised value and hindsight auction prices |
 | `scripts/lookup.py` | print board rows for named players |
-| `app/template.html`, `app/verify.mjs` | the interface, and the headless-browser diff of its JS against pandas |
+| `app/template.html`, `app/verify.mjs` | the interface, and the headless-browser diff of its JS against pandas (17 checks; three of them exist only because a reader found a defect first, FINDINGS #73, #74) |
+| `scripts/build_survey.py`, `app/verify_survey.mjs`, `scripts/ingest_survey.py` | the blind keep/cut survey for a human reviewer, its flow check, and the scorer (FINDINGS #77) |
 | `out/keeper_lab.html` | the app: one 6.7 MB file, 7 tabs, no server |
 | `out/keeper_board_2027.csv` | 275 rostered players with values, costs, surplus, bands, flags |
 | `out/model_params.json` | fitted constants: exchange rate, save model, denominators, baselines, config |
