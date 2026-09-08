@@ -48,6 +48,9 @@ SEASONS = (2022, 2023, 2024, 2025, 2026)
 HISTORY_START = min(SEASONS)
 
 
+RP_CATS = [f"rp_{c}" for c in C.CATS]
+
+
 def scored_history() -> pd.DataFrame:
     """Roto points per (season, fg_id) on that season's own scale."""
     sigma_rel = pooled_relative_dispersion()
@@ -86,7 +89,7 @@ def build() -> pd.DataFrame:
     a["fg_id"] = a["fg_id"].fillna(-1).astype(int)
     a = a.rename(columns={"roto_points": "rp_realized"})
 
-    scored = scored_history()[["season", "fg_id", "roto_points"]]
+    scored = scored_history()[["season", "fg_id", "roto_points"] + RP_CATS]
     pt = playing_time()
     prior = scored.merge(pt, on=["season", "fg_id"], how="outer")
 
@@ -94,9 +97,15 @@ def build() -> pd.DataFrame:
     for lag in (1, 2):
         lagged = prior.copy()
         lagged["season"] = lagged["season"] + lag        # S-lag line -> season S row
-        lagged = lagged.rename(columns={
-            "roto_points": f"rp_prior{lag}", "PA": f"PA_prior{lag}",
-            "IP": f"IP_prior{lag}", "SV": f"SV_prior{lag}"})
+        ren = {"roto_points": f"rp_prior{lag}", "PA": f"PA_prior{lag}",
+               "IP": f"IP_prior{lag}", "SV": f"SV_prior{lag}"}
+        if lag == 1:
+            # Per-category prior line, lag 1 only: the profile the comp
+            # estimator matches on (klab/auction_estimator.PROFILE_COLS).
+            ren.update({c: f"{c}_prior1" for c in RP_CATS})
+        else:
+            lagged = lagged.drop(columns=RP_CATS)
+        lagged = lagged.rename(columns=ren)
         out = out.merge(lagged, on=["season", "fg_id"], how="left")
         out[f"played_prior{lag}"] = out[f"rp_prior{lag}"].notna().astype(int)
 
@@ -135,6 +144,8 @@ def build() -> pd.DataFrame:
         out[f"rp_prior{lag}"] = out[f"rp_prior{lag}"].fillna(0.0)
         for c in ("PA", "IP", "SV"):
             out[f"{c}_prior{lag}"] = out[f"{c}_prior{lag}"].fillna(0.0)
+    for c in RP_CATS:
+        out[f"{c}_prior1"] = out[f"{c}_prior1"].fillna(0.0)
     out["rp_prior_best"] = out[["rp_prior1", "rp_prior2"]].max(axis=1)
     out["rp_prior_mean"] = out[["rp_prior1", "rp_prior2"]].mean(axis=1)
     out["log_salary"] = np.log(out["salary"])
@@ -147,7 +158,7 @@ def build() -> pd.DataFrame:
             "played_prior1", "played_prior2", "has_prior_window", "no_prior_line",
             "auction_tenure", "ever_bought_before", "last_salary",
             "last_salary_season", "years_since_last",
-            "birth_year", "age", "rp_realized", "played"]
+            "birth_year", "age", "rp_realized", "played"] + [f"{c}_prior1" for c in RP_CATS]
     return out[cols].sort_values(["season", "salary"], ascending=[True, False])
 
 
