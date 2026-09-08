@@ -286,6 +286,15 @@ The convergence worth reporting is at the top. For Skubal the two measures built
 
 **57.7 Where the systems disagree is the buy/sell signal.** Largest `production_value - market_price` gaps: Skubal +$17.91, Skenes +$17.78, Cade Smith +$16.96, Jhoan Duran +$16.35, Zach Neto +$15.69 (produce more than they will cost). Largest the other way: Ohtani's pitcher asset -$34.00, Cam Schlittler -$25.38, Gavin Williams -$19.33, Jordan Walker -$19.00, Nolan McLean -$19.52 (cost more than they produce). The sell list is almost entirely young pitchers, which is the market paying for prospect upside that the production model, correctly, does not see. Whether that is the market being wrong or the model being blind is the question Step 5 was meant to answer and could not.
 
+### 58. Innings were read in thirds notation as decimals (bug, fixed)
+FanGraphs writes innings pitched as `132.1` meaning 132 and one third, not 132.1. `klab/io.load_pitchers_history()` handed that straight to `denoms.py`, which sums it (`ppool["IP"].sum()`) and divides by it (`base_IP + ip` in `RotoScorer.pitchers()`) as a decimal. A pitcher with a `.1` fraction was short 0.233 innings and one with `.2` short 0.467, so a nine-man staff lost up to about 4 innings and every ERA and WHIP denominator sat on the wrong base.
+
+Worse than the rounding: the three pitcher files were on two different conventions. Actuals (`fg_pitchers_2022_2026.csv`) use thirds (fractional parts .0/.1/.2 only); the rest-of-season export is whole innings; ZiPS 2027 uses true decimals (.0/.3/.7). `project.py` blends actuals against ZiPS, so it was mixing units.
+
+Fixed at the loader: `IP = floor(IP) + frac x 10/3`. The check that it is right is that ERA and WHIP recomputed from the converted innings now reproduce FanGraphs' own columns exactly (Skubal 2026: derived 2.8564 / 0.9824 against stored 2.8564 / 0.9824; they did not match before).
+
+**Impact is small and is reported as small.** Mean absolute change in projected roto points: pitchers 0.0069, hitters 0.0000. Max change in `production_value` $0.15. Zero keep/cut flips. `$/rp` keep 10.010 to 10.003, redraft 6.526 to 6.522, replacement 4.7333 unchanged. The error largely cancelled: it shrank each pitcher's innings and the league denominator built from those same innings by the same proportion. Fixed because it is wrong, not because it moved a decision.
+
 ---
 
 **Exchange-rate trail.** $7.56 (#7/#14); $10.08 (#17, mechanism retracted #19); $9.11/$6.32 keeper/redraft (pre-#26); $9.26/$6.24 (#26); $9.26/$6.21 (#28); $9.17/$6.29 (#31); $6.58 to $7.56 positional (#52). Pooled 2022-26 $5.83 (CI 5.13-6.74); single-season ~+/-40% (#7); denominators +/-34% (#30).

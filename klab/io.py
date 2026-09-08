@@ -11,6 +11,7 @@ import unicodedata
 from difflib import SequenceMatcher
 from functools import wraps
 
+import numpy as np
 import pandas as pd
 
 from .config import DATA
@@ -102,6 +103,14 @@ def load_pitchers_history() -> pd.DataFrame:
     df = df.dropna(subset=["fg_id"])
     df["fg_id"] = df["fg_id"].astype(int)
     df["role"] = "PIT"
+    # FanGraphs writes innings in thirds notation: 132.1 is 132 + 1/3, not
+    # 132.1. Everything downstream sums and divides IP as a decimal, so a
+    # 9-pitcher staff lost up to ~4 innings and every ERA/WHIP denominator was
+    # computed on the wrong base. The ROS export is whole innings and ZiPS uses
+    # true decimals (.3/.7), so the actuals were the one file on a different
+    # convention and were being blended against the others (docs/FINDINGS.md #58).
+    ip = df["IP"].astype(float)
+    df["IP"] = np.floor(ip) + (ip - np.floor(ip)) * 10.0 / 3.0
     return df
 
 
