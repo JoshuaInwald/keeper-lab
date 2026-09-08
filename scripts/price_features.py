@@ -82,6 +82,45 @@ def ages() -> pd.DataFrame:
             .astype({"fg_id": int, "birth_year": int}))
 
 
+def comp_upside(d: pd.DataFrame, k: int = 25) -> pd.Series:
+    """Ex-ante upside: how differently did players who LOOKED like this one go on
+    to perform?
+
+    ROADMAP item 1 Step 5 asks for ZiPS P90-minus-P50 spread. That column exists
+    only in the 2027 and 2028 exports; no historical ZiPS archive is in `data/`,
+    so a coefficient on it cannot be estimated from 2023-2026 purchases. This is
+    the same idea built from data that does exist on both sides: for each
+    purchase, find the k nearest EARLIER purchases in ex-ante space (prior roto
+    points, prior playing time, age) and take the spread of what they actually
+    delivered. A 22-year-old with 300 PA has comps whose outcomes fan out; a
+    31-year-old with 600 PA has comps that cluster.
+
+    Strictly backward-looking: comps come from strictly earlier seasons, so this
+    is computable on auction day and leaks nothing.
+    """
+    axes = ["rp_prior1", "rp_prior2", "PA_prior1", "IP_prior1", "age"]
+    z = d[axes].copy()
+    z["age"] = z["age"].fillna(z["age"].mean())
+    scale = z.std().replace(0, 1.0)
+    z = z / scale
+
+    p90, p50, n_comp = [], [], []
+    for i, row in enumerate(z.itertuples(index=False, name=None)):
+        season = d["season"].iloc[i]
+        earlier = (d["season"] < season).to_numpy()
+        if earlier.sum() < k:
+            p90.append(np.nan); p50.append(np.nan); n_comp.append(int(earlier.sum()))
+            continue
+        dist = np.sqrt(((z[earlier] - np.array(row)) ** 2).sum(axis=1))
+        idx = dist.nsmallest(k).index
+        out = d.loc[idx, "rp_realized"]
+        p90.append(float(out.quantile(0.90)))
+        p50.append(float(out.quantile(0.50)))
+        n_comp.append(k)
+    spread = pd.Series(p90, index=d.index) - pd.Series(p50, index=d.index)
+    return spread
+
+
 def build() -> pd.DataFrame:
     a = pd.read_csv(C.OUT / "auction_sample.csv")
     a = a[["season", "team", "player", "salary", "pos", "fg_id", "match",
@@ -146,6 +185,9 @@ def build() -> pd.DataFrame:
             out[f"{c}_prior{lag}"] = out[f"{c}_prior{lag}"].fillna(0.0)
     for c in RP_CATS:
         out[f"{c}_prior1"] = out[f"{c}_prior1"].fillna(0.0)
+    # Step 5 upside proxy. Needs the finished feature columns, so it runs last.
+    out = out.sort_values(["season"]).reset_index(drop=True)
+    out["comp_upside"] = comp_upside(out)
     out["rp_prior_best"] = out[["rp_prior1", "rp_prior2"]].max(axis=1)
     out["rp_prior_mean"] = out[["rp_prior1", "rp_prior2"]].mean(axis=1)
     out["log_salary"] = np.log(out["salary"])
@@ -156,6 +198,7 @@ def build() -> pd.DataFrame:
             "PA_prior1", "IP_prior1", "SV_prior1",
             "PA_prior2", "IP_prior2", "SV_prior2",
             "played_prior1", "played_prior2", "has_prior_window", "no_prior_line",
+            "comp_upside",
             "auction_tenure", "ever_bought_before", "last_salary",
             "last_salary_season", "years_since_last",
             "birth_year", "age", "rp_realized", "played"] + [f"{c}_prior1" for c in RP_CATS]

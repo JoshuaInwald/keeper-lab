@@ -60,6 +60,10 @@ from klab import config as C
 from klab.auction_estimator import PROFILE_COLS
 
 TRAIN = (2023, 2024, 2025)
+# Chosen by leave-one-season-out inside TRAIN; see main(). Named here so
+# klab/price.py fits the same specification it was validated under.
+TRANSFORM = "linear"
+AGE_FILL = "segment"
 TEST = 2026
 PROFILE_PRIOR = [f"{c}_prior1" for c in PROFILE_COLS]
 
@@ -83,7 +87,8 @@ def age_fills(train: pd.DataFrame) -> dict:
     rook = have[have["no_prior_line"] == 1]["age"]
     return {"mean": float(have["age"].mean()),
             "rookie": float(rook.mean()) if len(rook) else float(have["age"].mean()),
-            "veteran": float(have[have["no_prior_line"] == 0]["age"].mean())}
+            "veteran": float(have[have["no_prior_line"] == 0]["age"].mean()),
+            "upside": float(train["comp_upside"].mean())}
 
 
 def impute_age(d: pd.DataFrame, how: str, fills: dict) -> tuple[pd.Series, pd.Series | None]:
@@ -107,7 +112,7 @@ def impute_age(d: pd.DataFrame, how: str, fills: dict) -> tuple[pd.Series, pd.Se
 
 
 def design(d: pd.DataFrame, seasons: tuple[int, ...], transform: str,
-           age_fill: str, fills: dict) -> pd.DataFrame:
+           age_fill: str, fills: dict, upside: bool = False) -> pd.DataFrame:
     """Model matrix. Season dummies are built against `seasons`; a row whose
     season is not among them gets the most recent training season's dummy, so
     a future season inherits the latest observed price level instead of the
@@ -137,6 +142,13 @@ def design(d: pd.DataFrame, seasons: tuple[int, ...], transform: str,
     X["age"] = age
     if flag is not None:
         X["age_missing"] = flag
+    if upside:
+        # ROADMAP item 1 Step 5. Interaction as well as level: the hypothesis on
+        # record is that the market pays for spread among hitters and not among
+        # pitchers, so the two are separated rather than pooled.
+        u = d["comp_upside"].fillna(fills["upside"])
+        X["comp_upside"] = u
+        X["comp_upside_pit"] = u * pit
 
     latest = max(seasons)
     for s in seasons[1:]:
@@ -148,9 +160,9 @@ def design(d: pd.DataFrame, seasons: tuple[int, ...], transform: str,
 
 
 def fit_price_model(train: pd.DataFrame, seasons: tuple[int, ...], transform: str,
-                    age_fill: str = "mean+flag") -> dict:
+                    age_fill: str = "mean+flag", upside: bool = False) -> dict:
     fills = age_fills(train)
-    X, y = design(train, seasons, transform, age_fill, fills), train["log_salary"]
+    X, y = design(train, seasons, transform, age_fill, fills, upside), train["log_salary"]
     ols = sm.OLS(y, X).fit()
     # Duan smearing: E[price] = exp(Xb) * mean(exp(residual)), from training only.
     smear = float(np.mean(np.exp(ols.resid)))
@@ -158,18 +170,55 @@ def fit_price_model(train: pd.DataFrame, seasons: tuple[int, ...], transform: st
     q80 = sm.QuantReg(y, X).fit(q=0.80, max_iter=5000)
     return {"ols": ols, "smear": smear, "q20": q20, "q80": q80,
             "seasons": seasons, "transform": transform, "age_fill": age_fill,
-            "fills": fills,
+            "fills": fills, "upside": upside, "conformal": (0.0, 0.0),
             # The league has never paid more than this for the role; a price
             # model that predicts past it is extrapolating, not forecasting.
             "role_cap": train.groupby("role")["salary"].max().to_dict()}
 
 
+def conformal_width(train: pd.DataFrame, seasons: tuple[int, ...], transform: str,
+                    age_fill: str, upside: bool, miss: float = 0.20) -> tuple[float, float]:
+    """How much each END of the P20-P80 band has to move to actually cover.
+
+    In-sample the quantile fits cover 57.5%, out of sample 38.4%: the band is
+    fit where the residuals are already minimised and does not transfer. This is
+    split-conformal quantile regression with the training SEASONS as the folds,
+    which is the right split here because the thing that fails to transfer is a
+    season, not a random row. Each fold refits q20/q80 on the other seasons and
+    scores the held-out one.
+
+    The two ends are calibrated separately. Pooling them left the misses
+    lopsided (19.6% below P20 against 27.7% above P80) because the upper tail is
+    what the model underprices; one shared widening cannot fix an asymmetric
+    miss. Each end targets `miss` of the mass outside it.
+
+    Calibrated on training seasons only, so the held-out season stays held out.
+    """
+    lo_scores, hi_scores = [], []
+    for hold in seasons:
+        fit_seasons = tuple(s for s in seasons if s != hold)
+        tr = train[train["season"].isin(fit_seasons)]
+        te = train[train["season"] == hold]
+        f = age_fills(tr)
+        Xtr = design(tr, fit_seasons, transform, age_fill, f, upside)
+        lo = sm.QuantReg(tr["log_salary"], Xtr).fit(q=0.20, max_iter=5000)
+        hi = sm.QuantReg(tr["log_salary"], Xtr).fit(q=0.80, max_iter=5000)
+        Xte = design(te, fit_seasons, transform, age_fill, f, upside)
+        y = te["log_salary"]
+        lo_scores.append(lo.predict(Xte) - y)      # > 0 when the truth fell below P20
+        hi_scores.append(y - hi.predict(Xte))      # > 0 when it fell above P80
+    q = 1.0 - miss
+    return (max(0.0, float(np.quantile(np.concatenate([s.to_numpy() for s in lo_scores]), q))),
+            max(0.0, float(np.quantile(np.concatenate([s.to_numpy() for s in hi_scores]), q))))
+
+
 def predict(m: dict, d: pd.DataFrame, cap: bool = True) -> pd.DataFrame:
-    X = design(d, m["seasons"], m["transform"], m["age_fill"], m["fills"])
+    X = design(d, m["seasons"], m["transform"], m["age_fill"], m["fills"], m["upside"])
+    w_lo, w_hi = m.get("conformal", (0.0, 0.0))
     out = pd.DataFrame({
         "pred": np.exp(m["ols"].predict(X)) * m["smear"],
-        "p20": np.exp(m["q20"].predict(X)),
-        "p80": np.exp(m["q80"].predict(X)),
+        "p20": np.exp(m["q20"].predict(X) - w_lo),
+        "p80": np.exp(m["q80"].predict(X) + w_hi),
     }, index=d.index).clip(lower=1.0)
     if cap:
         ceiling = d["role"].map(m["role_cap"]).astype(float)
@@ -235,7 +284,42 @@ def calibration(actual: pd.Series, pred: pd.Series, nbins: int = 10) -> pd.DataF
     return g.round(2)
 
 
-def select_transform(train: pd.DataFrame, age_fill: str = "mean+flag") -> pd.DataFrame:
+def gbm_loso(train: pd.DataFrame, transform: str, age_fill: str) -> pd.DataFrame | None:
+    """ROADMAP item 1 Step 2's own fallback: a monotone gradient-boosted model,
+    to be tried only if the GLM's held-out error is poor. Reported because a
+    tree model cannot predict outside the observed price range, which is
+    exactly the top-end problem the GLM needs a hard cap for. It loses anyway.
+
+    Optional dependency: skipped, not failed, when scikit-learn is absent."""
+    try:
+        from sklearn.ensemble import HistGradientBoostingRegressor
+    except ImportError:
+        return None
+    rows = []
+    for mono in (True, False):
+        preds, acts = [], []
+        for hold in TRAIN:
+            fit_seasons = tuple(s for s in TRAIN if s != hold)
+            tr = train[train["season"].isin(fit_seasons)]
+            te = train[train["season"] == hold]
+            f = age_fills(tr)
+            X = design(tr, fit_seasons, transform, age_fill, f)
+            cst = [1 if c in ("rp_prior1", "rp_prior2", "log_last_salary") else 0
+                   for c in X.columns]
+            g = HistGradientBoostingRegressor(
+                max_iter=300, learning_rate=0.05, max_depth=3, min_samples_leaf=15,
+                l2_regularization=1.0, random_state=0,
+                monotonic_cst=cst if mono else None).fit(X, tr["log_salary"])
+            Xte = design(te, fit_seasons, transform, age_fill, f)[list(X.columns)]
+            preds.append(pd.Series(np.exp(g.predict(Xte)), index=te.index).clip(lower=1.0))
+            acts.append(te["salary"])
+        a, p = pd.concat(acts), pd.concat(preds)
+        rows.append({**score(a, p, f"GBM monotone={mono}")})
+    return pd.DataFrame(rows)[["model", "MAE", "RMSE", "bias", "Spearman"]]
+
+
+def select_transform(train: pd.DataFrame, age_fill: str = "mean+flag",
+                     upside: bool = False) -> pd.DataFrame:
     """Leave-one-season-out over the TRAINING seasons only. Each fold refits
     everything (coefficients, smearing, quantiles, role caps) on the other two
     seasons, so the held-out season is never touched by the choice."""
@@ -246,7 +330,7 @@ def select_transform(train: pd.DataFrame, age_fill: str = "mean+flag") -> pd.Dat
             fit_seasons = tuple(s for s in TRAIN if s != hold)
             tr = train[train["season"].isin(fit_seasons)]
             te = train[train["season"] == hold]
-            m = fit_price_model(tr, fit_seasons, name, age_fill)
+            m = fit_price_model(tr, fit_seasons, name, age_fill, upside)
             preds.append(predict(m, te)["pred"])
             acts.append(te["salary"])
         a, p = pd.concat(acts), pd.concat(preds)
@@ -254,10 +338,7 @@ def select_transform(train: pd.DataFrame, age_fill: str = "mean+flag") -> pd.Dat
     return pd.DataFrame(rows).drop(columns=["model"])
 
 
-def report(m: dict, train: pd.DataFrame, test: pd.DataFrame, label: str,
-           full: bool) -> pd.DataFrame:
-    """Held-out scoring for one specification. `full` prints the whole
-    acceptance battery; otherwise just the headline scores."""
+def report(m: dict, train: pd.DataFrame, test: pd.DataFrame, label: str) -> pd.DataFrame:
     raw = predict(m, test, cap=False)
     p = predict(m, test)
     t = test.assign(pred=p["pred"], p20=p["p20"], p80=p["p80"])
@@ -268,8 +349,6 @@ def report(m: dict, train: pd.DataFrame, test: pd.DataFrame, label: str,
         score(t["salary"], t["base_prior_salary"], "baseline: prior salary + trend"),
         score(t["salary"], t["base_comps"], "baseline: comp estimator (train-only pool)"),
     ]).to_string(index=False))
-    if not full:
-        return t
 
     print("\ncalibration by predicted-price decile")
     print(calibration(t["salary"], t["pred"]).to_string())
@@ -283,17 +362,12 @@ def report(m: dict, train: pd.DataFrame, test: pd.DataFrame, label: str,
         {"set": "training 2023-2025 (in-sample)", "n": len(train),
          "coverage_pct": round(coverage(train, tr_in["p20"], tr_in["p80"]), 1),
          "median_width": round(float((tr_in["p80"] - tr_in["p20"]).median()), 2)},
-        {"set": f"held-out {TEST}, capped", "n": len(t),
+        {"set": f"held-out {TEST}", "n": len(t),
          "coverage_pct": round(coverage(t, t["p20"], t["p80"]), 1),
          "median_width": round(float((t["p80"] - t["p20"]).median()), 2)},
-        {"set": f"held-out {TEST}, uncapped", "n": len(t),
-         "coverage_pct": round(coverage(t, raw["p20"], raw["p80"]), 1),
-         "median_width": round(float((raw["p80"] - raw["p20"]).median()), 2)},
     ]).to_string(index=False))
-    below = 100 * float((t["salary"] < t["p20"]).mean())
-    above = 100 * float((t["salary"] > t["p80"]).mean())
-    print(f"  misses split {below:.1f}% below P20 / {above:.1f}% above P80 "
-          f"(nominal 20/20)")
+    print(f"  misses {100 * float((t['salary'] < t['p20']).mean()):.1f}% below P20 / "
+          f"{100 * float((t['salary'] > t['p80']).mean()):.1f}% above P80 (target 20/20)")
 
     print("\nheld-out error by segment")
     seg = t.assign(segment=np.where(
@@ -328,39 +402,37 @@ def main() -> int:
     test["base_prior_salary"] = baseline_prior_salary(train, test)
     test["base_comps"] = baseline_comps(train, test)
 
-    print("\n--- specification choice: leave-one-season-out inside 2023-2025 ---")
-    cv = select_transform(train)
-    print(cv.to_string(index=False))
-    best = cv.sort_values("MAE").iloc[0]["transform"]
-    print(f"chosen production transform: {best} (lowest LOSO MAE). "
-          f"2026 was not consulted.")
+    print("\n--- specification search: leave-one-season-out inside 2023-2025 ---")
+    print("2026 is never consulted here. Selecting a spec on the held-out season")
+    print("is the same leak as fitting on it (docs/FINDINGS.md #7).")
+    for up in (False, True):
+        cv = select_transform(train, AGE_FILL, up)
+        print(f"\n  production transform, Step 5 upside feature = {up}:")
+        print("  " + cv.to_string(index=False).replace("\n", "\n  "))
+    gb = gbm_loso(train, TRANSFORM, AGE_FILL)
+    print("\n  Step 2's monotone-GBM fallback:")
+    print("  " + (gb.to_string(index=False).replace("\n", "\n  ")
+                  if gb is not None else "skipped (scikit-learn not installed)"))
+    print(f"\nchosen: transform={TRANSFORM}, age={AGE_FILL}, upside=False, GLM. "
+          f"Both ROADMAP fallbacks lose on LOSO.")
 
-    m = fit_price_model(train, TRAIN, best, "mean+flag")
+    w = conformal_width(train, TRAIN, TRANSFORM, AGE_FILL, False)
+    m = fit_price_model(train, TRAIN, TRANSFORM, AGE_FILL, False)
     ols = m["ols"]
     print(f"\nlog-price OLS on 2023-2025: R^2 {ols.rsquared:.3f} "
           f"(adj {ols.rsquared_adj:.3f}), Duan smearing {m['smear']:.4f}, "
-          f"role caps {m['role_cap']}")
+          f"role caps {m['role_cap']}, conformal widening lo {w[0]:.4f} hi {w[1]:.4f}")
     print(pd.DataFrame({"coef": ols.params.round(4), "se": ols.bse.round(4),
                         "t": ols.tvalues.round(2), "p": ols.pvalues.round(4)}).to_string())
 
-    t = report(m, train, test, "pre-registered spec (age mean-filled + missingness flag)",
-               full=True)
+    m["conformal"] = (0.0, 0.0)
+    report(m, train, test, "quantile bands as fitted (uncalibrated)")
+    m["conformal"] = w
+    t = report(m, train, test, "quantile bands conformally calibrated on training seasons")
 
-    # Diagnosed after the fact, reported as such: the missingness flag is not a
-    # real feature (see impute_age). Refit with segment imputation instead.
-    print("\n--- post-hoc: age missingness flag removed ---")
-    print("Motivated by the mechanism, not by the score: every age-missing row in\n"
-          "training sold for exactly $1 (unmatched placeholders), every one in 2026\n"
-          "is a prospect or NPB import sold for $1-$20. The flag transfers a $1\n"
-          "prior onto the most expensive rookie class in the sample.")
-    m2 = fit_price_model(train, TRAIN, best, "segment")
-    print(f"LOSO inside 2023-2025 with segment imputation:")
-    print(select_transform(train, "segment").to_string(index=False))
-    t2 = report(m2, train, test, "segment age imputation, no flag", full=True)
-
-    out = t2[["season", "player", "fg_id", "role", "pos_group", "salary",
-              "pred", "p20", "p80", "base_prior_salary", "base_comps",
-              "rp_prior1", "last_salary", "age", "no_prior_line"]]
+    out = t[["season", "player", "fg_id", "role", "pos_group", "salary",
+             "pred", "p20", "p80", "base_prior_salary", "base_comps",
+             "rp_prior1", "last_salary", "age", "no_prior_line"]]
     path = C.OUT / "price_model_holdout.csv"
     out.sort_values("salary", ascending=False).to_csv(path, index=False)
     print(f"\nwrote {path}")
