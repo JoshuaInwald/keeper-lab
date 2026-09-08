@@ -2,6 +2,15 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-08 (Roto '26 ships: the projection gets a reference point)
+
+| type | item |
+|---|---|
+| built | `Roto '26` column: the full 2026 season (banked actuals + ZiPS rest-of-season) in roto points, next to the renamed `Roto '27`. Wacha reads 7.11 -> 2.52, which makes #72's whole question answer itself. The drawer carries the same three lines for phones, where both roto columns stay hidden (FINDINGS #73) |
+| built | The 2026 line was already built inline inside `project_hitters`/`project_pitchers` as "source A" and discarded. Extracted to `project.lines_2026_hitters()` / `lines_2026_pitchers()` so one definition serves both the projection and the new column. Board verified byte-identical across the refactor: zero diff on all 58 numeric columns |
+| built | Scored on the 2027 scale on purpose, so it can be subtracted from `Roto '27`. It therefore will not tie out against the 2026 standings; said so in the tooltip |
+| built | Sanity: largest declines are Misiorowski -9.84, Schlittler -8.83, Sale -7.39, all coming off unsustainable seasons; largest gains are Crochet +8.17, Greene +5.63, Strider +4.35, all hurt or ineffective in 2026. Regression to the mean, now visible |
+
 ## 2026-09-08 (user audit of the board: two challenged numbers, both hold)
 
 | type | item |

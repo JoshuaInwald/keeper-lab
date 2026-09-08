@@ -44,8 +44,8 @@ from .denoms import (RotoScorer, denominators_for_level,
                      pooled_relative_dispersion, season_levels, team_baselines,
                      teams_per_category)
 from .io import  load_rosters
-from .project import (fit_save_model, project_hitters, project_pitchers,
-                      projected_2027_levels)
+from .project import (fit_save_model, lines_2026_hitters, lines_2026_pitchers,
+                      project_hitters, project_pitchers, projected_2027_levels)
 
 
 @cached
@@ -110,6 +110,34 @@ def fit_exchange_rate(sigma=None, seasons=None):
 
 
 @cached
+def roto_2026_lines() -> pd.DataFrame:
+    """What each player is producing in 2026, in roto points, ON THE 2027 SCALE.
+
+    The line is the full 2026 season: banked actuals plus the ZiPS
+    rest-of-season projection for the weeks still to play, which is exactly the
+    projection's own "source A". Scored with the 2027 scorer ON PURPOSE, not
+    2026's: the whole point is to sit beside the 2027 figure and be subtracted
+    from it, and two numbers on different denominators cannot be. It is
+    therefore "his 2026 production, valued in 2027 money", not his contribution
+    to the 2026 standings, which the Standings tab already shows.
+
+    See docs/FINDINGS.md #73: a projection with nothing beside it cannot be
+    read, and every question about a surprising 2027 number turns out to be a
+    question about how far it sits from what the player just did.
+    """
+    scorer, _, _, _ = build_2027_scorer()
+    H = lines_2026_hitters()
+    P = lines_2026_pitchers()
+    H = H[H["PA"].fillna(0) > 0].copy()
+    P = P[P["IP"].fillna(0) > 0].copy()
+    h = pd.DataFrame({"fg_id": H["fg_id"].to_numpy(), "role": "HIT",
+                      "roto_2026": scorer.hitters(H)["roto_points"].to_numpy()})
+    p = pd.DataFrame({"fg_id": P["fg_id"].to_numpy(), "role": "PIT",
+                      "roto_2026": scorer.pitchers(P)["roto_points"].to_numpy()})
+    return pd.concat([h, p], ignore_index=True)
+
+
+@cached
 def project_all_players(full_time: bool = True) -> pd.DataFrame:
     """Every projected 2027 player with roto points on the 2027 scale.
 
@@ -134,7 +162,13 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
 
     Hs = H.join(scorer.hitters(H))
     Ps = P.join(scorer.pitchers(P))
-    keep = ["fg_id", "name", "role", "w_2026", "pt_scale", "pt_scale_kind", "roto_points"] + \
+    # Attached after to_full_time so the counterfactual PT scaling cannot touch
+    # it: roto_2026 is what actually happened, never a scaled-up version of it.
+    r26 = roto_2026_lines()
+    Hs = Hs.merge(r26[r26["role"] == "HIT"].drop(columns=["role"]), on="fg_id", how="left")
+    Ps = Ps.merge(r26[r26["role"] == "PIT"].drop(columns=["role"]), on="fg_id", how="left")
+    keep = ["fg_id", "name", "role", "w_2026", "pt_scale", "pt_scale_kind",
+            "roto_points", "roto_2026"] + \
            [f"rp_{c}" for c in C.CATS]
     for df in (Hs, Ps):
         for c in keep:
@@ -154,7 +188,7 @@ def project_all_players(full_time: bool = True) -> pd.DataFrame:
     split_rows = out[split_names].copy()
     out = out[~split_names]
 
-    num = [c for c in out.columns if c.startswith("rp_")] + ["roto_points"] + \
+    num = [c for c in out.columns if c.startswith("rp_")] + ["roto_points", "roto_2026"] + \
           [c for c in stat_cols if c not in ("AVG", "ERA", "WHIP")]
     out["_hit"] = (out["role"] == "HIT").astype(int)
     out["_pit"] = (out["role"] == "PIT").astype(int)

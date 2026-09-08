@@ -43,7 +43,7 @@ PLAYER_COLS = [
     "fg_id", "name", "team", "role", "il", "position", "mlb_team",
     "salary", "contract", "keeper_status", "keeper_cost", "years_controlled",
     "keepable", "extension_used", "extension_option", "extension_years", "keep_2027",
-    "roto_points", "rp_above_repl", "redraft_value", "keep_value",
+    "roto_points", "roto_2026", "rp_above_repl", "redraft_value", "keep_value",
     # production_value is redraft_value renamed; market_price is the separate
     # auction-cost quantity, NaN until ROADMAP item 1 Step 3 (docs/FINDINGS.md #56).
     "production_value", "market_price", "market_price_lo", "market_price_hi",

@@ -117,23 +117,35 @@ def _safe_div(a, b):
 # --- hitters ----------------------------------------------------------------
 
 @cached
-def project_hitters() -> pd.DataFrame:
+def lines_2026_hitters() -> pd.DataFrame:
+    """A full 2026 hitter season: banked actuals plus the ZiPS rest-of-season
+    projection for the weeks still to play.
+
+    This is the projection's "source A". It is extracted so the board can SHOW
+    it (docs/FINDINGS.md #73): a 2027 number with nothing to compare it against
+    cannot be read, and the first question anyone asks of a projection is how
+    far it sits from what the player just did.
+    """
     hist = load_hitters_history()
     a26 = hist[hist["season"] == 2026].copy()
     ros = load_ros_hitters()
 
-    ros_cols = ["fg_id", "PA", "AB", "H", "HR", "R", "RBI", "SB"]
-    r = ros[ros_cols].groupby("fg_id", as_index=False).sum()
-    a = a26[["fg_id", "name", "PA", "AB", "H", "HR", "R", "RBI", "SB"]].groupby(
-        "fg_id", as_index=False).agg({"name": "first", **{c: "sum" for c in
-        ["PA", "AB", "H", "HR", "R", "RBI", "SB"]}})
+    cols = ["PA", "AB", "H", "HR", "R", "RBI", "SB"]
+    r = ros[["fg_id"] + cols].groupby("fg_id", as_index=False).sum()
+    a = a26[["fg_id", "name"] + cols].groupby("fg_id", as_index=False).agg(
+        {"name": "first", **{c: "sum" for c in cols}})
 
-    # Source A = 2026 actuals + rest of season
     A = a.merge(r, on="fg_id", how="outer", suffixes=("", "_ros"))
     A["name"] = A["name"].fillna("")
-    for c in ["PA", "AB", "H", "HR", "R", "RBI", "SB"]:
+    for c in cols:
         A[c] = A[c].fillna(0.0) + A[f"{c}_ros"].fillna(0.0)
-    A = A[["fg_id", "name", "PA", "AB", "H", "HR", "R", "RBI", "SB"]]
+    return A[["fg_id", "name"] + cols]
+
+
+@cached
+def project_hitters() -> pd.DataFrame:
+    # Source A = 2026 actuals + rest of season
+    A = lines_2026_hitters()
 
     z = load_zips27_hitters()
     B = z[["fg_id", "name", "PA", "AB", "H", "HR", "R", "RBI", "SB"]].groupby(
@@ -183,8 +195,14 @@ def project_hitters() -> pd.DataFrame:
 # --- pitchers ---------------------------------------------------------------
 
 @cached
-def project_pitchers(save_model: dict | None = None) -> pd.DataFrame:
-    save_model = save_model or fit_save_model()
+@cached
+def lines_2026_pitchers() -> pd.DataFrame:
+    """A full 2026 pitcher season: banked actuals plus ZiPS rest-of-season.
+
+    The projection's "source A", extracted for the same reason as the hitter
+    version (docs/FINDINGS.md #73). `reliever` rides along because the save
+    model needs it and it is derived from the same G/GS split.
+    """
     hist = load_pitchers_history()
     a26 = hist[hist["season"] == 2026].copy()
     ros = load_ros_pitchers()
@@ -200,7 +218,14 @@ def project_pitchers(save_model: dict | None = None) -> pd.DataFrame:
     for c in cols:
         A[c] = A[c].fillna(0.0) + A[f"{c}_ros"].fillna(0.0)
     A["reliever"] = A["GS"].fillna(0) < 0.5 * A["G"].fillna(0).clip(lower=1)
-    A = A[["fg_id", "name", "reliever"] + cols]
+    return A[["fg_id", "name", "reliever"] + cols]
+
+
+@cached
+def project_pitchers(save_model: dict | None = None) -> pd.DataFrame:
+    save_model = save_model or fit_save_model()
+    A = lines_2026_pitchers()
+    cols = ["IP", "W", "SV", "K", "ER", "BB", "H"]
 
     z = load_zips27_pitchers().rename(columns={"SO": "K"})
     B = z[["fg_id", "name"] + [c for c in cols if c != "SV"]].groupby(
