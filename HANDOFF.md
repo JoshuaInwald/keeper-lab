@@ -1,7 +1,9 @@
 # Session handoff
 
 Current state only; history is in `docs/SESSION-LOG.md`, evidence in `docs/FINDINGS.md`.
-Last updated 2026-09-08. Read `CONSTRAINTS.md` first, then this.
+Last updated 2026-09-09. Read `CONSTRAINTS.md` first, then this. The full
+bottom-up model review, with ranked error sources and the projection refresh
+calendar, is `docs/MODEL-REVIEW.md`.
 
 ## What this project is for
 
@@ -29,6 +31,7 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 - `keep_2027` runs on `keep_value` (`KEEP_BASIS = "replacement"`, #70); the old redraft basis is still selectable. The calibration pool is the fieldable 140/90 (`POOL_RULE = "slot_role"`, #70).
 - `keep_value` runs rich at the top: Skubal $86.93 against a revealed $34.31. The decision only needs it to clear his cost, so the ordering is safe and the level is not.
 - The app carries `Roto '26`, `Roto '27` and `Move` in standings places (#72), a `playing time` selector (#76), and per-category decomposition on hover (#74).
+- Since 2026-09-09 (#80): 2028 values and the owner audit use per-role replacement; the bootstrap bands follow `POOL_RULE` and `KEEP_BASIS` (they bracket the headline surplus now); the Monte Carlo shock sign is fixed for pitcher negative stats; Ohtani counts once in every roster sum and is tradeable in the finder; free-agent surplus is on the keep scale.
 - Age exists (`data/chadwick_register.csv`); the market discounts 8.0% per year holding production constant. This does not reopen the aging-curve decision for production, which `CONSTRAINTS.md` declines.
 - Ohtani is two 2027 assets. `F` contracts are unkeepable. Payout 50/25/15/breakeven.
 - Unresolved data questions: Skubal's +$15 salary step and the deGrom/Turang contract clocks (#23.4, #25).
@@ -50,9 +53,9 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 ## Open, in priority order
 
 0. **Run the survey (`docs/WORKFLOWS.md` 6b). It is the only item here that can be done today.** `out/keeper_survey.html` collects blind keep/cut calls from Pookie 2.0's owner and from Josh; `scripts/ingest_survey.py` scores them against the model and each other. #69 makes a good owner a benchmark rather than a reviewer, and the role-split price calibration is the test of the model's most falsifiable claim (20 of its 25 biggest bargains are pitchers).
-1. **The model does not beat the owners out of sample (#69), and #70 has not been re-scored.** #69 measured each change in isolation; the shipped combination has never been run through `backtest_keepers.py` at the new defaults. Cheapest first move of any session.
-2. **Attack the projection.** The blend constants are fitted and flat (#70), so the gains are in the SOURCE: a fresh ZiPS 2027 export incorporating the finished 2026 season is the highest-value data refresh available before the auction. Steamer or THE BAT as a second opinion is the next step after that.
-3. **Three consequences of #70 are now load-bearing.** `MAX_KEEPERS` binds for 6 of 10 teams, so the model fills a cap rather than choosing at the margin. The keeper-count equilibrium is not closed: the exchange rate assumes 100 withheld while the advice implies ~123. And `keep_value` is rich at the top. None is obviously an error; all three now carry weight.
+1. ~~Re-score the #70 combination~~ **Done, #79.1**: the MAX_KEEPERS cap changes zero of 289 backtest calls, so the shipped rule scores as `model_replace` in #69: it edges the owners on 2026 dollars (+$78.6 vs +$73.5 vs keep-everything) and trails on accuracy (64.9% vs 71.6%). It wins by sizing, not classification.
+2. **Attack the projection, on this calendar (`docs/MODEL-REVIEW.md` section 5).** No 2026-aware 2027 projection exists anywhere before ~Nov 2026. First week of Oct: refresh 2026 final actuals. ~Nov: Steamer 2027 lands on FanGraphs, first 2026-aware system; ingest as `PROJ_2027_*` (a filename switch). Nov-Jan: fresh ZiPS 2027 + DC. ~Feb: ATC (an accuracy-weighted aggregate; aggregates beat every single system in every published test). FanGraphs CSV export is members-only now; budget the membership.
+3. **Two consequences of #70 still carry weight; the third is measured and small.** `MAX_KEEPERS` binds for 6 of 10 teams, so the model fills a cap rather than choosing at the margin. `keep_value` is rich at the top. The keeper-count equilibrium is now closed by measurement (#79.35): the loop converges at 121 keeps against the shipped 123, flipping only Brooks Lee and Kyle Stowers, so it is a two-flip worry, not a structural one.
 4. **`WAIVER_VALUE` is open and now matters more.** Replacement is a per-role pair since #70 (5.121 HIT / 3.526 PIT). The #62 tie (4.381 from waiver churn against the internal-consistency objection) should be re-asked in that frame. Transaction logs WITH DATES would settle it.
 5. **The projection-source toggle.** Build last; `PROJECTION_BASIS` is the precedent. Backward-facing only, since Marcel 2027 does not exist.
 6. **`data/positions_2026.csv` goes stale.** A roster-time snapshot; rebuild when comp pools look wrong.
@@ -69,11 +72,9 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 - **Relaxing the reliability discount** so recent ERA counts for more. Swept; production is the maximum. #71.3.
 - **A custom hover card** for the tooltips. Native tooltips use a proportional font and there is no hover on a phone; the drawer covers touch. #76.
 
-## How this session went wrong, four times (#78)
+## The standing trap (#78, four defects on 2026-09-08; #80.2 was the same class)
 
-**Every defect Josh found on 2026-09-08 was in the presentation layer, and every one came from changing the model without chasing the change through to what a reader sees.** A board shipped twice with correct numbers under the wrong headings; a tooltip stated arithmetic the model no longer performed; a confident wrong scale argument shipped and was corrected by the reader; and one question took three rounds to answer with an explanation when an instrument was available from the first.
-
-Three guards now exist because of them (`assertBoardRowShape()`, the rendered-cell check, the tooltip checks), and the app went from 15 verification checks to 17 plus a survey check. **The rule: a change to a dollar scale, a column, or a decision basis is not finished when the tests pass. It is finished when the thing a reader sees has been looked at.**
+**A change to a dollar scale, a column, or a decision basis is not finished when the tests pass. It is finished when the thing a reader sees has been looked at.** Every defect a reader has found was presentation-layer fallout of a model change; the guards that exist (`assertBoardRowShape()`, the rendered-cell check, the tooltip checks) each exist because a human found the defect first.
 
 ## Rules that bite
 - **Adding a board column takes FOUR edits** (#73): `BOARD_FIELDS` in `scripts/build_app.py`, `BOARD_COLS`, a `<td>` in `playerRow()` **at the same index**, and the phone CSS `nth-child` hide-list. Three of the four fail silently; forgetting the `<td>` shifts every column right of it under the wrong heading, which shipped twice.

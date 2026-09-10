@@ -2,6 +2,25 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-09 (bottom-up model review)
+
+| type | item |
+|---|---|
+| built | `docs/MODEL-REVIEW.md`: the full chain read against outside methodology (SGP literature, projection-accuracy studies, keeper-inflation treatments), framed as three reviewers; ranked error sources; projection refresh calendar. Two web-research passes and one code-review subagent behind it |
+| built | HANDOFF item 1 closed: the shipped #70 combination re-scored through `backtest_keepers.py`; the MAX_KEEPERS cap changes zero of 289 calls, so the shipped rule scores as `model_replace` in #69 (edges owners on 2026 dollars +78.6 vs +73.5, trails on accuracy). #79.1 |
+| declined | Role-specific future-year discount (the sharpest outside objection): measured league retention 0.751 HIT / 0.526 PIT, engine already implies 0.873 / 0.556 on the decision scale; a second haircut would double-count. #79.2 |
+| bug | 2028 values priced every hitter against the pitcher replacement bar (+$9.90 each); same scalar overstated hitters ~$10 in the owner audit. Zero keep flips (decision scale never saw it). #80.1 |
+| bug | Bootstrap bands used the pre-#70 role-blind pool and the redraft basis under a keep-basis headline; both now follow config. Bands bracket their headline; 9 of 123 keeps below 80% confidence. #80.2 |
+| bug | Monte Carlo hot/cold shock raised a hot pitcher's ER/BB/hits-allowed along with his W/K; sign flipped for negative stats in Python and the JS port. #80.3 |
+| bug | Ohtani double-counted in `_team_volume` (every win-now evaluation and finish-odds draw), `validate.py` check 1, and the app payload; trade finder silently skipped him via a swallowed "ambiguous" error. `find_player` now combines split rows into one asset. #80.4 |
+| bug | Rewound exchange scored 2022-23 purchases with the 2024-26 SV field size, an ex-ante leak in the backtest; numerically neutral, fixed for the principle. #80.5 |
+| bug | Free-agent multi-year surplus ran on the redraft scale beside a keep-basis board; now follows `KEEP_BASIS`. #80.6 |
+| built | `ros_lines`/`prorated_to_date_lines` memoised (trade-finder rebuild ~135s to ~100s); `sensitivity.knob()` clear-list completed; doubled `@cached` removed. #80.7 |
+| built | Projection question answered with dates: no 2026-aware 2027 projection exists anywhere until ~Nov 2026 (Steamer first, ZiPS Nov-Jan, ATC Feb; aggregates beat single systems in every published test); refresh calendar in MODEL-REVIEW section 5 and HANDOFF |
+| built | The keeper-count equilibrium closed by measurement: refitting the exchange rate at 100-130 assumed keepers moves $/pt 10.00-11.94 but the advice converges at 121 keeps (vs 123 shipped), flipping only Brooks Lee and Kyle Stowers. A two-flip worry, not structural. #79.35 |
+| bug | The finder's shortlist and win-now picker also treated split rows as separate half-strength assets (name-keyed `set_index` returned a Series and crashed the batch); both aggregate per name now. #80.4 |
+| bug | The quoted CHECK 1 standings correlation (0.851) was stale: it predates the 2026-09-07 evening actuals refresh. Current: 0.527 pre-fix, 0.588 after the dedup, and the check decays by construction late in a season. Docs trued. #80.65 |
+
 ## 2026-09-08 (assessment phase B, then a reader pass over the result)
 
 One long session. Phase A had run earlier the same day (below); B answered its

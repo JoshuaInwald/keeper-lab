@@ -5,7 +5,7 @@ Read `CONSTRAINTS.md` and `HANDOFF.md` before doing anything. If the ask is a tr
 ## What this repo is
 - `klab/`: the engine. `scripts/run_all.py` rebuilds every output; `scripts/build_app.py` inlines a snapshot into `out/keeper_lab.html` (single file, no server, opens on a phone).
 - `out/`: committed build artifacts (the app, `model_params.json`, two core tables, trade suggestions, audit). Everything else the scripts write is gitignored.
-- `docs/`: METHODS (how), FINDINGS (results, numbered #1-#76, cited from code comments), ROADMAP (next), WORKFLOWS (recipes), SESSION-LOG (history), EXPERT-REVIEW (question set for the league expert), ASSESSMENT-BRIEF (a closed phase, kept as a stub), constitution.txt (league rules).
+- `docs/`: METHODS (how), FINDINGS (results, numbered #1-#80, cited from code comments), MODEL-REVIEW (the 2026-09-09 bottom-up review: error sources, projection calendar), ROADMAP (next), WORKFLOWS (recipes), SESSION-LOG (history), EXPERT-REVIEW (question set for the league expert), ASSESSMENT-BRIEF (a closed phase, kept as a stub), constitution.txt (league rules).
 - `data/`: gitignored working copy of raw exports; master copies in `~/Documents/Fantasy Baseball/`. `data/README.md` says what each file is and how often it needs refreshing.
 
 ## Three surfaces (keep in sync; a change that reaches one is not done)

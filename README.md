@@ -7,10 +7,9 @@ Player-valuation engine for a private 10-team 5x5 roto keeper auction league (CB
 Ranked by value per hour. Full context in `HANDOFF.md`; evidence in `docs/FINDINGS.md`.
 
 1. **Run the survey, both of you.** `out/keeper_survey.html` collects blind keep/cut calls and auction prices; `scripts/ingest_survey.py` scores them. The model does NOT beat this league's owners out of sample (#69), so a good owner is a benchmark, not a reviewer. Recipe in `docs/WORKFLOWS.md` 6b. **Doable today, and nothing else on this list is.**
-2. **Re-score what shipped.** #70 changed the keep basis and the calibration pool; #69 measured each in isolation and the combination has never been run through `scripts/backtest_keepers.py` at the new defaults. One command, and it validates or indicts the day's biggest change.
-3. **October: refresh completed 2026 actuals.** The blend already knows what to do with them and they are currently ~88% of a season. A free improvement needing no new projection.
-4. **November onward: a fresh ZiPS or Steamer 2027.** #69 localised the binding constraint to the projection rather than the valuation machinery, and the current ZiPS export is a mid-2026 vintage. This is the highest-value data refresh before the auction, which follows a keeper deadline a few weeks before opening day.
-5. **Watch the three load-bearing consequences of #70:** `MAX_KEEPERS` binds for 6 of 10 teams, the keeper-count equilibrium is unclosed (the exchange rate assumes 100 withheld, the advice implies ~123), and `keep_value` runs rich at the top.
+2. **October: refresh completed 2026 actuals.** The blend already knows what to do with them and they are currently ~88% of a season. A free improvement needing no new projection.
+3. **November onward: the projection refresh calendar** (`docs/MODEL-REVIEW.md` section 5): Steamer 2027 ~Nov (first 2026-aware system), fresh ZiPS Nov-Jan, ATC ~Feb. #69 localised the binding constraint to the projection; nothing 2026-aware exists anywhere before then. (The shipped decision rule itself has now been re-scored: it edges the owners on 2026 dollars, #79.1.)
+4. **Watch the three load-bearing consequences of #70:** `MAX_KEEPERS` binds for 6 of 10 teams, the keeper-count equilibrium is unclosed (the exchange rate assumes 100 withheld, the advice implies ~123), and `keep_value` runs rich at the top. Closing the keeper-count loop is the first candidate for the next modeling session.
 
 **The standing trap** (#73, #78): a change to a dollar scale, a column, or a decision basis is not finished when the tests pass. It is finished when the thing a reader sees has been looked at. Four defects shipped today because of this; three guards now exist because of them.
 
@@ -38,7 +37,7 @@ open out/keeper_lab.html                                # the app: one file, no 
 
 | check | result |
 |---|---|
-| rostered players to 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale) |
+| rostered players to 2026 standings | Spearman 0.588, Pearson 0.691 (2026-09-09; decays by construction late in a season as in-season adds bank production elsewhere; older quoted 0.85-0.86 predated the last actuals refresh) |
 | replacement level, per role | 5.12 hitters / 3.53 pitchers (fieldable pool) vs 3.98 (auction intercept) |
 | budget identity | the calibration pool's `redraft_value` sums to exactly $2,600 |
 | decision robustness | ~90% of keep/cut calls hold across six modelling variants |
@@ -69,8 +68,9 @@ docs/            METHODS, FINDINGS, ROADMAP, WORKFLOWS, SESSION-LOG, constitutio
 |---|---|
 | `docs/WORKFLOWS.md` | asked to evaluate a trade, a keeper, a price, a team: tested recipes, run first |
 | `docs/METHODS.md` | how every number is computed, judgment calls, limitations, module map |
-| `docs/FINDINGS.md` | the 55 empirical results, condensed, retractions preserved |
-| `docs/ROADMAP.md` | what is next, starting with the market-price recalibration |
+| `docs/FINDINGS.md` | the 80 empirical results, condensed, retractions preserved |
+| `docs/MODEL-REVIEW.md` | the bottom-up review: reviewer lenses, ranked error sources, projection calendar |
+| `docs/ROADMAP.md` | what is next, and what is declined with its evidence |
 | `docs/SESSION-LOG.md` | what was built and broken, by date |
 | `HANDOFF.md` | current state, next session start here |
 | `CONSTRAINTS.md` | permanent decisions; violating one is a session failure |

@@ -60,7 +60,7 @@ redraft_value  = max(0, (rp - replacement_rp) x usd_per_rp + 1)      # headline;
 keep_value     = max(0, (rp - intercept) / slope)                     # auction opportunity cost, $10.00/pt
 ```
 
-The pool is role-constrained because a projection ranks 183 hitters and 47 pitchers into a role-blind top 230, a set no ten teams could field, which handed hitters 73.7% of the budget against a perfect-foresight 52-55% (FINDINGS #65, #68, #69). `meta["replacement_by_role"]` carries the pair; `meta["replacement_rp"]` stays the lower of the two for the downstream consumers that read one scalar (the app's free agents, the finish-odds sim).
+The pool is role-constrained because a projection ranks 183 hitters and 47 pitchers into a role-blind top 230, a set no ten teams could field, which handed hitters 73.7% of the budget against a perfect-foresight 52-55% (FINDINGS #65, #68, #69). `meta["replacement_by_role"]` carries the pair and is used by `value_2028`, the bootstrap bands and the decision audit (FINDINGS #80); `meta["replacement_rp"]` stays the lower of the two for the remaining scalar consumers (the finish-odds sim's empty-slot fill, `ros_value_over_replacement`), a documented display-layer approximation (MODEL-REVIEW 4.9).
 
 Current: replacement 5.12 HIT / 3.53 PIT, $6.21/rp redraft. Both are computed on expected playing time. `keeper.pt_scale()` / `to_full_time()` produce the counterfactual columns `redraft_value_ft` and `upside_ft` at `KEEPER_PA_FLOOR = 600`, `KEEPER_IP_FLOOR = 150`, `KEEPER_SV_FLOOR = 25`, `KEEPER_RP_IP_FLOOR = 65`, capped at `MAX_PT_SCALE = 2.0`; `keeper.pt_scale_kind()` tags each as `health` or `role` (reliever handed the closer job). `board.value_2028()` prices the out year on the same 2027 scale. `POSITIONAL_ADJUSTMENT` (off) swaps in `keeper.two_position_replacement()` for C and SS (`TWO_POS_SLOTS`); `keeper.positional_replacement()` is the full-spectrum version, disabled for lack of eligibility coverage.
 
@@ -88,7 +88,7 @@ Later years clip at zero because a contract is an option, not an obligation. A r
 
 ### 2.7 Keeper optimisation
 
-`board.mark_optimal_keepers()`: per team, every player with positive `surplus_redraft`, best first, capped at `MAX_KEEPERS`; if fewer than `MIN_KEEPERS` clear zero, the least-bad six are forced. `api._inflation()`: `inflation = (cap - kept salary) / (cap - kept worth)` given every team keeps optimally; +33% in the current build (moves every rebuild). `freeagents.free_agent_board()` prices the unrostered pool with the contract each player would carry on re-add. `uncertainty.bootstrap_bands()` resamples pooled team-seasons (B=1000) for `value_lo/hi`, `surplus_lo/hi`, `p_surplus_positive`.
+`board.mark_optimal_keepers()`: per team, every player with positive `surplus_redraft`, best first, capped at `MAX_KEEPERS`; if fewer than `MIN_KEEPERS` clear zero, the least-bad six are forced. `api._inflation()`: `inflation = (cap - kept salary) / (cap - kept worth)` given every team keeps optimally; +33% in the current build (moves every rebuild). `freeagents.free_agent_board()` prices the unrostered pool with the contract each player would carry on re-add, multi-year surplus on the same `KEEP_BASIS` scale as the board (FINDINGS #80). `uncertainty.bootstrap_bands()` resamples pooled team-seasons (B=1000) for `value_lo/hi` (redraft scale), `surplus_lo/hi` and `p_surplus_positive` (the `KEEP_BASIS` scale, replacement refit per draw under `POOL_RULE`; the exchange fit is held fixed, FINDINGS #80).
 
 ### 2.8 Trade evaluation, two lenses
 
@@ -96,7 +96,7 @@ Later years clip at zero because a contract is an option, not an obligation. A r
 
 ### 2.9 Finish-odds Monte Carlo
 
-`standings_sim.simulate_finish_odds()` draws one shared hot/cold shock per player per simulated season, scaled per category by `1 - RELIABILITY` (SV borrows W), applied to rest-of-2026 lines; reports P(1st) to P(`PAYOUT_SPOTS`) and `p_money`. Playing time is not jittered. `simulate_keeper_finish_odds()` does the same for 2027 keeper cores with replacement fill held fixed, per projection basis. The JS port must agree within 8 points (observed 0.4 to 1.7).
+`standings_sim.simulate_finish_odds()` draws one shared hot/cold shock per player per simulated season, scaled per category by `1 - RELIABILITY` (SV borrows W), applied to rest-of-2026 lines; a hot draw LOWERS ER/BB/hits-allowed (FINDINGS #80.3); reports P(1st) to P(`PAYOUT_SPOTS`) and `p_money`. Playing time is not jittered. `simulate_keeper_finish_odds()` does the same for 2027 keeper cores with replacement fill held fixed, per projection basis. The JS port must agree within 8 points (observed 0.4 to 1.7).
 
 ### 2.10 Comp-based auction estimator
 
@@ -149,7 +149,7 @@ Two keeper bases ship. `keep_2027` is production surplus and is the recommendati
 
 | check | result | source |
 |---|---|---|
-| current rosters rolled over 2026 actuals vs 2026 standings | Spearman 0.851, Pearson 0.885 (2026-09-07 rerun; 0.863 in older docs was stale); league leader predicted 1st | `scripts/validate.py` |
+| current rosters rolled over 2026 actuals vs 2026 standings | Spearman 0.588, Pearson 0.691 (2026-09-09 rerun after the split-player dedup, #80.4; the 0.851 and 0.863 in older docs predate the 2026-09-07 evening actuals refresh and were stale). This check decays by construction as the season ages: it credits a team's CURRENT roster with full-season production, and in-season adds banked it elsewhere. Directional only | `scripts/validate.py` |
 | replacement level, four routes, none fitted to agree | 5.121 HIT / 3.526 PIT (fieldable pool, used) vs 3.978 (auction intercept) vs 4.381 (300th) vs 4.12-4.39 (observed waiver churn, FINDINGS #62) | `out/model_params.json`, `scripts/waiver_value.py` |
 | budget identity | the calibration pool's `redraft_value` sums to exactly $2,600 (caught a $3,854 build) | `scripts/audit.py`, pytest |
 | budget identity, role split | The pool is the fieldable 140 hitters / 90 pitchers and allocates 54.2% to hitters, inside the 52.0-55.1% band that perfect foresight on completed seasons produces for the same rule. The league's 63-64% is auction SPEND over a different population and is not this quantity (FINDINGS #68 item 5); do not fix with a budget split, #64 refutes it | `scripts/validate.py` CHECK 5 |
@@ -177,7 +177,7 @@ Error bars: bootstrap ±34% per category denominator (2,000 resamples; the analy
 3. No aging curve by decision, and that decision is now empirically supported rather than merely inherited (FINDINGS #59). A 3-year contract's third year still reuses the 2028 figure with a flat discount.
 4. Waiver-wire value is now measured from two roster snapshots and disagrees with the internal-consistency route; replacement level is genuinely contested between 4.38 and 5.04 (FINDINGS #62). Transaction data WITH DATES would settle it.
 5. Rostered salary ($3,235) exceeds the league cap ($2,600) because $260 is the AUCTION budget for 23 active slots and reserve players sit outside it (constitution, roster composition). Not a discrepancy; the $2,600 identity is over the 230 active slots, which is the right frame (FINDINGS #75).
-6. Uncertainty is propagated to `redraft_value` and `surplus_multiyear` only; `keep_value` and the comp estimator are point estimates.
+6. Uncertainty is propagated to `redraft_value` and `surplus_multiyear` (on the `KEEP_BASIS` scale since #80) only; the exchange fit inside the surplus draws is held fixed, so its own ~±40% (#7) is not in the bands; the comp estimator is a point estimate.
 7. Positional replacement covers C and SS only, off by default; 1B/2B/3B/OF lack eligibility data.
 8. `production_value` exceeds market prices at the TOP and falls short of them everywhere else: over all 277 rostered players it is 0.74x committed salary, but 1.39x across the top 50 and 0.19x across the bottom 157. Stars are underpriced and scrubs overpriced, which is why keeping is profitable. `market_price` is the only column comparable to a draft price (FINDINGS #75).
 9. The comp estimator still has no age axis, though age now exists in `data/chadwick_register.csv` and is used by the price and keeper models. Position coverage is fixed: `position_map()` was blank for 48% of the roster and is now 100% (FINDINGS #61).
