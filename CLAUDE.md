@@ -5,7 +5,7 @@ Read `CONSTRAINTS.md` and `HANDOFF.md` before doing anything. If the ask is a tr
 ## What this repo is
 - `klab/`: the engine. `scripts/run_all.py` rebuilds every output; `scripts/build_app.py` inlines a snapshot into `out/keeper_lab.html` (single file, no server, opens on a phone).
 - `out/`: committed build artifacts (the app, `model_params.json`, two core tables, trade suggestions, audit). Everything else the scripts write is gitignored.
-- `docs/`: METHODS (how), FINDINGS (results, numbered #1-#80, cited from code comments), MODEL-REVIEW (the 2026-09-09 bottom-up review: error sources, projection calendar), ROADMAP (next), WORKFLOWS (recipes), SESSION-LOG (history), EXPERT-REVIEW (question set for the league expert), ASSESSMENT-BRIEF (a closed phase, kept as a stub), constitution.txt (league rules).
+- `docs/`: METHODS (how), FINDINGS (results, numbered #1-#81, cited from code comments), MODEL-REVIEW (the 2026-09-09 bottom-up review: error sources, projection calendar), UI-REVIEW (same process on the presentation layer, same day), ROADMAP (next), WORKFLOWS (recipes), SESSION-LOG (history), EXPERT-REVIEW (question set for the league expert), ASSESSMENT-BRIEF (a closed phase, kept as a stub), constitution.txt (league rules).
 - `data/`: gitignored working copy of raw exports; master copies in `~/Documents/Fantasy Baseball/`. `data/README.md` says what each file is and how often it needs refreshing.
 
 ## Three surfaces (keep in sync; a change that reaches one is not done)
@@ -20,7 +20,7 @@ rsync -a --delete --exclude='.git' --exclude='.venv311' --exclude='node_modules'
 
 ## Runtime facts (do not guess)
 - Needs Python 3.11+ or scipy >= 1.9 (older scipy returns `spearmanr` as a tuple; one test fails silently).
-- Build: `PYTHONPATH=.:scripts python3 scripts/run_all.py` (~3 s cold). Tests: `PYTHONPATH=. python3 -m pytest tests/ -q` (64 tests, 3-6 min; `test_build_payload` dominates). App check: `cd app && npm i playwright@1.56.1 && cd .. && node app/verify.mjs` (17 checks; JS re-implementation must match pandas on 25 quantities).
+- Build: `PYTHONPATH=.:scripts python3 scripts/run_all.py` (~3 s cold). Tests: `PYTHONPATH=. python3 -m pytest tests/ -q` (64 tests, 3-6 min; `test_build_payload` dominates). App check: `cd app && npm i playwright@1.56.1 && cd .. && node app/verify.mjs` (21 checks; JS re-implementation must match pandas on 25 quantities).
 - `scripts/build_trade_suggestions.py` (~2 min) is not in `run_all.py`; rerun it after any roster change or the app serves stale suggestions.
 - `team_reports.py`, `run_all.py`, `estimate_auction_price.py` need `PYTHONPATH=.:scripts`.
 - Committed outputs match the documented numbers. If a rebuild changes them, say so in the commit message. Float noise at 1e-13 across platforms is normal; restore from HEAD rather than commit it.

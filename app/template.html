@@ -9,7 +9,7 @@
   --bg:#10141a; --panel:#171c24; --panel2:#1e2530; --line:#2b323d;
   --ink:#eae6dc; --dim:#96a1b0; --dimmer:#5e6875;
   --pos:#5cbfa0; --neg:#e0806e; --accent:#2fb2c4; --accent2:#d99a52; --link:#7cb9d9;
-  --hover:#182029; --sel:#17323b;
+  --hover:#182029;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
@@ -57,7 +57,6 @@ td{padding:5px 8px;border-bottom:1px solid #191e26;text-align:right;
 td.l{font-family:inherit;font-size:13px}
 tbody tr{transition:background .1s ease}
 tbody tr:hover{background:var(--hover)}
-tbody tr.sel{background:var(--sel)}
 .name{cursor:pointer}
 .name:hover{color:var(--accent)}
 .pos{color:var(--pos)}.neg{color:var(--neg)}.dim{color:var(--dim)}
@@ -94,15 +93,11 @@ tbody tr.sel{background:var(--sel)}
 /* On a phone the board keeps the columns a keeper decision actually needs: who,
    what he costs, what he is worth, what he will cost at auction, and the two
    surplus figures. Indices track BOARD_COLS and must be re-counted whenever a
-   column is added -- the list had drifted and was hiding Production $, the one
-   number the comment above it names. Hidden: team, role, roto pts, contract,
-   likely range, Sure?, Worth '28, if full-time. Re-counted twice: Replace $ at
-   position 11 (#71.1), Roto '26 at 5 and Move at 7 (#72). Replace $ stays
-   VISIBLE on a phone (it is the number the keep decision is made on); both roto
-   columns are hidden as Roto pts always was, but MOVE IS VISIBLE -- it is the
-   one number in the trio that stands alone, and the drawer carries the full
-   comparison. Hidden: team, role, Roto '26, Roto '27, Yr, likely range, Sure?,
-   Worth '28, if full-time. */
+   column is added (#71.1, #72 both shipped miscounts; app/verify.mjs now checks
+   the rendered hide-set). Hidden: team, role, Roto '26, Roto '27, Yr, likely
+   range, Sure?, Worth '28, if full-time. Replace $ and Move stay VISIBLE:
+   Replace $ is the number the keep decision is made on, and Move is the one
+   number of the roto trio that stands alone. */
 @media(max-width:700px){
   main{padding:14px 10px 60px}
   #tbl th:nth-child(2),#tbl td:nth-child(2),
@@ -173,25 +168,53 @@ const g = (r,c)=>r[IX[c]];
 const CATS = D.cats, NEG = new Set(D.neg_cats);
 const ROS = ["AB","H","HR","R","RBI","SB","IP","W","SV","K","ER","BB","H_allowed"];
 const TEAMS = Object.keys(D.cur_totals);
-const BOARD = D.board, FA = D.fa;
-const byId = {}; BOARD.concat(FA).forEach(r=>byId[g(r,"fg_id")]=r);
-const idByName = {}; BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
+// BOARD/FA/teams/constants are filled by applyVariant() at the bottom of the
+// file: the payload ships them only inside basis_variants[..].positional_variants,
+// so startup runs the same code path as a basis switch. The old top-level
+// aliases doubled the payload and one went stale (FINDINGS #81).
+const BOARD = [], FA = [];
+D.teams = []; D.constants = {};
+// A split two-way player is TWO rows per fg_id (HIT and PIT) but ONE roster
+// asset. byId keeps his FIRST row; rowsById carries both so sums and trades
+// can follow klab.trade's convention: value columns added, the single
+// contract counted once (FINDINGS #80.4; the JS side is #81).
+const byId = {}, idByName = {}, rowsById = {};
+function indexRows(){
+  for(const m of [byId, idByName, rowsById]) for(const k in m) delete m[k];
+  for(const r of BOARD.concat(FA)){
+    const id = g(r,"fg_id");
+    if(byId[id]===undefined) byId[id]=r;
+    (rowsById[id] = rowsById[id]||[]).push(r);
+  }
+  for(const r of BOARD) if(idByName[g(r,"name")]===undefined) idByName[g(r,"name")]=g(r,"fg_id");
+}
+// Mirrors klab.trade._TWO_WAY_SUM_COLS for the columns this file reads.
+const SPLIT_SUM_COLS = new Set(["roto_points","roto_2026","roto_move","redraft_value",
+  "production_value","keep_value","surplus_y2027","surplus_y2028","surplus_y2029",
+  "extension_option","surplus_multiyear","redraft_value_2028",
+  "roto_points_ft","redraft_value_ft","upside_ft"]);
+function assetVal(id,col){
+  const rows = rowsById[id];
+  if(!rows || rows.length<2 || !SPLIT_SUM_COLS.has(col))
+    return byId[id]!==undefined ? g(byId[id],col) : null;
+  return rows.reduce((s,r)=>s+(g(r,col)||0),0);
+}
 // Comp-based next-auction estimate (klab/auction_estimator.py), keyed by
 // fg_id. A deliberately separate, non-integrated tool -- see its panel in
 // showPlayer() -- reassigned wholesale by setBasis() since it's not present
 // for every player, unlike BOARD/FA which always have full row coverage.
-let AUCTION_EST = D.auction_estimates || {};
+let AUCTION_EST = {};
 // ros_value_over_replacement per player, keyed [rosBasis][fg_id] -- powers
 // the Keeper Board/Free Agents "ROS value" column. Varies by BOTH toggles
 // (docs/FINDINGS.md #46's _ros_values()), so reassigned wholesale by
 // setBasis() same as AUCTION_EST, and read live by rosVal() per S.rosBasis
 // rather than mutated into row arrays like the raw ros_* stat fields.
-let ROS_VALUES = D.ros_values || {};
+let ROS_VALUES = {};
 // 2027 standings projected from each team's keeper set alone, empty roster
 // slots filled at replacement level (docs/FINDINGS.md #49). Varies with
 // PROJECTION_BASIS (the keeper set and its 2027 production both do), not
 // with the rest-of-2026 toggle -- reassigned by setBasis() only.
-let KEEPER_STANDINGS_2027 = D.keeper_standings_2027 || [];
+let KEEPER_STANDINGS_2027 = [];
 const TRADE_SUGGESTIONS = D.trade_suggestions || [];
 // Alternate 2026 rest-of-season signals (docs/FINDINGS.md #45/#46): "ros"
 // (ZiPS alone, default), "prorated" (season-to-date pace), "blend" (50/50).
@@ -214,7 +237,7 @@ const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 
 // ---------- shared state ----------
 const S = {tab:"model", team:"", role:"", q:"", only:"", totals:false, sort:"surplus_multiyear",
-           desc:true, fa:false, infl:false, basis: D.projection_basis || "blend",
+           desc:true, infl:false, basis: D.projection_basis || "blend",
            rosBasis: D.ros_basis_default || "ros", standSeason: "live", positional: false,
            shades: {}, intuitionQ: "", intuitionCalculated: false, ptBasis: "projected"};
 let INFL = D.constants.inflation || 1;   // reassigned by setBasis() below
@@ -228,11 +251,11 @@ const adj = v => S.infl && v!=null ? v/INFL : v;   // what a dollar of value cos
 const BASES_ORDER = ["blend", "projection", "actuals"];
 const BASIS_LABEL = {blend: "blend", projection: "projection only", actuals: "2026 only"};
 const BASIS_HELP = "Which source drives every 2027 number on this page. "
-  + "\"blend\" (default) mixes 2026 form with the ZiPS 2027 projection, weighted "
-  + "by each stat's year-over-year reliability. \"projection only\" trusts ZiPS "
-  + "2027 alone and ignores 2026 entirely. \"2026 only\" extrapolates this year's "
-  + "actual performance and ignores the projection system entirely. About 17% of "
-  + "keep/cut calls move depending on this choice.";
+  + "\"blend\" (default) mixes 2026 form with ZiPS 2027 (a public projection "
+  + "system), weighted by each stat's year-over-year reliability. \"projection "
+  + "only\" trusts the ZiPS projection alone and ignores 2026 entirely. \"2026 "
+  + "only\" extrapolates this year's actual performance and ignores the "
+  + "projection entirely. About 17% of keep/cut calls move with this choice.";
 // ---------- positional adjustment ----------
 // docs/FINDINGS.md #52: prices catchers and shortstops off their own
 // position's replacement level instead of the pooled one. Every basis
@@ -251,10 +274,7 @@ function applyVariant(){
   const pv = bv.positional_variants[S.positional ? "on" : "off"];
   BOARD.length = 0; BOARD.push(...pv.board);
   FA.length = 0; FA.push(...pv.fa);
-  Object.keys(byId).forEach(k=>delete byId[k]);
-  BOARD.concat(FA).forEach(r=>byId[g(r,"fg_id")]=r);
-  Object.keys(idByName).forEach(k=>delete idByName[k]);
-  BOARD.forEach(r=>idByName[g(r,"name")]=g(r,"fg_id"));
+  indexRows();
   D.teams.length = 0; D.teams.push(...pv.teams_raw);
   Object.keys(D.constants).forEach(k=>delete D.constants[k]);
   Object.assign(D.constants, pv.constants);
@@ -383,7 +403,9 @@ const SHOCK_CATEGORY = {H:"H", HR:"HR", R:"R", RBI:"RBI", SB:"SB",
 // More is WORSE for these: a hot draw lowers them, mirroring
 // klab/standings_sim.py's _NEGATIVE_COLS (FINDINGS #80).
 const NEGATIVE_SHOCK_COLS = {ER:1, BB:1, H_allowed:1};
-const DEFAULT_SHOCK_SCALE = 0.35;
+// From the payload, not hard-coded: scripts/build_app.py's FINISH_SHOCK_SCALE
+// is the single source, so the JS sim can't drift from the Python one.
+const DEFAULT_SHOCK_SCALE = D.finish_sim.shock_scale;
 // Box-Muller for a standard normal draw -- the only thing a random-normal
 // library would be needed for here.
 function randNormal(){
@@ -468,9 +490,10 @@ function renderHeader(){
     + `C/SS positional adjustment</label>`;
 }
 renderHeader();
-$("foot").innerHTML = `Values are 2027 projections priced off this league's own auction history `
-  + `(n≈677 purchases). Honest error bar is <b>±34% per category</b> — read every dollar figure `
-  + `with that in mind. Methodology in <code>docs/METHODS.md</code>; `
+$("foot").innerHTML = `Values are 2027 projections priced off this league's own auction history. `
+  + `Honest error bars: each category's point scale carries a <b>±13-18% standard error</b> `
+  + `(the Home tab's denominator table shows each one) and projection error sits on top — read `
+  + `every dollar figure with that in mind. Methodology in <code>docs/METHODS.md</code>; `
   + `what was tried and rejected in <code>LAB_NOTEBOOK.md (git history, commit 8353172)</code>.`;
 
 // ---------- board ----------
@@ -489,9 +512,8 @@ const BOARD_COLS=[
   ["roto_move","Move"],
   ["salary","Sal"],["contract","Yr"],["keeper_cost","Cost"],
   // "Worth '27" was one label doing two jobs (docs/ROADMAP.md item 1 Step 0):
-  // production_value is worth-to-a-roster, market_price is auction cost. Both
-  // ship in the payload; market_price stays hidden until Step 3 calibrates its
-  // level (showing it needs the nth-child list in the phone CSS reindexed).
+  // production_value is worth-to-a-roster, market_price is auction cost.
+  // Both live columns; never blend them (CONSTRAINTS.md).
   ["production_value","Production $"],["market_price","Market $"],
   // Replace $ is keep_value, the scale the KEEP DECISION runs on since
   // KEEP_BASIS = "replacement" (docs/FINDINGS.md #70). Without it on the board
@@ -511,7 +533,6 @@ function rosVal(r){
   const m = ROS_VALUES[S.rosBasis];
   return m ? m[g(r,"fg_id")] : null;
 }
-// Plain-English gloss for every column header, shown on hover.
 // Plain-English gloss for every column header, shown on hover.
 //
 // THE CONTRACT, because these drifted into essays and into jargon (#74):
@@ -554,17 +575,19 @@ const COL_HELP = {
     +"again if you let him go. Higher than Production $ because your league "
     +"holds back about 100 players, so the auction is small and prices run "
     +"high. Keeping him saves you this much.",
-  value_lo:"The range his value landed in 80% of the time when the season was "
-    +"re-run thousands of times with the luck shuffled.",
+  value_lo:"The range his Production $ landed in 80% of the time when the "
+    +"season was re-run a thousand times with the luck shuffled. It brackets "
+    +"Production $, not the Replace $ column beside it.",
   surplus_y2027:"Replace $ minus what he costs you: the auction money you save "
     +"by keeping him for 2027 instead of buying that production again.",
   surplus_multiyear:"The same saving added up over every year you control him, "
     +"later years discounted and never counted as a negative, plus the value of "
     +"extending him. A cheap long contract can be worth several single seasons.",
   p_surplus_positive:"How often keeping him still came out ahead when the "
-    +"season was re-run with the luck shuffled. Under 80% is close to a coin "
-    +"flip, however good the dollar figure looks.",
-  redraft_value_2028:"The same dollar value, one year further out.",
+    +"season was re-run with the luck shuffled. Green above 90%; red below "
+    +"60%, where the dollar figure is close to a coin flip however good it looks.",
+  redraft_value_2028:"His Production $ one season further out, same "
+    +"worth-to-a-roster scale, from the 2028 projection.",
   upside_ft:"Extra value if he plays a full season rather than his projected "
     +"workload. For most players that is a health question. A \"role\" tag means "
     +"it assumes a reliever is handed the closer job, which is a shakier bet.",
@@ -620,8 +643,8 @@ function sortRows(rows){
 function sortBy(k){ if(S.sort===k) S.desc=!S.desc; else {S.sort=k;S.desc=true;} refilter(); }
 const FA_NOTE = "unrostered, priced at their live draft contract. "
   + "\"Likely range\" and \"Sure?\" are blank here on purpose -- the uncertainty "
-  + "bootstrap (klab/uncertainty.py) only scores the 275 rostered players' real "
-  + "contracts, not free agents' hypothetical ones";
+  + "ranges only score rostered players' real contracts, not free agents' "
+  + "hypothetical ones";
 const curRows = ()=> sortRows(filtered(S.tab==="fa"?FA:BOARD));
 // Re-render only the table. Keeps the search box focused and the caret where
 // the user left it, which a full re-render does not.
@@ -671,10 +694,11 @@ const ptFull = () => S.ptBasis === "full";
 const rp27  = r => ptFull() ? (g(r,"roto_points_ft") ?? g(r,"roto_points")) : g(r,"roto_points");
 const prodV = r => ptFull() ? (g(r,"redraft_value_ft") ?? g(r,"production_value")) : g(r,"production_value");
 function replV(r){
+  // Server-computed on both branches (FINDINGS #81): this used to re-derive
+  // the full-time dollar from the intercept client-side, the app's one
+  // exception to "every dollar value is computed server-side once".
   if(!ptFull()) return g(r,"keep_value");
-  const rp = rp27(r);
-  if(rp==null) return null;
-  return Math.max(0, (rp - D.constants.auction_intercept) * D.constants.usd_per_roto_point_auction);
+  return g(r,"keep_value_ft") ?? g(r,"keep_value");
 }
 const moveV = r => (rp27(r)==null || g(r,"roto_2026")==null) ? null : rp27(r) - g(r,"roto_2026");
 function surp27(r){
@@ -684,7 +708,7 @@ function surp27(r){
 function ptBasisPicker(){
   return `<label class="chk" title="How much he plays in 2027. &quot;As projected&quot; uses the `
     + `playing time the projection expects. &quot;Full season&quot; asks what he would be worth `
-    + `with a everyday job from opening day -- the question to ask about a prospect projected `
+    + `with an everyday job from opening day -- the question to ask about a prospect projected `
     + `for 200 plate appearances. Keeper flags stay on the projected basis either way.">`
     + `playing time <select onchange="S.ptBasis=this.value;render()">`
     + `<option value="projected"${S.ptBasis==="projected"?" selected":""}>as projected</option>`
@@ -769,7 +793,7 @@ function playerRow(r){
   const opt=g(r,"extension_option")>0, used=g(r,"extension_used"),
         block=g(r,"keepable")===false;
   return `<tr>
-  <td class="l"><span class="name" onclick="showPlayer(${g(r,"fg_id")})">${esc(g(r,"name"))}</span>`
+  <td class="l"><span class="name" onclick="showPlayer(${g(r,"fg_id")},'${g(r,"role")}')">${esc(g(r,"name"))}</span>`
   + (keep?'<span class="tag keep" title="in the recommended keeper set">KEEP</span>':"")
   + (il?'<span class="tag il" title="on the injured list">IL</span>':"")
   + (block?'<span class="tag il" title="becomes a free agent after 2026 and cannot be kept: the window to extend him has already closed">LOCKED</span>':"")
@@ -916,9 +940,9 @@ function auctionEstPanel(r){
       <div class="k">comp-adjusted range</div><div class="v">${money(est.lo)}–${money(est.hi)}</div>
       <div class="k">comp-adjusted midpoint</div><div class="v">${money(est.mid)}</div>
     </div>
-    <div class="note">${confNote} No age or debut-year data exists anywhere in this league's
-      records, so this can't do age-based comps the way a real market read would -- a stated
-      gap, not a silent one.</div>
+    <div class="note">${confNote} Comps are matched on production and league tenure only, not
+      age -- the market visibly pays for youth (about 8% per year at the same production), so
+      a young player's real price may run above his comps. A stated gap, not a silent one.</div>
     ${tenureNote}
     <table style="margin-top:9px"><thead><tr>
       <th class="l">Yr</th><th class="l">Comp</th><th class="l">Team</th>
@@ -926,8 +950,12 @@ function auctionEstPanel(r){
     </tr></thead><tbody>${rows}</tbody></table>
   </div>`;
 }
-function showPlayer(id){
-  const r=byId[id]; if(!r) return;
+function showPlayer(id, roleWanted){
+  // roleWanted picks the right half of a split two-way player (two rows,
+  // one fg_id); without it the drawer falls back to his first row.
+  const rows = rowsById[id];
+  const r = (roleWanted!=null && rows && rows.find(x=>g(x,"role")===roleWanted)) || byId[id];
+  if(!r) return;
   const rpRate = D.constants.usd_per_roto_point_redraft;
   const catRow = c=>{
     const rp = g(r,"rp_"+c) || 0;
@@ -937,8 +965,11 @@ function showPlayer(id){
   // so a per-category rp*rate split undercounts the subtraction and looks
   // like it doesn't add up to Production $. This row makes the table actually
   // reconcile: category rows sum to roto_points*rate; this one folds in the
-  // -replacement*rate and the +$1 floor everyone's price is anchored to.
-  const replAdj = -D.constants.replacement_roto_points*rpRate + 1;
+  // -replacement*rate and the +$1 floor. THIS ROW's own bar, not a league
+  // scalar: replacement is per role since FINDINGS #70, and roto_points -
+  // rp_above_repl recovers exactly the bar the server priced him against.
+  const rowRepl = g(r,"roto_points") - g(r,"rp_above_repl");
+  const replAdj = -rowRepl*rpRate + 1;
   const role=g(r,"role"), hits=role!=="PIT", pits=role!=="HIT";
   const hLine = `<div class="k">PA</div><div class="v">${nf(g(r,"PA"),0)}</div>
        <div class="k">R</div><div class="v">${nf(g(r,"R"),0)}</div>
@@ -994,8 +1025,8 @@ function showPlayer(id){
         <th title="Places in the standings this one category adds, or costs.">Roto pts</th>
         <th title="Those standings places turned into dollars, at the same rate for every category.">$ of Production</th>
       </tr></thead><tbody>${cats.map(catRow).join("")}
-        <tr><td class="l dim" title="Every player's price is anchored the same way: subtract what a free replacement player would produce, then floor at a $1 minimum bid. This isn't a category -- it's the same fixed adjustment for everyone, folded in here so this table's own numbers add up to Production $ exactly.">− replacement level, + $1 floor</td>
-          <td class="dim">−${nf(D.constants.replacement_roto_points,2)}</td>
+        <tr><td class="l dim" title="Every player's price is anchored the same way: subtract what a free replacement player at his role would produce, then floor at a $1 minimum bid. This isn't a category -- it's the same fixed adjustment for every player of his role (hitters and pitchers have different free-player bars), folded in here so this table's own numbers add up to Production $ exactly.">− replacement level, + $1 floor</td>
+          <td class="dim">−${nf(rowRepl,2)}</td>
           <td class="dim">${sgn(replAdj,0,"$")}</td></tr>
       </tbody></table>
       <div class="kv" style="margin-top:8px">
@@ -1035,9 +1066,10 @@ function showPlayer(id){
       <div class="note">Surplus = value − cost, each future year discounted
         ${nf(D.settings.FUTURE_YEAR_DISCOUNT,2)}× and floored at zero, because a contract is an
         option you may decline, not an obligation.</div>
-      <div class="note">Ranges come from ${D.band.draws} bootstrap resamples of the team-seasons
-        the denominators are fit on. They describe uncertainty in <i>how to score a stat line</i>,
-        not in the stat line — projection error is separate and additional.</div>
+      <div class="note">Ranges come from re-scoring his line ${D.band.draws} times, each time
+        re-drawing the past team-seasons the scoring scale is fit on. They describe uncertainty
+        in <i>how to score a stat line</i>, not in the stat line — projection error is separate
+        and additional.</div>
     </div>
     ${auctionEstPanel(r)}
     <div class="panel">
@@ -1099,8 +1131,11 @@ function teamsView(){
       <div class="n">buys $${nf(c.keeper_worth,0)} of value</div></div>
     <div class="card"><div class="k">aggregate surplus</div><div class="v">$${nf(c.aggregate_surplus,0)}</div>
       <div class="n">the whole league's edge over the auction</div></div>
-    <div class="card"><div class="k">replacement level</div><div class="v">${nf(c.replacement_roto_points,2)}</div>
-      <div class="n">roto pts of a free player · waiver setting "${D.settings.WAIVER_VALUE}"</div></div>
+    <div class="card"><div class="k">replacement level</div>
+      <div class="v">${c.replacement_by_role&&c.replacement_by_role.HIT!=null
+        ? `${nf(c.replacement_by_role.HIT,2)}<span style="font-size:13px;color:var(--dim)"> H</span> · ${nf(c.replacement_by_role.PIT,2)}<span style="font-size:13px;color:var(--dim)"> P</span>`
+        : nf(c.replacement_roto_points,2)}</div>
+      <div class="n">roto pts of a free hitter / pitcher · waiver setting "${D.settings.WAIVER_VALUE}"</div></div>
   </div>`;
   // "Committed salary" used to sit here and it was close to meaningless: it
   // summed every contract on the roster including in-season free-agent adds
@@ -1152,8 +1187,8 @@ function contentionHelp(is2027){
       + `keeper set alone plus replacement-level fill for every open roster slot -- keeper-core `
       + `strength, not a real-auction forecast (every team will also spend a full 2027 budget). `
     : `${D.finish_sim.draws} simulated rest-of-2026 seasons, jittering real player-outcome `
-      + `uncertainty (a hot/cold stretch, not a denominator-fit question -- different `
-      + `uncertainty source than the ± bands elsewhere in the app). `;
+      + `uncertainty (a hot or cold stretch -- a different uncertainty source than the ± `
+      + `ranges elsewhere in the app, which measure how settled the scoring scale is). `;
   return base + scope + "Contender: 50%+ chance of the money. Bubble: 5-50%. Rebuild: under "
     + "5%. Judgment-call thresholds, not a hard line.";
 }
@@ -1304,8 +1339,13 @@ function tradeView(){
   if(!T.a) T.a=TEAMS[0];
   if(!T.b) T.b=TEAMS[1];
   const side=(key,team,other)=>{
+    // One picker entry per ASSET: a split two-way player has two BOARD rows
+    // but trades as one player (FINDINGS #80.4/#81), so dedupe on fg_id and
+    // show his summed values via assetVal().
+    const seenIds=new Set();
     const roster=BOARD.filter(r=>g(r,"team")===team)
-      .sort((x,y)=>g(y,"surplus_multiyear")-g(x,"surplus_multiyear"));
+      .filter(r=>{const id=g(r,"fg_id"); if(seenIds.has(id)) return false; seenIds.add(id); return true;})
+      .sort((x,y)=>(assetVal(g(y,"fg_id"),"surplus_multiyear")||0)-(assetVal(g(x,"fg_id"),"surplus_multiyear")||0));
     const taken=new Set(T[key]);
     return `<div class="panel">
       <h3>${key==="a"?"Team A sends":"Team B sends"}</h3>
@@ -1317,10 +1357,11 @@ function tradeView(){
         || '<span class="dim" style="font-size:12px">nobody yet</span>'}</div>
       <div class="picker">${roster.map(r=>{
         const id=g(r,"fg_id");
+        const split=(rowsById[id]||[]).length>1;
         return `<div class="${taken.has(id)?"taken":""}" onclick="add('${key}',${id})">
-          <span>${esc(g(r,"name"))} <span class="dim">${g(r,"role")==="PIT"?"P":"H"}</span>
+          <span>${esc(g(r,"name"))} <span class="dim">${split?"H/P":g(r,"role")==="PIT"?"P":"H"}</span>
           <span class="mlbteam">${esc(g(r,"mlb_team"))}</span></span>
-          <span class="dim">${usd(g(r,"keeper_cost"))} → ${sgn(adj(g(r,"surplus_multiyear")),0,"$")}</span></div>`;
+          <span class="dim">${usd(g(r,"keeper_cost"))} → ${sgn(adj(assetVal(id,"surplus_multiyear")),0,"$")}</span></div>`;
       }).join("")}</div></div>`;
   };
   return `<div class="bar">
@@ -1392,14 +1433,16 @@ function suggestedTradesPanel(){
     </div>`;
   }).join("");
   return `<div class="panel"><h3>Suggested trades between these two teams</h3>
-    <div class="dim" style="font-size:11px;margin-bottom:8px">Precomputed 1-for-1 search, docs/FINDINGS.md #40 — "no trade cleared this bar" is a real result, not a gap.</div>
+    <div class="dim" style="font-size:11px;margin-bottom:8px">Precomputed 1-for-1 search over every player pair — "no trade cleared this bar" is a real result, not a gap.</div>
     <div class="sugg-grid">${cards}</div></div>`;
 }
 
 function tradeResult(){
   if(!T.aOut.length && !T.bOut.length)
     return `<div class="panel"><h3>Verdict</h3><div class="dim">Pick players on both sides.</div></div>`;
-  const sum=(ids,col)=>ids.reduce((s,id)=>s+(g(byId[id],col)||0),0);
+  // assetVal, not a raw row lookup: a split player's value columns sum over
+  // his two rows while his single contract counts once (FINDINGS #80.4/#81).
+  const sum=(ids,col)=>ids.reduce((s,id)=>s+(assetVal(id,col)||0),0);
   const swap={}; T.aOut.forEach(id=>swap[id]=T.b); T.bOut.forEach(id=>swap[id]=T.a);
   const after=rotoPoints(catTotals(rosterAgg(swap)));
   // One 2026 standings point is priced at what a roto point costs at
@@ -1438,7 +1481,7 @@ function tradeResult(){
       <div class="kv">
         <div class="k">2027 value in / out</div><div class="v">${money(vIn)} / ${money(vOut)}</div>
         <div class="k">2027 salary in / out</div><div class="v">${usd(cIn)} / ${usd(cOut)}</div>
-        <div class="k">Δ surplus, 2027</div><div class="v">${sgn(adj(dS),1,"$")}</div>
+        <div class="k" title="Production $ received minus sent, net of 2027 salary, on the worth-to-a-roster scale. A different scale from the board's Surplus '27, which prices against your own thin auction -- the same trade convention klab.trade.evaluate_trade uses.">Δ surplus, 2027</div><div class="v">${sgn(adj(dS),1,"$")}</div>
         <div class="k">Δ surplus, multi-year</div><div class="v">${sgn(adj(dMY),1,"$")}</div>
         <div class="k">Δ 2026 standings points</div><div class="v">${sgn(dP,1)}</div>
         <div class="k" title="This league pays the top ${D.finish_sim.payout_spots} places -- this is the trade's effect on how OFTEN this team actually lands there, not just its point total. Simulated fresh for this exact swap.">Δ P(money), this trade</div>
@@ -1458,8 +1501,9 @@ function tradeResult(){
         ? others.map(([t,d])=>`${esc(t)} ${sgn(d,1)}`).join(" · ")
         : "no other team's standings move"}</div>
       <div class="note">Combined score = Δ2027 surplus + ${nf(cw,2)} × Δ2026 standings points ×
-        $${nf(usdpt,2)}. The weight is the rebuilder's setting: a 2026 standings point is worth a
-        quarter of a 2027 dollar. Slide it toward 1.0 if you are contending.</div>
+        $${nf(usdpt,2)}. The weight is the rebuilder's setting: a 2026 standings point counts a
+        quarter of a 2027 dollar. If you are contending, read the score as if the weight were
+        nearer 1.0 -- it is a build-time setting (CONTENTION_WEIGHT), not a control here.</div>
     </div>`;
 }
 
@@ -1469,9 +1513,9 @@ function tradeResult(){
 const CONST_HELP = {
   "usd_per_roto_point_auction": "What one standings point costs in a live auction, estimated by regressing what teams actually paid for players against how many points those players delivered. This is the number the trade evaluator uses to compare a dollar of value against a standings point.",
   "usd_per_roto_point_redraft": "A slightly different scale for the player-card “Worth” figures: what a point is worth if you drafted the player fresh today, not what an actual auction (with its own quirks, like saves being underpaid) says a specific player costs.",
-  "auction_intercept": "A second, independent estimate of replacement level: what the auction-price regression predicts a $0 player would produce, in roto points. No one has ever actually paid $0 in this league (the minimum bid is $1) -- this is a straight-line extrapolation one dollar past the edge of the real data, which is exactly why docs/FINDINGS.md #27 treats it as a LOWER-BOUND estimate, not the number the model actually prices players against (that's \"replacement level\" below, fit a different way). Deliberately never fit to match that number — when the two roughly agree, that's a real cross-check, not a coincidence.",
-  "replacement_level": "How many roto points the best player you could add for free (off any team's bench or the waiver wire) actually produces. Every rostered player's dollar value is measured relative to this baseline, not to zero.",
-  "budget_check": "A sanity check on the whole scale: this league has 10 teams × 23 active roster spots = 230 rostered players, and 10 teams × $260 = $2,600 total. If the top 230 projected players' dollar values don't sum close to $2,600, something upstream is miscalibrated.",
+  "auction_intercept": "A second, independent estimate of replacement level: what the auction-price regression predicts a $0 player would produce, in roto points. The minimum real bid is $1, so this is an extrapolation just past the edge of the data, best read as a lower bound. It was deliberately never fit to match the replacement level below — when the two roughly agree, that's a real cross-check, not a coincidence.",
+  "replacement_level": "How many roto points a free player (the best available off the waiver wire) produces, measured separately for hitters and pitchers. Every rostered player's dollar value is measured against the bar for his own role, not against zero.",
+  "budget_check": "A sanity check on the whole scale: 10 teams × $260 = $2,600 total, and the players a league can actually field (140 hitter slots and 90 pitcher slots) should carry dollar values summing close to that. If they don't, something upstream is miscalibrated.",
   "inflation": "How much more a dollar of talent costs in the real 2027 auction than the “fair value” redraft scale says — because keeper-league owners have already locked up a lot of cheap production, leaving less available talent chasing the same total budget.",
   "dollar_buys": "The flip side of inflation: how much redraft-scale value one real 2027 auction dollar actually buys, given that squeeze. Below 1.0× means a dollar buys less than face value.",
 };
@@ -1479,9 +1523,9 @@ const SETTING_HELP = {
   "denom seasons": "Which past seasons' final standings are pooled to work out how many stats it takes to buy one standings point in each category.",
   "auction seasons": "Which past seasons' real auction prices are used to fit the $-per-roto-point conversion rate.",
   "exchange basis": "How the $/roto-point rate is fit. “keeper_adjusted” (default) accounts for how many players were already off the board as keepers in each of those past auctions, so the rate reflects the world 2027's auction will actually happen in, not an average of very different years.",
-  "projection basis": "Which source drives every 2027 number on this page right now — the same fork as the header's “projection basis” dropdown. “blend” mixes 2026 form with the ZiPS 2027 projection; “projection” trusts ZiPS alone; “actuals” extrapolates 2026 alone.",
-  "waiver value": "Which anchor sets replacement level, i.e. how good a “free” player is assumed to be. “low” (default, most generous to your own roster) uses the 230th-best projected player — one per active roster spot leaguewide. “high” uses what free-agent pickups actually produced in 2026, which overstates it since those players were picked up AFTER they got hot.",
-  "positional adjustment": "Whether a scarce position (catcher, middle infield) gets a value bump over a common one for identical production. Off by default — not an oversight: tested directly, and the published evidence (FanGraphs' 13-system test, Razzball's four-stance test) both found it hurts more than it helps in a format like this one.",
+  "projection basis": "Which source drives every 2027 number on this page right now — the same fork as the header's “projection basis” dropdown. “blend” mixes 2026 form with ZiPS 2027 (a public projection system); “projection” trusts that projection alone; “actuals” extrapolates 2026 alone.",
+  "waiver value": "Which anchor sets replacement level, i.e. how good a “free” player is assumed to be. “low” (default) uses the last player a league could actually field at each role — the 140th-best hitter and the 90th-best pitcher. “high” uses what free-agent pickups actually produced in 2026, which overstates it since those players were picked up AFTER they got hot.",
+  "positional adjustment": "Whether catchers and shortstops are priced against their own position's replacement level instead of the league-wide one — the same fork as the header's “C/SS positional adjustment” checkbox. Off by default and not an oversight: on this league's data both positions come out DEEPER than the pooled line, so turning it on mostly lowers their values.",
   "future year discount": "How much a future season's keeper surplus is discounted per year further out (0.85 = 15% per year), because a contract you're free to decline is an option, not a locked-in obligation, and rosters/leagues drift.",
   "sv punt threshold": "Teams with fewer saves than this are assumed to be intentionally punting the category and are excluded before fitting how many saves buy a standings point — otherwise a couple of non-competing teams would distort what a save is worth for everyone else.",
   "max pt scale": "The most a player's projected playing time can be scaled up for the “if he plays a full season” upside figure on his player card. Beyond this, a bigger role isn't a reasonable extrapolation of this player — it'd effectively be projecting a different player.",
@@ -1536,8 +1580,9 @@ function shaded2027(r, s){
 // Per-player hover context requested for this tab (and, per Josh, as a
 // general design rule: sortable/scannable numbers are columns, everything
 // else is a tooltip so it doesn't clutter the table -- docs/FINDINGS.md #50).
-// No age anywhere: no file in data/ has one, same gap already stated for
-// the auction estimator.
+// No age shown: birthdates exist (data/chadwick_register.csv) but age is
+// deliberately not a valuation input (no aging curve, CONSTRAINTS.md), so
+// displaying it here would invite hand-adjustments the model doesn't make.
 function playerTooltip(r){
   const isPit = g(r,"role")==="PIT";
   const cats = isPit ? D.pit_cats : D.hit_cats;
@@ -1774,13 +1819,19 @@ function modelView(){
         ${kvHelp("$ / roto point, auction scale", `$${nf(c.usd_per_roto_point_auction,2)}`, CONST_HELP.usd_per_roto_point_auction)}
         ${kvHelp("$ / roto point, redraft scale", `$${nf(c.usd_per_roto_point_redraft,2)}`, CONST_HELP.usd_per_roto_point_redraft)}
         ${kvHelp("auction intercept, roto pts", nf(c.auction_intercept,2), CONST_HELP.auction_intercept)}
-        ${kvHelp("replacement level, roto pts", nf(c.replacement_roto_points,2), CONST_HELP.replacement_level)}
-        ${kvHelp("top-230 budget check", `$${nf(c.budget_check_top230,0)}`, CONST_HELP.budget_check)}
+        ${kvHelp("replacement level, roto pts",
+          c.replacement_by_role&&c.replacement_by_role.HIT!=null
+            ? `${nf(c.replacement_by_role.HIT,2)} H · ${nf(c.replacement_by_role.PIT,2)} P`
+            : nf(c.replacement_roto_points,2), CONST_HELP.replacement_level)}
+        ${kvHelp("budget check, fieldable pool", `$${nf(c.budget_check_top230,0)}`, CONST_HELP.budget_check)}
         ${kvHelp("projected 2027 inflation", `${nf(INFL,3)}×`, CONST_HELP.inflation)}
         ${kvHelp("a 2027 dollar buys", nf(c.dollar_buys,3), CONST_HELP.dollar_buys)}
       </div>
       <div class="note">The intercept is a second, independent read on replacement level: a
-        $0 player returns ${nf(c.auction_intercept,2)} roto points, against ${nf(c.replacement_roto_points,2)}
+        $0 player returns ${nf(c.auction_intercept,2)} roto points, against
+        ${c.replacement_by_role&&c.replacement_by_role.HIT!=null
+          ? `${nf(c.replacement_by_role.HIT,2)} (hitters) / ${nf(c.replacement_by_role.PIT,2)} (pitchers)`
+          : nf(c.replacement_roto_points,2)}
         from the projection route. They were never fitted to agree.</div>
     </div>
     <div class="panel"><h3>Active settings</h3><div class="kv">${set}</div>
@@ -1812,7 +1863,9 @@ function render(){
   else if(S.tab==="intuition") v.innerHTML=intuitionView();
   else if(S.tab==="model") v.innerHTML=modelView();
 }
-render();
+// Startup IS a variant application (see the payload note at the top of the
+// file): fills BOARD/FA/teams/constants, indexes rows, and renders.
+applyVariant();
 </script>
 </body>
 </html>

@@ -2,6 +2,19 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-09 (UI review pass)
+
+| type | item |
+|---|---|
+| built | `docs/UI-REVIEW.md`: the MODEL-REVIEW process pointed at the presentation layer; three subagent reads over `app/template.html` / `scripts/build_app.py` / `app/verify.mjs`, every claim re-verified in the main loop before any change. #81 |
+| bug | The League tab's "Points now" column was blank on the "projection only" and "2026 only" bases: `points_2026` was stamped onto a payload alias but not the object `applyVariant()` reads (subprocess JSON round-trip broke the aliasing). Found by inspecting the committed payload, not by any reader or check. #81.1 |
+| bug | The JS trade path priced a split two-way player at his pitcher row alone ($4.95 of $83.66), listed him twice in the picker, and opened the wrong drawer half; #80.4's Python fix had never reached the browser. `rowsById` + `assetVal()` now mirror `klab.trade._TWO_WAY_SUM_COLS`. #81.2 |
+| built | Payload de-aliased: startup now runs `applyVariant()` like any basis switch, so board/fa/teams/constants ship once instead of thrice; dead fields dropped. Built file 7,669,157 B to 5,245,232 B (-31.6%) with one column added. #81.3 |
+| bug | Sixteen stale user-facing strings of the #71.1 class, five still describing role-blind replacement, a FINDINGS reference rendered in a tooltip, a footer error bar contradicting the panel it points at, and an invitation to slide a control that does not exist. Drawer reconciliation now uses the row's own bar (`roto_points - rp_above_repl`). #81.4 |
+| built | `keep_value_ft` ships server-side, retiring the app's one client-side dollar derivation; the JS sim's shock scale now reads the payload instead of a hard-coded 0.35. #81.5 |
+| built | `verify.mjs` 17 checks to 21: phone hide-list by field name (#73's unguarded fourth edit), raw help-string audit (the gap that let #27 through), bands-bracket-headline over all rows (#80.2's class), the split-asset convention, and the suggestion check no longer passes on an empty payload. #81.6 |
+| declined | Trimming the 3.1 MB of auction comps (a visible table, so a product cut); moving `evaluate_trade` to the keep basis (a model question, recorded as a diagnostic with the label fixed) |
+
 ## 2026-09-09 (bottom-up model review)
 
 | type | item |

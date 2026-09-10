@@ -98,6 +98,9 @@ def snapshot(positional: bool = False) -> Snapshot:
         "usd_per_roto_point_redraft": meta["usd_per_rp_redraft"],
         "auction_intercept": exch["intercept"],
         "replacement_roto_points": meta["replacement_rp"],
+        # Per-role pair under POOL_RULE "slot_role" (FINDINGS #70); {} on the
+        # legacy pooled rule, so the app must fall back to the scalar above.
+        "replacement_by_role": meta["replacement_by_role"],
         "budget_check_top230": meta["budget_check_top230"],
         "denominators": meta["denominators"],
         "denominators_se": meta["denominators_se"],

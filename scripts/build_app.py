@@ -41,14 +41,14 @@ BASES = ["blend", "projection", "actuals"]
 # "everything" so the file stays small and the schema is reviewable.
 PLAYER_COLS = [
     "fg_id", "name", "team", "role", "il", "position", "mlb_team",
-    "salary", "contract", "keeper_status", "keeper_cost", "years_controlled",
+    "salary", "contract", "keeper_status", "keeper_cost",
     "keepable", "extension_used", "extension_option", "extension_years", "keep_2027",
     "roto_points", "roto_2026", "roto_move", "rp_above_repl", "redraft_value", "keep_value",
     # production_value is redraft_value renamed; market_price is the separate
-    # auction-cost quantity, NaN until ROADMAP item 1 Step 3 (docs/FINDINGS.md #56).
+    # auction-cost quantity, fitted since FINDINGS #57 (held-out MAE 5.76).
     "production_value", "market_price", "market_price_lo", "market_price_hi",
-    "roto_points_ft", "redraft_value_ft", "upside_ft", "upside_kind",
-    "redraft_value_2028", "surplus_redraft",
+    "roto_points_ft", "redraft_value_ft", "keep_value_ft", "upside_ft", "upside_kind",
+    "redraft_value_2028",
     "surplus_y2027", "surplus_y2028", "surplus_y2029", "surplus_multiyear",
     "pt_scale", "pt_scale_kind",
     "value_lo", "value_hi", "surplus_lo", "surplus_hi", "p_surplus_positive",
@@ -63,7 +63,7 @@ ROS_COLS = ["AB", "H", "HR", "R", "RBI", "SB",
 BOOTSTRAP_DRAWS = 1000      # ~11s; the bands are stable well below this
 FINISH_SIM_DRAWS = 2000     # ~10s per ROS basis, x3 bases -- klab/standings_sim.py
 KEEPER_FINISH_SIM_DRAWS = 800   # ~15-20s per PROJECTION_BASIS, x3; costlier per draw
-FINISH_SHOCK_SCALE = 0.35   # explicit so the payload's "finish_sim" metadata can't drift
+FINISH_SHOCK_SCALE = 0.35   # the app's JS sim reads finish_sim.shock_scale, so this is the single source
 
 
 def _round(v):
@@ -221,7 +221,7 @@ def _finish_odds(board: pd.DataFrame, B: int = FINISH_SIM_DRAWS,
         finish_cols = [f"p_finish_{p}" for p in range(1, C.PAYOUT_SPOTS + 1)]
         out[basis] = {row["team"]: {
             **{c: _round(row[c]) for c in finish_cols},
-            "p_money": _round(row["p_money"]), "current_points": _round(row["current_points"]),
+            "p_money": _round(row["p_money"]),
         } for _, row in odds.iterrows()}
     return out
 
@@ -312,7 +312,6 @@ def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: lis
 
     cols = PLAYER_COLS + ros_cols
     return {
-        "cols": cols,
         "board": _rows(board, cols),
         "fa": _rows(fa, cols),
         "teams_raw": json.loads(s.teams.reset_index().to_json(orient="records")),
@@ -349,7 +348,6 @@ def _variant_payload() -> dict:
 
     variants = {pos: _board_fa_teams_constants(pos, ros, ros_cols, pos_map, team_map)
                for pos in (False, True)}
-    default = variants[False]
 
     # The pooled-board features below need DataFrames, not serialised rows.
     s = snapshot(positional=False)
@@ -365,11 +363,9 @@ def _variant_payload() -> dict:
     fa_raw[ros_cols] = fa_raw[ros_cols].fillna(0.0)
 
     return {
-        "cols": default["cols"],
-        "board": default["board"],
-        "fa": default["fa"],
-        "teams_raw": default["teams_raw"],
-        "constants": default["constants"],
+        # One copy of the column list: identical across every basis and
+        # positional setting, so it ships once at the payload top level.
+        "cols": PLAYER_COLS + ros_cols,
         "positional_variants": {"off": variants[False], "on": variants[True]},
         "auction_estimates": _auction_estimates(board_raw, fa_raw),
         "ros_values": _ros_values(board_raw, fa_raw, _meta["denominators"], _meta["baseline"],
@@ -402,13 +398,14 @@ def build_payload() -> dict:
     s = snapshot()   # ambient basis; standings and trade suggestions don't
                       # vary by basis, so one snapshot covers all three
     pts_2026 = s.standings["points_2026"].to_dict()
+    # Stamp BOTH positional settings explicitly. The old top-level alias got
+    # this mutation while the subprocess bases' "off" object (a separate dict
+    # after the JSON round-trip) did not, which blanked the League tab's
+    # "Points now" column on every non-default basis (FINDINGS #81).
     for v in variants.values():
-        # teams_raw IS positional_variants["off"]["teams_raw"]; "on" is a
-        # separate dict and needs its own pass or its League tab goes blank.
-        for t in v["teams_raw"]:
-            t["points_2026"] = pts_2026.get(t["team"])
-        for t in v["positional_variants"]["on"]["teams_raw"]:
-            t["points_2026"] = pts_2026.get(t["team"])
+        for setting in ("off", "on"):
+            for t in v["positional_variants"][setting]["teams_raw"]:
+                t["points_2026"] = pts_2026.get(t["team"])
 
     st = load_standings_long()
     cur = st[st["season"] == 2026].pivot(index="team", columns="category",
@@ -419,18 +416,19 @@ def build_payload() -> dict:
     sugg_path = C.OUT / "trade_suggestions.json"
     trade_suggestions = json.loads(sugg_path.read_text()) if sugg_path.exists() else []
 
+    dboard = variants[default]["positional_variants"]["off"]
     fid_i = variants[default]["cols"].index("fg_id")
-    fg_ids = {r[fid_i] for r in variants[default]["board"] + variants[default]["fa"]}
+    fg_ids = {r[fid_i] for r in dboard["board"] + dboard["fa"]}
     ros_variants = _ros_variants(fg_ids)
 
     return {
         "built": date.today().isoformat(),
         "projection_basis": default,
-        # Keys marked (default basis) alias basis_variants[default] for the
-        # screens that predate the selector (template.html's setBasis()).
-        "basis_variants": {b: {"cols": v["cols"], "board": v["board"], "fa": v["fa"],
-                               "teams": v["teams_raw"], "constants": v["constants"],
-                               "auction_estimates": v["auction_estimates"],
+        # No per-basis or top-level aliases of board/fa/teams/constants: the
+        # template initialises through applyVariant() like any basis switch,
+        # so every screen reads positional_variants and nothing ships twice.
+        # The aliases cost ~2.4 MB and hid a stale-copy bug (FINDINGS #81).
+        "basis_variants": {b: {"auction_estimates": v["auction_estimates"],
                                "ros_values": v["ros_values"],
                                "keeper_standings_2027": v["keeper_standings_2027"],
                                "keeper_finish_odds": v["keeper_finish_odds"],
@@ -444,14 +442,7 @@ def build_payload() -> dict:
         "neg_cats": sorted(C.NEG_CATS),
         "hit_cats": C.HIT_CATS,
         "pit_cats": C.PIT_CATS,
-        "cols": variants[default]["cols"],                 # (default basis)
-        "board": variants[default]["board"],                # (default basis)
-        "fa": variants[default]["fa"],                      # (default basis)
-        "teams": variants[default]["teams_raw"],             # (default basis)
-        "auction_estimates": variants[default]["auction_estimates"],  # (default basis)
-        "ros_values": variants[default]["ros_values"],      # (default proj basis; keyed by [rosBasis][fg_id])
-        "keeper_standings_2027": variants[default]["keeper_standings_2027"],  # (default basis)
-        "keeper_finish_odds": variants[default]["keeper_finish_odds"],  # (default basis)
+        "cols": variants[default]["cols"],   # identical across variants; shipped once
         "standings": json.loads(s.standings.reset_index().to_json(orient="records")),
         "history_standings": _historical_standings(),
         "finish_odds": _finish_odds(s.board, B=FINISH_SIM_DRAWS),
@@ -465,7 +456,6 @@ def build_payload() -> dict:
         "cur_totals": {t: {c: _round(cur.loc[t, c]) for c in C.CATS}
                        for t in cur.index},
         "base26": {"AB": _round(b26["team_AB"]), "IP": _round(b26["team_IP"])},
-        "constants": variants[default]["constants"],        # (default basis)
         "settings": {k: _round(v) if not isinstance(v, list) else v
                      for k, v in s.settings.items()},
         "league": {
@@ -484,8 +474,10 @@ def _selftest(payload: dict) -> None:
     browser is unambiguously a JavaScript bug."""
     idx = {c: i for i, c in enumerate(payload["cols"])}
     cur = pd.DataFrame(payload["cur_totals"]).T
+    board = payload["basis_variants"][payload["projection_basis"]][
+        "positional_variants"]["off"]["board"]
     agg = {}
-    for r in payload["board"]:
+    for r in board:
         t = r[idx["team"]]
         d = agg.setdefault(t, dict.fromkeys(ROS_COLS, 0.0))
         for c in ROS_COLS:
@@ -547,7 +539,8 @@ def main() -> None:
     html = tpl.replace("/*__DATA__*/null", blob)
     out = C.OUT / "keeper_lab.html"
     out.write_text(html)
-    print(f"  {len(payload['board'])} rostered + {len(payload['fa'])} free agents")
+    pv = payload["basis_variants"][payload["projection_basis"]]["positional_variants"]["off"]
+    print(f"  {len(pv['board'])} rostered + {len(pv['fa'])} free agents")
     print(f"  wrote {out}  ({len(html)/1024:.0f} KB)")
     print(f"  wrote {ref}  -- check the browser with: node app/verify.mjs")
 

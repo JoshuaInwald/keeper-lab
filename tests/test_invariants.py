@@ -311,16 +311,26 @@ def test_app_payload_has_no_column_collisions_and_no_nans():
     ix = {c: i for i, c in enumerate(p["cols"])}
     for col in ["PA", "AB", "IP", "redraft_value", "keeper_cost", "surplus_multiyear"]:
         assert col in ix
+    # board/fa/teams ship only inside positional_variants since FINDINGS #81
+    # (the top-level aliases doubled the payload and one went stale).
+    pv = p["basis_variants"][p["projection_basis"]]["positional_variants"]["off"]
     # A two-way player ships as HIT and PIT rows; the PA>0 check is on his hitter row.
-    ohtani = [r for r in p["board"] if r[ix["name"]] == "Shohei Ohtani"]
+    ohtani = [r for r in pv["board"] if r[ix["name"]] == "Shohei Ohtani"]
     assert {r[ix["role"]] for r in ohtani} == {"HIT", "PIT"}
     hit_row = next(r for r in ohtani if r[ix["role"]] == "HIT")
     assert hit_row[ix["PA"]] > 0
     # every rostered row must carry the fields the UI dereferences
-    for r in p["board"]:
+    for r in pv["board"]:
         for col in ["name", "team", "role", "salary", "keeper_cost", "redraft_value"]:
             assert r[ix[col]] is not None, f"{r[ix['name']]} missing {col}"
-    assert set(p["cur_totals"]) == set(t["team"] for t in p["teams"])
+    assert set(p["cur_totals"]) == set(t["team"] for t in pv["teams_raw"])
+    # Every basis and positional setting must carry points_2026: the top-level
+    # alias used to get the stamp while the subprocess bases' "off" copy did
+    # not, blanking the League tab's "Points now" column (FINDINGS #81).
+    for b, v in p["basis_variants"].items():
+        for setting in ("off", "on"):
+            for t in v["positional_variants"][setting]["teams_raw"]:
+                assert t["points_2026"] is not None, (b, setting, t["team"])
 
 
 def test_reliability_weights_match_a_fresh_refit():

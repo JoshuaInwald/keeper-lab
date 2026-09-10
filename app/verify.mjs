@@ -102,6 +102,11 @@ const suggResult = await page.evaluate(() => {
 });
 const suggBad = suggResult.filter(r => r.loadedOk !== r.buttons);
 if (suggBad.length) console.log('  SUGGESTION PANEL MISMATCH:', JSON.stringify(suggBad));
+// A missing/empty trade_suggestions.json (the stale-build failure CLAUDE.md
+// warns about) used to pass silently: zero buttons matched zero loads.
+const suggEmpty = await page.evaluate(() => TRADE_SUGGESTIONS.length === 0)
+  || suggResult.reduce((s, r) => s + r.buttons, 0) === 0;
+if (suggEmpty) console.log('  SUGGESTION PANEL EMPTY: no suggestions in the payload at all');
 
 // Projection-basis selector: swapping BOARD/FA/teams/constants in place
 // (app/template.html's setBasis()) must actually change displayed numbers,
@@ -484,6 +489,103 @@ const intuitionBad = !intuitionResult.standingsChanged || !intuitionResult.dolla
   || !intuitionResult.boardUntouched || !intuitionResult.projUntouched;
 if (intuitionBad) console.log('  INTUITION TAB MISMATCH:', JSON.stringify(intuitionResult));
 
+// The phone CSS nth-child hide list is the fourth edit of FINDINGS #73's
+// four-edit rule and was the only one with no guard: inserting a column
+// reindexes every nth-child and silently hides the wrong columns on a phone.
+// Render at phone width and check WHICH fields disappear, by name.
+await page.setViewportSize({ width: 390, height: 800 });
+const phoneResult = await page.evaluate(() => {
+  go('board'); S.team = ''; S.q = ''; render();
+  const row = document.querySelector('#tbl tbody tr');
+  return { hidden: [...row.querySelectorAll('td')]
+    .map((td, i) => getComputedStyle(td).display === 'none' ? BOARD_COLS[i][0] : null)
+    .filter(Boolean) };
+});
+await page.setViewportSize({ width: 1280, height: 720 });
+const PHONE_HIDDEN = ['team', 'role', 'roto_2026', 'roto_points', 'contract',
+                      'value_lo', 'p_surplus_positive', 'redraft_value_2028', 'upside_ft'];
+const phoneBad = JSON.stringify(phoneResult.hidden) !== JSON.stringify(PHONE_HIDDEN);
+if (phoneBad) console.log('  PHONE HIDE-LIST MISMATCH: hidden', JSON.stringify(phoneResult.hidden),
+                          'want', JSON.stringify(PHONE_HIDDEN));
+
+// The tooltip check above only scans [title] attributes in the CURRENT DOM,
+// so a file/finding reference in a help string for another tab escaped it
+// (that is how docs/FINDINGS.md #27 reached the model tab). Audit the RAW
+// help-string objects: no internal references anywhere, no unglossed jargon
+// in the board tooltips, and no first sentence drifting back into an essay.
+const helpResult = await page.evaluate(() => {
+  const leakRe = /docs\/|FINDINGS|SESSION-LOG|METHODS\.md|ROADMAP|LAB_NOTEBOOK|klab\/|scripts\/|#\d{2}/;
+  const jargonRe = /bootstrap|denominator|z-score|\bSGP\b/i;
+  const pools = { COL_HELP, CONST_HELP, SETTING_HELP,
+                  MISC: { basis: BASIS_HELP, positional: POSITIONAL_HELP,
+                          ros_basis: ROS_BASIS_HELP, fa_note: FA_NOTE,
+                          contention_live: contentionHelp(false),
+                          contention_2027: contentionHelp(true) } };
+  const leaks = [], jargon = [], essays = [];
+  for (const [pool, obj] of Object.entries(pools)) {
+    for (const [k, v] of Object.entries(obj)) {
+      if (leakRe.test(v)) leaks.push(`${pool}.${k}`);
+      if (pool === 'COL_HELP') {
+        if (jargonRe.test(v)) jargon.push(`${pool}.${k}`);
+        const first = String(v).split(/(?<=[.!?:])\s/)[0];
+        if (first.split(/\s+/).length > 28) essays.push(`${pool}.${k}`);
+      }
+    }
+  }
+  return { leaks, jargon, essays };
+});
+const helpBad = helpResult.leaks.length > 0 || helpResult.jargon.length > 0
+  || helpResult.essays.length > 0;
+if (helpBad) console.log('  HELP-STRING CONTRACT:', JSON.stringify(helpResult));
+
+// The uncertainty bands once described a different model than the one shipped
+// (redraft-basis draws under a keep-basis headline, FINDINGS #80.2). Assert
+// each band actually brackets the number it is displayed under; a basis
+// mix-up violates this for essentially every top-of-board row.
+const bandResult = await page.evaluate(() => {
+  let n = 0, vBad = 0, sBad = 0;
+  for (const r of BOARD) {
+    const lo = g(r, 'value_lo'), hi = g(r, 'value_hi');
+    if (lo == null || hi == null) continue;
+    n++;
+    const v = g(r, 'redraft_value');
+    if (!(lo - 1e-6 <= v && v <= hi + 1e-6)) vBad++;
+    const slo = g(r, 'surplus_lo'), shi = g(r, 'surplus_hi'), s = g(r, 'surplus_multiyear');
+    if (slo != null && shi != null && s != null
+        && !(slo - 1e-6 <= s && s <= shi + 1e-6)) sBad++;
+  }
+  return { n, vBad, sBad };
+});
+const bandBad = bandResult.n === 0 || bandResult.vBad / bandResult.n > 0.05
+  || bandResult.sBad / bandResult.n > 0.05;
+if (bandBad) console.log('  BAND/HEADLINE BASIS MISMATCH:', JSON.stringify(bandResult));
+
+// A split two-way player is two BOARD rows but ONE tradeable asset
+// (FINDINGS #80.4 fixed the Python side; #81 the JS side): value columns
+// sum across his rows, the single contract counts once, and the trade
+// picker lists him once. Passes vacuously (with a note) if the league has
+// no split player on a roster.
+const splitResult = await page.evaluate(() => {
+  const split = Object.entries(rowsById)
+    .find(([id, rows]) => rows.length > 1 && g(rows[0], 'team') !== '(free agent)');
+  if (!split) return { none: true };
+  const [id, rows] = split;
+  const summed = rows.reduce((s, r) => s + (g(r, 'keep_value') || 0), 0);
+  const sumOk = Math.abs(summed - assetVal(id, 'keep_value')) < 1e-9;
+  const costOnce = assetVal(id, 'keeper_cost') === g(rows[0], 'keeper_cost');
+  go('trade');
+  T.a = g(rows[0], 'team'); T.b = TEAMS.find(t => t !== T.a);
+  T.aOut = []; T.bOut = []; render();
+  const name = g(rows[0], 'name');
+  const entries = [...document.querySelectorAll('.picker div')]
+    .filter(el => el.textContent.includes(name)).length;
+  T.aOut = []; T.bOut = []; go('board');
+  return { none: false, name, sumOk, costOnce, entries };
+});
+const splitBad = splitResult.none ? false
+  : (!splitResult.sumOk || !splitResult.costOnce || splitResult.entries !== 1);
+if (splitBad) console.log('  SPLIT-PLAYER ASSET MISMATCH:', JSON.stringify(splitResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -500,8 +602,9 @@ console.log(bad ? `FAIL  ${bad}/${n} quantities disagree`
                 : `PASS  JS matches pandas on all ${n} quantities`);
 console.log(errs.length ? 'JS ERRORS:\n  ' + errs.join('\n  ')
                         : 'PASS  no console errors across six tabs, drawer, filters, re-sort');
-console.log(suggBad.length ? `FAIL  trade-suggestion load-into-picker mismatched on ${suggBad.length} pair(s)`
-                            : 'PASS  trade-suggestion panel renders and loads correctly on every tested pair');
+console.log(suggBad.length || suggEmpty
+  ? `FAIL  trade-suggestion panel ${suggEmpty ? 'is empty (stale build?)' : `mismatched on ${suggBad.length} pair(s)`}`
+  : 'PASS  trade-suggestion panel renders, is non-empty, and loads correctly on every tested pair');
 console.log(basisBad ? 'FAIL  projection-basis selector did not swap/round-trip correctly'
                      : `PASS  basis selector changes ${basisResult.changedProj}/${basisResult.total} `
                        + `players on switch and round-trips back exactly`);
@@ -531,7 +634,16 @@ console.log(upsideKindBad ? 'FAIL  upside_ft role/health split missing a case or
                           : 'PASS  upside_ft tags closer-role upside separately from health upside');
 console.log(intuitionBad ? 'FAIL  Intuition tab shading did not move both halves or leaked outside its sandbox'
                          : 'PASS  Intuition tab shading moves both halves and stays sandboxed');
+console.log(phoneBad ? 'FAIL  Phone view hides the wrong columns (nth-child list drifted from BOARD_COLS)'
+                     : 'PASS  Phone view hides exactly the intended columns, by field name');
+console.log(helpBad ? 'FAIL  Help strings: an internal reference, unglossed jargon, or an essay-length opener'
+                    : 'PASS  Raw help strings carry no internal refs, no board-tooltip jargon, no essays');
+console.log(bandBad ? 'FAIL  Uncertainty bands do not bracket the headline they are displayed under'
+                    : `PASS  Bands bracket their headlines (${bandResult.n} rows; ${bandResult.vBad}/${bandResult.sBad} tail misses)`);
+console.log(splitResult.none ? 'PASS  Split-player check skipped: no rostered two-way player this season'
+  : splitBad ? 'FAIL  Split player is not one asset (sum, single contract, or picker dedupe broke)'
+             : `PASS  ${splitResult.name} trades as one asset: values sum, contract counts once, listed once`);
 await browser.close();
-process.exit(bad || errs.length || suggBad.length || basisBad || positionalBad || homeBad || finishBad || auctionBad
+process.exit(bad || errs.length || suggBad.length || suggEmpty || basisBad || positionalBad || homeBad || finishBad || auctionBad
             || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || contention2027Bad
-            || upsideKindBad || intuitionBad ? 1 : 0);
+            || upsideKindBad || intuitionBad || phoneBad || helpBad || bandBad || splitBad ? 1 : 0);

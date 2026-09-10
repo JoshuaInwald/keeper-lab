@@ -22,7 +22,7 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 
 ## System
 - Repo `~/PycharmProjects/keeper-lab` on the Mac, GitHub `JoshuaInwald/keeper-lab` (`main`), read-only mirror at `~/Documents/Fantasy Baseball/keeper-lab/`. Three-surface rule in `CLAUDE.md`.
-- Build `PYTHONPATH=.:scripts python3 scripts/run_all.py`; tests `PYTHONPATH=. python3 -m pytest tests/ -q` (64 pass); app check `node app/verify.mjs` (17 pass).
+- Build `PYTHONPATH=.:scripts python3 scripts/run_all.py`; tests `PYTHONPATH=. python3 -m pytest tests/ -q` (64 pass); app check `node app/verify.mjs` (21 pass since #81).
 - `data/` current to 2026-09-07 (2026 season ~88% played at that pull). Refresh cadence in `data/README.md`.
 - Committed numbers after #70: **$10.00** per roto point (auction scale), **$6.21** (redraft scale), replacement **5.12 HIT / 3.53 PIT**, 123 flagged keep. All move on a rebuild; quote from `out/model_params.json`.
 
@@ -32,6 +32,7 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 - `keep_value` runs rich at the top: Skubal $86.93 against a revealed $34.31. The decision only needs it to clear his cost, so the ordering is safe and the level is not.
 - The app carries `Roto '26`, `Roto '27` and `Move` in standings places (#72), a `playing time` selector (#76), and per-category decomposition on hover (#74).
 - Since 2026-09-09 (#80): 2028 values and the owner audit use per-role replacement; the bootstrap bands follow `POOL_RULE` and `KEEP_BASIS` (they bracket the headline surplus now); the Monte Carlo shock sign is fixed for pitcher negative stats; Ohtani counts once in every roster sum and is tradeable in the finder; free-agent surplus is on the keep scale.
+- Since 2026-09-09 evening (#81, `docs/UI-REVIEW.md`): the app payload is de-aliased (5.0 MB, was 7.3; startup runs `applyVariant()` like a basis switch), the League tab survives every basis, a split player is one asset in the JS trade path, the drawer reconciles per role, and the presentation prose matches the post-#70/#80 model. `verify.mjs` carries 21 checks.
 - Age exists (`data/chadwick_register.csv`); the market discounts 8.0% per year holding production constant. This does not reopen the aging-curve decision for production, which `CONSTRAINTS.md` declines.
 - Ohtani is two 2027 assets. `F` contracts are unkeepable. Payout 50/25/15/breakeven.
 - Unresolved data questions: Skubal's +$15 salary step and the deGrom/Turang contract clocks (#23.4, #25).
@@ -52,15 +53,17 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 
 ## Next session: start here
 
-**Josh's ask (2026-09-09, verbatim intent): build multiple valuation-model assumptions as user-facing toggles, then run the MODEL-REVIEW process on the UI itself.** Two deliverables, in order:
+**The UI review pass shipped 2026-09-09 evening (#81, `docs/UI-REVIEW.md`); the valuation-curve toggle set is now the deliverable.** Josh's ask (2026-09-09, verbatim intent): build multiple valuation-model assumptions as user-facing toggles.
 
-1. **A valuation-curve toggle set in the app.** The dollar scales are linear in roto points; three instruments say the market is concave at the top and the $1 floor bends the bottom (#56.5 revealed P50 vs `keep_value`, #57.6 Skubal $34/$34 vs $87, #75 tier ratios 1.39x/0.19x, #2 price-band table). Build alternative dollar-curve fits, splines first (knots at the tails, more complex only if LOSO earns it), as selectable UI parameters alongside the existing toggles. Scope notes that matter:
+**A valuation-curve toggle set in the app.** The dollar scales are linear in roto points; three instruments say the market is concave at the top and the $1 floor bends the bottom (#56.5 revealed P50 vs `keep_value`, #57.6 Skubal $34/$34 vs $87, #75 tier ratios 1.39x/0.19x, #2 price-band table). Build alternative dollar-curve fits, splines first (knots at the tails, more complex only if LOSO earns it), as selectable UI parameters alongside the existing toggles. Scope notes that matter:
    - The failed top-end attempts (#57.2 monotone GBM, #62.5 bounded logit) were on the PRICE model; this ask is about the VALUE scales too. A non-linear rp-to-$ map must still satisfy the $2,600 identity over the calibration pool per variant (`scripts/audit.py`); recalibrate inside each variant or the budget check fails.
-   - UI pattern precedents: `PROJECTION_BASIS` (three payloads in subprocesses, #42), positional adjustment (both variants shipped every build, #52), playing time (#76). Ship-both-variants beats rebuild-on-click; payload size is the constraint to watch (6.7 MB now).
+   - UI pattern precedents: `PROJECTION_BASIS` (three payloads in subprocesses, #42), positional adjustment (both variants shipped every build, #52), playing time (#76). Ship-both-variants beats rebuild-on-click; payload size is the constraint to watch (5.0 MB after #81's de-aliasing; the ~3.1 MB of auction comps is the next lever if needed, UI-REVIEW section 3).
+   - Since #81 the payload has NO top-level board/fa/teams/constants aliases: everything a new variant ships goes inside `basis_variants[..]` (or a parallel structure) and the template initialises through `applyVariant()`. Follow that shape or re-create the stale-alias bug class #81.1 closed.
    - Keep flags follow the shipped default only; a display toggle must not silently re-decide keeps (#76's rule).
-   - Every new board column costs FOUR edits (#73) and every new number needs a tooltip under the #74 contract.
+   - Every new board column costs FOUR edits (#73), now all four guarded by `verify.mjs` (the phone hide-list check is new); every new number needs a tooltip under the #74 contract, and the raw-string audit will fail on jargon or file references.
    - Record the board before/after each variant and report keep/cut FLIPS, not correlations (workflow rule).
-2. **Then a UI review pass, same process as `docs/MODEL-REVIEW.md`:** read `app/template.html` and `scripts/build_app.py` bottom-up (subagent for the long reads), check every user-facing string against what the model now computes (#71.1 class), hunt dead code and payload bloat, compact where possible, write `docs/UI-REVIEW.md`, extend `verify.mjs` where a reader-found defect class has no guard. The survey (item 0 below) is still Josh's own task and still first if he is present.
+
+The survey (item 0 below) is still Josh's own task and still first if he is present.
 
 ## Open, in priority order
 

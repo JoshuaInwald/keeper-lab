@@ -364,6 +364,12 @@ def value_players(exch: dict | None = None, positional: bool = False
     players = players.drop(columns=["pt_scale_full"])
     players["redraft_value_ft"] = dollars(players["roto_points_ft"].fillna(
         players["roto_points"]), repl_series)
+    # Full-time on the opportunity-cost scale too: the app's playing-time
+    # toggle re-derived this dollar client-side, the one exception to
+    # "every dollar is computed server-side" (FINDINGS #81).
+    players["keep_value_ft"] = (
+        (players["roto_points_ft"].fillna(players["roto_points"])
+         - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
     players["upside_ft"] = players["redraft_value_ft"] - players["redraft_value"]
     # Which floor produced upside_ft (FINDINGS #53): "health" = full healthy
     # workload; "role" = 5+ save reliever handed the closer job, a weaker bet.
@@ -483,7 +489,7 @@ def build_board(exch: dict | None = None, positional: bool = False
     # by attach_market_price(), which needs the keeper set to set its level.
     b["production_value"] = b["redraft_value"]
     b["pt_scale"] = b["pt_scale"].fillna(1.0)
-    for c in ("roto_points_ft", "redraft_value_ft", "upside_ft"):
+    for c in ("roto_points_ft", "redraft_value_ft", "keep_value_ft", "upside_ft"):
         b[c] = b[c].fillna(0.0)
 
     # groupby().max(), not set_index(): a two-way player has two rows per
