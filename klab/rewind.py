@@ -334,7 +334,10 @@ def rewound_exchange(season: int) -> dict:
 
     seasons = sorted(prior_seasons(season))
     sigma = pooled_relative_dispersion(seasons=seasons)
-    sample = auction_sample(seasons=tuple(seasons), sigma_rel=sigma)
+    # Prior-season field sizes too: the module-default window includes future
+    # seasons' SV punting behaviour, a small but real leak (FINDINGS #80).
+    nbc = tuple(sorted(teams_per_category(seasons=seasons).items()))
+    sample = auction_sample(seasons=tuple(seasons), sigma_rel=sigma, n_by_cat=nbc)
     r = regress(sample)
     slope, intercept = float(r.params["salary"]), float(r.params["const"])
     return {"slope": slope, "intercept": intercept,

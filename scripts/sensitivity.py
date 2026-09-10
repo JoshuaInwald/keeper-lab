@@ -32,7 +32,11 @@ _CACHED = [
     (klab.project, ["fit_save_model", "project_hitters", "project_pitchers"]),
     (klab.auction, ["match_drafts", "auction_sample"]),
     (klab.board, ["build_2027_scorer", "fit_exchange_rate", "project_all_players",
-                  "value_players"]),
+                  "value_players",
+                  # depend on SV_PUNT_THRESHOLD / DENOM_SEASONS via the denom
+                  # loaders; missing from this list they served baseline
+                  # roto_2026 / roto_move under every variant (FINDINGS #80)
+                  "scorer_2026_full", "roto_2026_lines"]),
 ]
 
 

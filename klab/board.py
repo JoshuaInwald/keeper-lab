@@ -420,13 +420,25 @@ def value_2028(exch: dict, meta: dict, saves_2027: pd.Series,
     # 2028 lines (role non-null); summing would give both 2027 rows the total.
     split_names = both["name"].isin(C.TWO_WAY_SPLIT_NAMES)
     split_rows = both[split_names][["fg_id", "role", "roto_points"]]
-    combined = (both[~split_names].groupby("fg_id", as_index=False)["roto_points"].sum()
+    both["_hit"] = (both["role"] == "HIT").astype(int)
+    combined = (both[~split_names].groupby("fg_id", as_index=False)
+                .agg({"roto_points": "sum", "_hit": "max"})
                .assign(role=None))
     out = pd.concat([combined, split_rows], ignore_index=True)
     out = out.rename(columns={"roto_points": "roto_points_2028"})
     scale = meta["usd_per_rp_redraft"]
 
-    repl = pd.Series(meta["replacement_rp"], index=out.index)
+    # 2028 must sit on the same per-role bar as 2027: the scalar
+    # replacement_rp is min(HIT, PIT), which priced 2028 hitters against the
+    # pitcher bar and inflated every hitter out-year by ~$10 (FINDINGS #80).
+    rbr = meta.get("replacement_by_role") or {}
+    if rbr:
+        is_hit = np.where(out["role"].isna(), out["_hit"].fillna(0) > 0,
+                          out["role"] == "HIT")
+        repl = pd.Series(np.where(is_hit, rbr["HIT"], rbr["PIT"]), index=out.index)
+    else:
+        repl = pd.Series(meta["replacement_rp"], index=out.index)
+    out = out.drop(columns=["_hit"])
     if positional and meta.get("positional_replacement"):
         # Same override/any_mask pattern as value_players(): min(pooled, pos)
         # silently no-op'd here too (FINDINGS #52, #53).

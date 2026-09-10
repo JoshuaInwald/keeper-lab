@@ -226,7 +226,6 @@ def project_hitters() -> pd.DataFrame:
 # --- pitchers ---------------------------------------------------------------
 
 @cached
-@cached
 def lines_2026_pitchers() -> pd.DataFrame:
     """A full 2026 pitcher season: banked actuals plus ZiPS rest-of-season.
 

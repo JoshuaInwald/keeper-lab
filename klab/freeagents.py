@@ -68,11 +68,20 @@ def free_agent_board(positional: bool = False) -> pd.DataFrame:
     # groupby().max(), not set_index(): a two-way player has two rows per
     # fg_id and a duplicate index breaks .map() inside project_saves().
     sv27 = players.groupby("fg_id")["SV"].max() if "SV" in players else None
-    v28 = value_2028(exch, meta, sv27, positional=positional)[["fg_id", "redraft_value_2028"]]
+    v28 = value_2028(exch, meta, sv27, positional=positional)[
+        ["fg_id", "redraft_value_2028", "keep_value_2028"]]
     fa = fa.merge(v28, on="fg_id", how="left")
     fa["redraft_value_2028"] = fa["redraft_value_2028"].fillna(0.0)
+    fa["keep_value_2028"] = fa["keep_value_2028"].fillna(0.0)
 
-    my = multiyear_surplus(fa["redraft_value"], fa["redraft_value_2028"],
+    # Same decision scale as the rostered board (config.KEEP_BASIS): the app
+    # ranks free agents beside keepers, and a redraft-basis surplus here under
+    # a keep-basis surplus there priced the same contract two ways (FINDINGS #80).
+    if C.KEEP_BASIS == "replacement":
+        v27, v28col = fa["keep_value"], fa["keep_value_2028"]
+    else:
+        v27, v28col = fa["redraft_value"], fa["redraft_value_2028"]
+    my = multiyear_surplus(v27, v28col,
                            fa["keeper_cost"], fa["years_controlled"], fa["salary"])
     fa = pd.concat([fa.reset_index(drop=True), my.reset_index(drop=True)], axis=1)
     fa["surplus_redraft"] = fa["redraft_value"] - fa["keeper_cost"]

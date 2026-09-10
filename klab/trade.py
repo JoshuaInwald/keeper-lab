@@ -17,17 +17,41 @@ from __future__ import annotations
 import pandas as pd
 
 from . import config as C
-from .io import (load_ros_hitters, load_ros_pitchers, load_standings_long,
-                 norm_name)
+from .io import (cached, load_ros_hitters, load_ros_pitchers,
+                 load_standings_long, norm_name)
 
 
 # --- roster / player lookup -------------------------------------------------
+
+# Additive columns for combining a split player's two rows into one asset.
+_TWO_WAY_SUM_COLS = ["roto_points", "roto_2026", "roto_move", "redraft_value",
+                     "production_value", "keep_value", "surplus_keep",
+                     "surplus_redraft", "surplus_y2027", "surplus_y2028",
+                     "surplus_y2029", "extension_option", "surplus_multiyear",
+                     "roto_points_2028", "redraft_value_2028", "keep_value_2028",
+                     "roto_points_ft", "redraft_value_ft", "upside_ft"]
+
+
+def _combine_two_way(cand: pd.DataFrame) -> pd.Series:
+    """A split player (TWO_WAY_SPLIT_NAMES) is TWO board rows but ONE roster
+    asset with one contract: value columns sum, the contract fields come from
+    either row. Without this, find_player raised "ambiguous" and the trade
+    finder silently skipped every candidate trade involving him (FINDINGS #80)."""
+    row = cand.iloc[0].copy()
+    for c in _TWO_WAY_SUM_COLS:
+        if c in cand:
+            row[c] = float(cand[c].fillna(0.0).sum())
+    row["role"] = "TWO"
+    return row
+
 
 def find_player(board: pd.DataFrame, query: str) -> pd.Series:
     """Resolve a name (or fg_id) against the rostered player board."""
     q = str(query).strip()
     if q.isdigit():
         hit = board[board["fg_id"] == int(q)]
+        if len(hit) > 1:
+            return _combine_two_way(hit)
         if len(hit):
             return hit.iloc[0]
     n = norm_name(q)
@@ -35,18 +59,23 @@ def find_player(board: pd.DataFrame, query: str) -> pd.Series:
     if len(cand) == 1:
         return cand.iloc[0]
     if len(cand) > 1:
+        if cand["fg_id"].nunique() == 1:
+            return _combine_two_way(cand)
         raise ValueError(f"'{query}' is ambiguous: {list(cand['name'])}")
     last = n.split()[-1] if n else ""
     cand = board[board["name"].map(norm_name).str.endswith(" " + last)]
     if len(cand) == 1:
         return cand.iloc[0]
     if len(cand) > 1:
+        if cand["fg_id"].nunique() == 1:
+            return _combine_two_way(cand)
         raise ValueError(f"'{query}' matches {list(cand['name'])} -- be specific")
     raise ValueError(f"'{query}' not found on any roster")
 
 
 # --- 2026 rest-of-season standings impact -----------------------------------
 
+@cached
 def ros_lines() -> pd.DataFrame:
     """Rest-of-2026 counting lines per player, for the win-now view."""
     h = load_ros_hitters()
@@ -59,6 +88,7 @@ def ros_lines() -> pd.DataFrame:
     return H.merge(P, on="fg_id", how="outer").fillna(0.0)
 
 
+@cached
 def prorated_to_date_lines(season_games: int | None = None,
                            games_played_pctile: float | None = None) -> pd.DataFrame:
     """Rest-of-2026 counting lines implied by each player's season-to-date
@@ -263,7 +293,9 @@ def _season_baseline(cur: pd.DataFrame) -> pd.DataFrame:
 def _team_volume(rosters_df: pd.DataFrame, ros: pd.DataFrame, cur_index) -> pd.DataFrame:
     """Sum each team's rest-of-season counting-stat volume from a roster map
     (fg_id -> team) and a rest-of-season stat-line table."""
-    m = rosters_df.merge(ros, on="fg_id", how="left").fillna(0.0)
+    # A split player carries two board rows per fg_id; without the dedup his
+    # one ROS line was summed twice into his team's volume (FINDINGS #80).
+    m = rosters_df.drop_duplicates().merge(ros, on="fg_id", how="left").fillna(0.0)
     g = m.groupby("team")[["AB", "H", "HR", "R", "RBI", "SB",
                            "IP", "W", "SV", "K", "ER", "BB",
                            "H_allowed"]].sum()

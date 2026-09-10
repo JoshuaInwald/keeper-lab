@@ -102,8 +102,15 @@ def build() -> pd.DataFrame:
     d = d.merge(rebuy_prices(), on=["decision_season", "fg_id"], how="left")
 
     usd = dollars_per_point(2026)
-    repl = float(pd.read_json(C.OUT / "model_params.json", typ="series")
-                 ["replacement_rp"])
+    params = pd.read_json(C.OUT / "model_params.json", typ="series")
+    # Per-role bars, matching the board's own pricing. The scalar
+    # `replacement_rp` is min(HIT, PIT) = the pitcher bar and overstated
+    # every hitter's value by ~$10 here (FINDINGS #80).
+    rbr = params.get("replacement_by_role") or {}
+    if rbr:
+        repl = np.where(d["role"] == "PIT", rbr["PIT"], rbr["HIT"])
+    else:
+        repl = float(params["replacement_rp"])
     # Value of what he actually produced, on the same scale the board uses.
     d["value_realised"] = ((d["rp_realised"] - repl) * usd + 1.0).clip(lower=0)
     d["value_ex_ante"] = ((d["rp_prior"] - repl) * usd + 1.0).clip(lower=0)

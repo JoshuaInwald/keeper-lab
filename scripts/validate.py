@@ -30,7 +30,9 @@ def check_2026_standings(board):
     h26 = hit[hit["season"] == 2026]
     p26 = pit[pit["season"] == 2026]
 
-    r = board[["team", "fg_id"]]
+    # drop_duplicates: a split player has two board rows per fg_id and was
+    # otherwise counted twice for his team (FINDINGS #80).
+    r = board[["team", "fg_id"]].drop_duplicates()
     H = r.merge(h26, on="fg_id", how="inner")
     P = r.merge(p26, on="fg_id", how="inner")
 

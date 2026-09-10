@@ -70,6 +70,12 @@ def bootstrap_bands(B: int = 1000, seed: int = 0,
     n_rostered = C.N_TEAMS * C.N_ACTIVE
     dollars_above_min = C.N_TEAMS * C.BUDGET - n_rostered * 1.0
     rank = C.WAIVER_RANK.get(C.WAIVER_VALUE, n_rostered)
+    # The draws must apply the same pool rule as value_players() or the bands
+    # describe a different estimator than the point values (FINDINGS #80: they
+    # kept the role-blind 230 after POOL_RULE went "slot_role" in #70).
+    slot_role = C.POOL_RULE == "slot_role" and C.WAIVER_VALUE != "high"
+    hit_mask = (players["role"] != "PIT").to_numpy()
+    n_hit, n_pit = C.N_TEAMS * C.N_HIT_SLOTS, C.N_TEAMS * C.N_PIT_SLOTS
 
     # Keyed on (fg_id, role), not fg_id alone: a two-way player has two rows
     # per fg_id and a fg_id-only .loc duplicate-expanded them (shape mismatch).
@@ -86,6 +92,15 @@ def bootstrap_bands(B: int = 1000, seed: int = 0,
     b = board.set_index(["fg_id", "role"])
     v27_0 = b.loc[loc_key, "redraft_value"].to_numpy(float)
     v28_0 = b.loc[loc_key, "redraft_value_2028"].to_numpy(float)
+    # The surplus draws must run on the same scale as the shipped
+    # surplus_multiyear (config.KEEP_BASIS): the app shows the band under that
+    # headline, and redraft-basis draws under a keep-basis number were
+    # describing a different quantity than they sat beside (FINDINGS #80).
+    if C.KEEP_BASIS == "replacement":
+        s27_0 = b.loc[loc_key, "keep_value"].to_numpy(float)
+        s28_0 = b.loc[loc_key, "keep_value_2028"].to_numpy(float)
+    else:
+        s27_0, s28_0 = v27_0, v28_0
     # .set_axis(keep_ids): multiyear_surplus() aligns by label against plain
     # keep_ids Series; a MultiIndex here silently produced all-NaN surplus.
     cost = b.loc[loc_key, "keeper_cost"].astype(float).set_axis(keep_ids)
@@ -102,19 +117,35 @@ def bootstrap_bands(B: int = 1000, seed: int = 0,
         tot = rp @ (sigma0 / sig_b)
 
         # replacement level and the $2,600 calibration, refit inside the draw
-        order = np.sort(tot)[::-1]
-        repl = float(C.WAIVER_HIGH_RP) if C.WAIVER_VALUE == "high" else float(order[rank - 1])
-        pool_rp = float(order[:n_rostered].sum() - repl * n_rostered)
+        if slot_role:
+            th = np.sort(tot[hit_mask])[::-1][:n_hit]
+            tp = np.sort(tot[~hit_mask])[::-1][:n_pit]
+            repl_h, repl_p = float(th[-1]), float(tp[-1])
+            pool_rp = float(np.clip(th - repl_h, 0.0, None).sum()
+                            + np.clip(tp - repl_p, 0.0, None).sum())
+            repl_vec = np.where(hit_mask, repl_h, repl_p)
+        else:
+            order = np.sort(tot)[::-1]
+            repl = float(C.WAIVER_HIGH_RP) if C.WAIVER_VALUE == "high" else float(order[rank - 1])
+            pool_rp = float(order[:n_rostered].sum() - repl * n_rostered)
+            repl_vec = repl
         usd = dollars_above_min / pool_rp
-        val = np.clip((tot - repl) * usd + 1.0, 0.0, None)
+        val = np.clip((tot - repl_vec) * usd + 1.0, 0.0, None)
 
         v27 = val[keep_idx]
+        # Surplus on the KEEP_BASIS scale; the exchange fit is held fixed
+        # across draws (refitting it per draw would mean rebuilding the
+        # auction sample; its own error is reported separately, ~+/-40%, #7).
+        if C.KEEP_BASIS == "replacement":
+            s27 = np.clip((tot - exch["intercept"]) / exch["slope"], 0.0, None)[keep_idx]
+        else:
+            s27 = v27
         # 2028 is shocked by the player's own 2027 ratio (see module docstring)
-        shock = np.where(v27_0 > 0, v27 / np.where(v27_0 > 0, v27_0, 1.0), 1.0)
-        v28 = v28_0 * shock
+        shock = np.where(s27_0 > 0, s27 / np.where(s27_0 > 0, s27_0, 1.0), 1.0)
+        s28 = s28_0 * shock
 
-        my = multiyear_surplus(pd.Series(v27, index=keep_ids),
-                               pd.Series(v28, index=keep_ids),
+        my = multiyear_surplus(pd.Series(s27, index=keep_ids),
+                               pd.Series(s28, index=keep_ids),
                                cost, years, salary)["surplus_multiyear"].to_numpy()
         v27_draws[d] = v27
         my_draws[d] = np.where(keepable, my, 0.0)

@@ -29,6 +29,10 @@ _SHOCK_CATEGORY = {
     "H": "H", "HR": "HR", "R": "R", "RBI": "RBI", "SB": "SB",
     "W": "W", "K": "K", "ER": "ER", "BB": "BB", "H_allowed": "H",
 }
+# Columns where MORE is WORSE: a hot draw must lower them, or a pitcher's
+# quality gain and quality decline cancel inside the ERA/WHIP rebuild and
+# pitching dispersion collapses (FINDINGS #80).
+_NEGATIVE_COLS = {"ER", "BB", "H_allowed"}
 # Saves have no RELIABILITY entry (a separate persistence model projects
 # them); wins' r is the closest proxy -- both opportunity-driven, role-swingy.
 _SV_RELIABILITY = RELIABILITY["W"]
@@ -44,7 +48,8 @@ def _jitter_ros(ros: pd.DataFrame, rng: np.random.Generator,
         if col not in out:
             continue
         unreliability = 1.0 - RELIABILITY[cat] / REL_MAX
-        mult = np.clip(1.0 + t * shock_scale * unreliability, 0.0, None)
+        sign = -1.0 if col in _NEGATIVE_COLS else 1.0
+        mult = np.clip(1.0 + sign * t * shock_scale * unreliability, 0.0, None)
         out[col] = out[col].to_numpy() * mult
     if "SV" in out:
         unreliability = 1.0 - _SV_RELIABILITY / REL_MAX
@@ -115,11 +120,20 @@ def _jitter_keeper_lines(kept: pd.DataFrame, rng: np.random.Generator,
     """`_jitter_ros`'s shared-shock mechanism on full-2027-season lines."""
     out = kept.copy()
     t = rng.normal(0.0, 1.0, size=len(out))
+    # "H" is hits for a hitter row and hits ALLOWED for a pitcher row, so the
+    # hot-draw sign flips per role for that one column (FINDINGS #80).
+    is_pit = (out["role"] == "PIT").to_numpy() if "role" in out else np.zeros(len(out), bool)
     for col, cat in _KEEPER_SHOCK_CATEGORY.items():
         if col not in out:
             continue
         unreliability = 1.0 - RELIABILITY[cat] / REL_MAX
-        mult = np.clip(1.0 + t * shock_scale * unreliability, 0.0, None)
+        if col in ("ER", "BB"):
+            sign = -1.0
+        elif col == "H":
+            sign = np.where(is_pit, -1.0, 1.0)
+        else:
+            sign = 1.0
+        mult = np.clip(1.0 + sign * t * shock_scale * unreliability, 0.0, None)
         out[col] = out[col].to_numpy() * mult
     if "SV" in out:
         unreliability = 1.0 - _SV_RELIABILITY / REL_MAX

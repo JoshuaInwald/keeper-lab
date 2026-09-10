@@ -26,8 +26,11 @@ def _shortlist(board: pd.DataFrame, team: str, n: int = SHORTLIST_SIZE) -> list[
     by surplus_multiyear (real keepers); talent-only let rentals crowd out
     the keepers a partner would want."""
     t = board[board["team"] == team]
-    by_talent = set(t.nlargest(n, "roto_points")["name"])
-    by_value = set(t.nlargest(n, "surplus_multiyear")["name"])
+    # groupby: a split player's two rows must rank as one combined asset or
+    # he falls out of both top-n lists at half strength (FINDINGS #80).
+    agg = t.groupby("name")[["roto_points", "surplus_multiyear"]].sum()
+    by_talent = set(agg.nlargest(n, "roto_points").index)
+    by_value = set(agg.nlargest(n, "surplus_multiyear").index)
     # Sorted: set iteration order varies per process and the pickers break
     # ties first-seen-wins, so reruns silently differed (FINDINGS #41).
     return sorted(by_talent | by_value)
@@ -65,7 +68,9 @@ def _pick_win_now(board: pd.DataFrame, results: list[dict], team_a: str, team_b:
     if abs(gap) < STANDINGS_GAP_FOR_WIN_NOW:
         return None    # neither side is clearly buying or selling
     buyer, seller = (team_a, team_b) if gap > 0 else (team_b, team_a)
-    surplus = board.set_index("name")["surplus_multiyear"]
+    # groupby, not set_index: a split player has two rows under one name and a
+    # duplicate index makes .get() return a Series; his asset is the sum (FINDINGS #80).
+    surplus = board.groupby("name")["surplus_multiyear"].sum()
     best = None
     for r in results:
         buyer_gain = r["a_standings_delta"] if buyer == team_a else r["b_standings_delta"]

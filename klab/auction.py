@@ -67,10 +67,15 @@ def match_drafts(verbose: bool = True) -> pd.DataFrame:
 
 def score_season(season: int, sigma_rel: pd.DataFrame, levels: pd.DataFrame,
                  hit: pd.DataFrame, pit: pd.DataFrame,
-                 baselines: pd.DataFrame) -> pd.DataFrame:
-    """Roto points for every player in one season, on that season's scale."""
+                 baselines: pd.DataFrame, n_by_cat: dict | None = None) -> pd.DataFrame:
+    """Roto points for every player in one season, on that season's scale.
+
+    `n_by_cat` defaults to the DENOM_SEASONS window; an ex-ante caller
+    (klab/rewind.py) must pass its own prior-season field sizes or the SV
+    field count leaks future punting behaviour (FINDINGS #80)."""
     L = levels[levels["season"] == season].set_index("category")["level"].to_dict()
-    D = denominators_for_level(sigma_rel, L, n_by_cat=teams_per_category())
+    D = denominators_for_level(sigma_rel, L,
+                               n_by_cat=n_by_cat or teams_per_category())
     b = baselines.set_index("season").loc[season].to_dict()
     sc = RotoScorer(D, b)
 
@@ -95,14 +100,21 @@ def score_season(season: int, sigma_rel: pd.DataFrame, levels: pd.DataFrame,
 
 @cached
 def auction_sample(seasons=(2022, 2023, 2024, 2025, 2026),
-                   sigma_rel: pd.DataFrame | None = None) -> pd.DataFrame:
-    """One row per auction purchase: price paid + roto points delivered."""
+                   sigma_rel: pd.DataFrame | None = None,
+                   n_by_cat=None) -> pd.DataFrame:
+    """One row per auction purchase: price paid + roto points delivered.
+
+    `n_by_cat`: per-category field sizes as a tuple of (cat, n) pairs so the
+    memoiser can key on it; an ex-ante caller (klab/rewind.py) passes its own
+    prior-season sizes or the SV field leaks future punting (FINDINGS #80)."""
     sigma_rel = pooled_relative_dispersion() if sigma_rel is None else sigma_rel
+    nbc = dict(n_by_cat) if n_by_cat else None
     levels = season_levels()
     hit, pit = load_hitters_history(), load_pitchers_history()
     bl = team_baselines(list(seasons))
 
-    scored = pd.concat([score_season(s, sigma_rel, levels, hit, pit, bl)
+    scored = pd.concat([score_season(s, sigma_rel, levels, hit, pit, bl,
+                                     n_by_cat=nbc)
                         for s in seasons], ignore_index=True)
     drafts = match_drafts(verbose=False)
     drafts = drafts[drafts["season"].isin(seasons)].copy()

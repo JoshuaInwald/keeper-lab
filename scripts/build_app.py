@@ -286,6 +286,9 @@ def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: lis
     s = snapshot(positional=positional)
     board = s.board.merge(ros, on="fg_id", how="left")
     board[ros_cols] = board[ros_cols].fillna(0.0)
+    # A split player has two rows per fg_id but one ROS line; zero the
+    # duplicate or the JS rosterAgg sums his 2026 line twice (FINDINGS #80).
+    board.loc[board.duplicated(subset=["fg_id"], keep="first"), ros_cols] = 0.0
     board["position"] = board["fg_id"].map(pos_map).fillna("?")
     board["mlb_team"] = board["fg_id"].map(team_map).fillna("?")
     # Bootstrap bands are NOT positional-aware (documented scope limit):
@@ -352,6 +355,8 @@ def _variant_payload() -> dict:
     s = snapshot(positional=False)
     board_raw = s.board.merge(ros, on="fg_id", how="left")
     board_raw[ros_cols] = board_raw[ros_cols].fillna(0.0)
+    # Same split-player dedup as _board_fa_teams_constants (FINDINGS #80).
+    board_raw.loc[board_raw.duplicated(subset=["fg_id"], keep="first"), ros_cols] = 0.0
     board_raw["position"] = board_raw["fg_id"].map(pos_map).fillna("?")
     fa_raw = s.free_agents.copy()
     fa_raw["team"] = "(free agent)"

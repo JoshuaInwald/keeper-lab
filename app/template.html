@@ -286,9 +286,15 @@ function setRosBasis(basis){
   if(!ROS_VARIANTS[basis]) return;
   S.rosBasis = basis;
   const v = ROS_VARIANTS[basis];
+  // A split player has two BOARD rows per fg_id but one ROS line; it lands
+  // on his first row only, or rosterAgg sums it twice (FINDINGS #80).
+  const seen = {};
   for(const r of BOARD.concat(FA)){
-    const rec = v[g(r,"fg_id")];
+    const id = g(r,"fg_id");
+    const rec = v[id];
     if(!rec) continue;
+    if(seen[id]){ for(const c of ROS) r[IX["ros_"+c]] = 0; continue; }
+    seen[id] = 1;
     for(const c of ROS) r[IX["ros_"+c]] = rec[c] ?? 0;
   }
   recomputeProjections();
@@ -374,6 +380,9 @@ function recomputeProjections(){   // re-run after setRosBasis() changes ros_* f
 // (swap=null) and the Trade tab's what-if view (swap={fg_id: newTeam}).
 const SHOCK_CATEGORY = {H:"H", HR:"HR", R:"R", RBI:"RBI", SB:"SB",
                         W:"W", K:"K", ER:"ER", BB:"BB", H_allowed:"H"};
+// More is WORSE for these: a hot draw lowers them, mirroring
+// klab/standings_sim.py's _NEGATIVE_COLS (FINDINGS #80).
+const NEGATIVE_SHOCK_COLS = {ER:1, BB:1, H_allowed:1};
 const DEFAULT_SHOCK_SCALE = 0.35;
 // Box-Muller for a standard normal draw -- the only thing a random-normal
 // library would be needed for here.
@@ -400,7 +409,7 @@ function jitteredShadeCols(shockScale){
   for(const r of BOARD){
     const t = randNormal();
     const m = {};
-    for(const col in unrel) m[col] = Math.max(0, 1 + t*shockScale*unrel[col]);
+    for(const col in unrel) m[col] = Math.max(0, 1 + (NEGATIVE_SHOCK_COLS[col]?-t:t)*shockScale*unrel[col]);
     m.SV = Math.max(0, 1 + t*shockScale*svUnreliability);
     cols[g(r,"fg_id")] = m;
   }
