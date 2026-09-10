@@ -20,6 +20,7 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 | built | The keeper-count equilibrium closed by measurement: refitting the exchange rate at 100-130 assumed keepers moves $/pt 10.00-11.94 but the advice converges at 121 keeps (vs 123 shipped), flipping only Brooks Lee and Kyle Stowers. A two-flip worry, not structural. #79.35 |
 | bug | The finder's shortlist and win-now picker also treated split rows as separate half-strength assets (name-keyed `set_index` returned a Series and crashed the batch); both aggregate per name now. #80.4 |
 | bug | The quoted CHECK 1 standings correlation (0.851) was stale: it predates the 2026-09-07 evening actuals refresh. Current: 0.527 pre-fix, 0.588 after the dedup, and the check decays by construction late in a season. Docs trued. #80.65 |
+| declined | Building the valuation-curve toggles same-session (Josh's next ask, near the token boundary): seeded instead as HANDOFF "Next session: start here" with scope notes (splines at the tails, budget identity per variant, ship-both-variants UI pattern), followed by a UI review pass mirroring MODEL-REVIEW |
 
 ## 2026-09-08 (assessment phase B, then a reader pass over the result)
 

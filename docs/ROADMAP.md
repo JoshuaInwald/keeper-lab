@@ -14,6 +14,12 @@ headline number, is in git history and its conclusions are in #56 and #57.
 
 ## Live
 
+**Valuation-curve toggles, then a UI review (Josh, 2026-09-09; queued as HANDOFF
+"Next session: start here").** Non-linear dollar curves (splines at the tails
+first) as selectable UI parameters beside the existing basis/positional/playing
+time toggles, budget identity preserved per variant; then the MODEL-REVIEW
+process applied to the UI layer itself (`docs/UI-REVIEW.md`).
+
 **Intuition tab v2 (scope needs a decision, blocked on Josh).**
 Show each player's PA/IP and per-category rates; three ways to adjust (+/-
 buttons, direct entry, presets such as full-time); all 230 rostered players

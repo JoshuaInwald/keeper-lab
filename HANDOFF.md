@@ -50,6 +50,18 @@ Marcel 2027 will not exist before either date (Baseball-Reference publishes afte
 | `fetch_chadwick.py`, `price_features.py`, `keeper_revealed.py`, `price_model.py`, `compare_valuations.py` | the item-1 price chain, in that order |
 | `fetch_marcel.js` | rebuilds the Marcel archive from a browser session; `data/` is gitignored so a fresh clone needs it |
 
+## Next session: start here
+
+**Josh's ask (2026-09-09, verbatim intent): build multiple valuation-model assumptions as user-facing toggles, then run the MODEL-REVIEW process on the UI itself.** Two deliverables, in order:
+
+1. **A valuation-curve toggle set in the app.** The dollar scales are linear in roto points; three instruments say the market is concave at the top and the $1 floor bends the bottom (#56.5 revealed P50 vs `keep_value`, #57.6 Skubal $34/$34 vs $87, #75 tier ratios 1.39x/0.19x, #2 price-band table). Build alternative dollar-curve fits, splines first (knots at the tails, more complex only if LOSO earns it), as selectable UI parameters alongside the existing toggles. Scope notes that matter:
+   - The failed top-end attempts (#57.2 monotone GBM, #62.5 bounded logit) were on the PRICE model; this ask is about the VALUE scales too. A non-linear rp-to-$ map must still satisfy the $2,600 identity over the calibration pool per variant (`scripts/audit.py`); recalibrate inside each variant or the budget check fails.
+   - UI pattern precedents: `PROJECTION_BASIS` (three payloads in subprocesses, #42), positional adjustment (both variants shipped every build, #52), playing time (#76). Ship-both-variants beats rebuild-on-click; payload size is the constraint to watch (6.7 MB now).
+   - Keep flags follow the shipped default only; a display toggle must not silently re-decide keeps (#76's rule).
+   - Every new board column costs FOUR edits (#73) and every new number needs a tooltip under the #74 contract.
+   - Record the board before/after each variant and report keep/cut FLIPS, not correlations (workflow rule).
+2. **Then a UI review pass, same process as `docs/MODEL-REVIEW.md`:** read `app/template.html` and `scripts/build_app.py` bottom-up (subagent for the long reads), check every user-facing string against what the model now computes (#71.1 class), hunt dead code and payload bloat, compact where possible, write `docs/UI-REVIEW.md`, extend `verify.mjs` where a reader-found defect class has no guard. The survey (item 0 below) is still Josh's own task and still first if he is present.
+
 ## Open, in priority order
 
 0. **Run the survey (`docs/WORKFLOWS.md` 6b). It is the only item here that can be done today.** `out/keeper_survey.html` collects blind keep/cut calls from Pookie 2.0's owner and from Josh; `scripts/ingest_survey.py` scores them against the model and each other. #69 makes a good owner a benchmark rather than a reviewer, and the role-split price calibration is the test of the model's most falsifiable claim (20 of its 25 biggest bargains are pitchers).
