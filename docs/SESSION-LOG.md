@@ -14,6 +14,7 @@ Reverse chronological. Dates are commit dates. Undated entries predate the GitHu
 | built | `keep_value_ft` ships server-side, retiring the app's one client-side dollar derivation; the JS sim's shock scale now reads the payload instead of a hard-coded 0.35. #81.5 |
 | built | `verify.mjs` 17 checks to 21: phone hide-list by field name (#73's unguarded fourth edit), raw help-string audit (the gap that let #27 through), bands-bracket-headline over all rows (#80.2's class), the split-asset convention, and the suggestion check no longer passes on an empty payload. #81.6 |
 | declined | Trimming the 3.1 MB of auction comps (a visible table, so a product cut); moving `evaluate_trade` to the keep basis (a model question, recorded as a diagnostic with the label fixed) |
+| built | HANDOFF reseeded after Josh's read of the review reports: the toggle deliverable now spans rp-to-$ curves AND alternative exchange-rate estimators (tiered, window, partial-pooling, robust), tiered inflation for `market_price`, and `WAIVER_VALUE` as a visible three-anchor dropdown with "low" default; punter status recorded (#1/#6: SV exclusion load-bearing, no SB equivalent, threshold not intent) |
 
 ## 2026-09-09 (bottom-up model review)
 
