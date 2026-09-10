@@ -1,0 +1,15 @@
+variant,usd_per_pt,intercept,n,usd_se,segments,keeps,flips,skubal_keep_value,note
+keeper_adjusted,10.0,3.98,404.0,,,123.0,0.0,86.93,
+pick_level,10.38,3.99,677.0,2.76,,123.0,0.0,90.06,
+pick_level_2426,9.92,3.91,404.0,2.54,,123.0,0.0,86.81,
+pooled_2426,7.04,3.87,404.0,,,107.0,20.0,61.96,
+pooled_2226,5.41,3.27,677.0,,,111.0,20.0,50.82,
+recent_2026,9.92,3.91,112.0,,,123.0,0.0,86.81,
+window_2425,6.34,3.85,292.0,,,102.0,27.0,55.89,
+partial_pool,7.1,3.91,677.0,,,107.0,20.0,62.17,
+median_two_stage,16.36,4.18,677.0,,,128.0,11.0,138.92,
+median_pooled,8.59,4.21,404.0,,,108.0,15.0,72.68,
+projected,11.18,3.62,404.0,1.96,,129.0,8.0,101.23,
+projected_pooled,7.99,4.26,404.0,,,103.0,20.0,67.15,
+spline,24.55,3.08,677.0,,"[5.116, 7.026, 4.011, 24.547]",118.0,23.0,110.86,
+tiered_two_stage,,,,,,,,,"DEGENERATE: tiered two-stage segment 3 has 2 usable seasons (per-season usd [nan, nan, 2.02, 1.23, nan]); no honest trend exists"

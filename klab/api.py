@@ -63,6 +63,20 @@ def _team_summary(board: pd.DataFrame) -> pd.DataFrame:
     return t.sort_values("surplus", ascending=False)
 
 
+def _inflation_tiers(board: pd.DataFrame) -> dict:
+    """Auction money over roster worth, by tier of the board (FINDINGS #75:
+    stars run 1.39x their salary, the bottom tier 0.19x, so one scalar
+    understates what the top of the draft will cost). Tiers are by
+    production_value rank over players the price model prices; each entry is
+    sum(market_price) / sum(production_value) for the tier."""
+    d = board[board["market_price"].notna() & (board["production_value"] > 0)]
+    d = d.sort_values("production_value", ascending=False)
+    tiers = {"top50": d.iloc[:50], "mid": d.iloc[50:120], "depth": d.iloc[120:]}
+    return {f"inflation_{k}": float(g["market_price"].sum()
+                                    / g["production_value"].sum())
+            for k, g in tiers.items() if len(g) and g["production_value"].sum() > 0}
+
+
 def _inflation(board: pd.DataFrame) -> dict:
     k = board[board["keep_2027"]]
     sal, worth = k["keeper_cost"].sum(), k["redraft_value"].sum()
@@ -106,6 +120,7 @@ def snapshot(positional: bool = False) -> Snapshot:
         "denominators_se": meta["denominators_se"],
         "exchange_basis": exch.get("basis"),
         **_inflation(board),
+        **_inflation_tiers(board),
     }
     settings = {k: getattr(C, k) for k in [
         "DENOM_SEASONS", "AUCTION_SEASONS", "EXCHANGE_BASIS", "PROJECTION_BASIS",

@@ -53,14 +53,20 @@ def _pools(seasons=None) -> dict:
 
 @cached
 def bootstrap_bands(B: int = 1000, seed: int = 0,
-                    lo_pct: float = 10.0, hi_pct: float = 90.0) -> pd.DataFrame:
+                    lo_pct: float = 10.0, hi_pct: float = 90.0,
+                    exch: dict | None = None) -> pd.DataFrame:
     """Per-player dollar bands, indexed by (`fg_id`, `role`): lo/hi on
     `redraft_value` and `surplus_multiyear`, plus the share of draws in
     which the player is still worth keeping.
+
+    `exch` overrides the exchange fit so the app's fit dropdown gets bands
+    that describe the fit on screen (FINDINGS #82); a dict argument bypasses
+    the cache, so a variant's bands never shadow the default's.
     """
     rng = np.random.default_rng(seed)
-    players, exch, meta = value_players()
-    board, _, _ = build_board()
+    players, dexch, meta = value_players()
+    board, _, _ = build_board(exch=exch)
+    exch = exch or dexch
 
     pools = _pools()
     cats = [c for c in C.CATS if c in pools]
@@ -72,8 +78,11 @@ def bootstrap_bands(B: int = 1000, seed: int = 0,
     rank = C.WAIVER_RANK.get(C.WAIVER_VALUE, n_rostered)
     # The draws must apply the same pool rule as value_players() or the bands
     # describe a different estimator than the point values (FINDINGS #80: they
-    # kept the role-blind 230 after POOL_RULE went "slot_role" in #70).
-    slot_role = C.POOL_RULE == "slot_role" and C.WAIVER_VALUE != "high"
+    # kept the role-blind 230 after POOL_RULE went "slot_role" in #70). Since
+    # #82 slot_role holds under every anchor; WAIVER_VALUE moves only the bar.
+    slot_role = C.POOL_RULE == "slot_role"
+    rank_h = round(rank * C.N_HIT_SLOTS / C.N_ACTIVE)
+    rank_p = round(rank * C.N_PIT_SLOTS / C.N_ACTIVE)
     hit_mask = (players["role"] != "PIT").to_numpy()
     n_hit, n_pit = C.N_TEAMS * C.N_HIT_SLOTS, C.N_TEAMS * C.N_PIT_SLOTS
 
@@ -120,7 +129,16 @@ def bootstrap_bands(B: int = 1000, seed: int = 0,
         if slot_role:
             th = np.sort(tot[hit_mask])[::-1][:n_hit]
             tp = np.sort(tot[~hit_mask])[::-1][:n_pit]
-            repl_h, repl_p = float(th[-1]), float(tp[-1])
+            # The bar per anchor, mirroring value_players(): fieldable
+            # minimum ("low"), per-role deeper ranks ("medium"), or the
+            # measured FA level as a role-blind constant ("high").
+            if C.WAIVER_VALUE == "high":
+                repl_h = repl_p = float(C.WAIVER_HIGH_RP)
+            elif C.WAIVER_VALUE == "medium":
+                repl_h = float(np.sort(tot[hit_mask])[::-1][rank_h - 1])
+                repl_p = float(np.sort(tot[~hit_mask])[::-1][rank_p - 1])
+            else:
+                repl_h, repl_p = float(th[-1]), float(tp[-1])
             pool_rp = float(np.clip(th - repl_h, 0.0, None).sum()
                             + np.clip(tp - repl_p, 0.0, None).sum())
             repl_vec = np.where(hit_mask, repl_h, repl_p)

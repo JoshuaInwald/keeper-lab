@@ -121,10 +121,16 @@ EXCHANGE_BASIS = "keeper_adjusted"
 LEVEL_SEASONS = [2024, 2025]
 
 # --- Waiver-wire value ------------------------------------------------------
-# Replacement level = "the best player you can get for free". "low": the
-# 230th-best projection (one per active slot). "medium": the 300th. "high":
-# median 2026 production of actual FA pickups (5.04 rp) -- an ex-post upper
-# bound, for sensitivity only. Higher replacement = every rostered player worth less.
+# Replacement level = "the best player you can get for free". "low": the last
+# fieldable player (under POOL_RULE="slot_role" the 140th hitter / 90th
+# pitcher; blind, the 230th overall). "medium": #62's 300th-best-overall,
+# split per role by the fieldable share under slot_role (183rd / 117th).
+# "high": median 2026 production of actual FA pickups (5.04 rp), an ex-post
+# upper bound applied role-blind. The anchor moves only the BAR; the
+# calibration pool stays the fieldable 140/90 (#82; before that "medium"
+# no-op'd under slot_role and "high" reverted the pool to role-blind).
+# Higher replacement = every rostered player worth less. The #62 tie stands:
+# behavioural churn says ~4.38, internal consistency ~4.73, FA pickups 5.04.
 WAIVER_VALUE = "low"
 WAIVER_RANK = {"low": 230, "medium": 300}
 WAIVER_HIGH_RP = 5.04

@@ -20,7 +20,7 @@ rsync -a --delete --exclude='.git' --exclude='.venv311' --exclude='node_modules'
 
 ## Runtime facts (do not guess)
 - Needs Python 3.11+ or scipy >= 1.9 (older scipy returns `spearmanr` as a tuple; one test fails silently).
-- Build: `PYTHONPATH=.:scripts python3 scripts/run_all.py` (~3 s cold). Tests: `PYTHONPATH=. python3 -m pytest tests/ -q` (64 tests, 3-6 min; `test_build_payload` dominates). App check: `cd app && npm i playwright@1.56.1 && cd .. && node app/verify.mjs` (21 checks; JS re-implementation must match pandas on 25 quantities).
+- Build: `PYTHONPATH=.:scripts python3 scripts/run_all.py` (~3 s cold). Tests: `PYTHONPATH=. python3 -m pytest tests/ -q` (64 tests, 3-6 min; `test_build_payload` dominates). App check: `cd app && npm i playwright@1.56.1 && cd .. && node app/verify.mjs` (23 checks; JS re-implementation must match pandas on 25 quantities). `build_app.py` takes several minutes since #82 (per-variant overlay rebuilds and bootstraps).
 - `scripts/build_trade_suggestions.py` (~2 min) is not in `run_all.py`; rerun it after any roster change or the app serves stale suggestions.
 - `team_reports.py`, `run_all.py`, `estimate_auction_price.py` need `PYTHONPATH=.:scripts`.
 - Committed outputs match the documented numbers. If a rebuild changes them, say so in the commit message. Float noise at 1e-13 across platforms is normal; restore from HEAD rather than commit it.

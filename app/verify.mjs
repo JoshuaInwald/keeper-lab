@@ -519,6 +519,7 @@ const helpResult = await page.evaluate(() => {
   const pools = { COL_HELP, CONST_HELP, SETTING_HELP,
                   MISC: { basis: BASIS_HELP, positional: POSITIONAL_HELP,
                           ros_basis: ROS_BASIS_HELP, fa_note: FA_NOTE,
+                          exchange: EXCHANGE_HELP, anchor: ANCHOR_HELP,
                           contention_live: contentionHelp(false),
                           contention_2027: contentionHelp(true) } };
   const leaks = [], jargon = [], essays = [];
@@ -586,6 +587,82 @@ const splitBad = splitResult.none ? false
   : (!splitResult.sumOk || !splitResult.costOnce || splitResult.entries !== 1);
 if (splitBad) console.log('  SPLIT-PLAYER ASSET MISMATCH:', JSON.stringify(splitResult));
 
+// Exchange-fit dropdown (FINDINGS #82): switching the estimator must move
+// Replace $ and the surplus columns AND the auction-scale constant, must
+// leave every keep flag alone (#76: flags follow the shipped default), must
+// survive a basis switch and a positional toggle, and must round-trip back
+// to identical numbers -- the overlay mutates shared row arrays, so an
+// imperfect restore is exactly the bug this check exists to catch.
+const exchangeResult = await page.evaluate(() => {
+  const alt = (D.exchange_options || [])[1];
+  if (!alt) return { missing: true };
+  const top = BOARD.reduce((b, r) => g(r, 'keep_value') > g(b, 'keep_value') ? r : b);
+  const id = g(top, 'fg_id');
+  const before = g(top, 'keep_value'), sBefore = g(top, 'surplus_multiyear');
+  const usdBefore = D.constants.usd_per_roto_point_auction;
+  const flagsBefore = BOARD.map(r => g(r, 'keep_2027')).join('');
+  setExchangeFit(alt);
+  const after = g(byId[id], 'keep_value'), sAfter = g(byId[id], 'surplus_multiyear');
+  const usdAfter = D.constants.usd_per_roto_point_auction;
+  const flagsAfter = BOARD.map(r => g(r, 'keep_2027')).join('');
+  const selTracks = document.querySelector('#exchsel select')?.value === alt;
+  setBasis('projection');
+  const survivedBasis = S.exchange === alt
+    && D.constants.usd_per_roto_point_auction !== usdBefore;
+  setBasis('blend');
+  setPositionalAdjustment(true);
+  const survivedPositional = S.exchange === alt;
+  setPositionalAdjustment(false);
+  setExchangeFit((D.exchange_options)[0]);
+  const back = g(byId[id], 'keep_value');
+  const usdBack = D.constants.usd_per_roto_point_auction;
+  return { before, after, sBefore, sAfter, back, usdBefore, usdAfter, usdBack,
+          selTracks, survivedBasis, survivedPositional,
+          flagsUnchanged: flagsBefore === flagsAfter };
+});
+const exchangeBad = exchangeResult.missing || exchangeResult.before === exchangeResult.after
+  || exchangeResult.sBefore === exchangeResult.sAfter
+  || exchangeResult.usdBefore === exchangeResult.usdAfter
+  || !exchangeResult.selTracks || !exchangeResult.survivedBasis
+  || !exchangeResult.survivedPositional || !exchangeResult.flagsUnchanged
+  || Math.abs(exchangeResult.back - exchangeResult.before) > 1e-6
+  || Math.abs(exchangeResult.usdBack - exchangeResult.usdBefore) > 1e-6;
+if (exchangeBad) console.log('  EXCHANGE-FIT DROPDOWN MISMATCH:', JSON.stringify(exchangeResult));
+
+// Replacement-anchor dropdown (FINDINGS #62/#82): a different free-player bar
+// must move Production $ for an ordinary player and the redraft-scale
+// constant, must move ZERO keep flags (the keep decision prices against the
+// auction, which never sees the anchor), and must round-trip exactly.
+const anchorResult = await page.evaluate(() => {
+  const alt = (D.anchor_options || [])[1];
+  if (!alt) return { missing: true };
+  const row = BOARD.filter(r => g(r, 'redraft_value') > 5 && g(r, 'position') !== 'C'
+                                && g(r, 'position') !== 'SS')[0];
+  const id = g(row, 'fg_id');
+  const before = g(row, 'redraft_value');
+  const usdBefore = D.constants.usd_per_roto_point_redraft;
+  const flagsBefore = BOARD.map(r => g(r, 'keep_2027')).join('');
+  setAnchor(alt);
+  const after = g(byId[id], 'redraft_value');
+  const usdAfter = D.constants.usd_per_roto_point_redraft;
+  const flagsAfter = BOARD.map(r => g(r, 'keep_2027')).join('');
+  const selTracks = document.querySelector('#anchorsel select')?.value === alt;
+  setBasis('projection');
+  const survivedBasis = S.anchor === alt;
+  setBasis('blend');
+  setAnchor((D.anchor_options)[0]);
+  const back = g(byId[id], 'redraft_value');
+  const usdBack = D.constants.usd_per_roto_point_redraft;
+  return { before, after, back, usdBefore, usdAfter, usdBack, selTracks,
+          survivedBasis, flagsUnchanged: flagsBefore === flagsAfter };
+});
+const anchorBad = anchorResult.missing || anchorResult.before === anchorResult.after
+  || anchorResult.usdBefore === anchorResult.usdAfter || !anchorResult.selTracks
+  || !anchorResult.survivedBasis || !anchorResult.flagsUnchanged
+  || Math.abs(anchorResult.back - anchorResult.before) > 1e-6
+  || Math.abs(anchorResult.usdBack - anchorResult.usdBefore) > 1e-6;
+if (anchorBad) console.log('  REPLACEMENT-ANCHOR DROPDOWN MISMATCH:', JSON.stringify(anchorResult));
+
 let bad = 0;
 const cmp = (label, a, e, tol) => {
   if (!(Math.abs(a - e) <= tol)) { console.log(`  MISMATCH ${label}: js ${a} vs py ${e}`); bad++; }
@@ -643,7 +720,12 @@ console.log(bandBad ? 'FAIL  Uncertainty bands do not bracket the headline they 
 console.log(splitResult.none ? 'PASS  Split-player check skipped: no rostered two-way player this season'
   : splitBad ? 'FAIL  Split player is not one asset (sum, single contract, or picker dedupe broke)'
              : `PASS  ${splitResult.name} trades as one asset: values sum, contract counts once, listed once`);
+console.log(exchangeBad ? 'FAIL  Exchange-fit dropdown did not move keep-scale values, moved a keep flag, or failed to round-trip'
+                        : 'PASS  Exchange-fit dropdown moves Replace $/surplus, keeps flags fixed, survives other toggles, round-trips');
+console.log(anchorBad ? 'FAIL  Replacement-anchor dropdown did not move Production $, moved a keep flag, or failed to round-trip'
+                      : 'PASS  Replacement-anchor dropdown moves Production $, keeps flags fixed, survives a basis switch, round-trips');
 await browser.close();
 process.exit(bad || errs.length || suggBad.length || suggEmpty || basisBad || positionalBad || homeBad || finishBad || auctionBad
             || rosBasisBad || boardRosBad || historyBad || keeper2027Bad || contention2027Bad
-            || upsideKindBad || intuitionBad || phoneBad || helpBad || bandBad || splitBad ? 1 : 0);
+            || upsideKindBad || intuitionBad || phoneBad || helpBad || bandBad || splitBad
+            || exchangeBad || anchorBad ? 1 : 0);

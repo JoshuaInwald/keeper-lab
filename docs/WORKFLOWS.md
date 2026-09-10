@@ -128,7 +128,7 @@ The app re-implements a little arithmetic in JavaScript, and that copy drifts in
 ```bash
 PYTHONPATH=. python3 -m pytest tests/ -q          # 1. logic still holds
 PYTHONPATH=.:scripts python3 scripts/build_app.py # 2. rebuild the app
-node app/verify.mjs                               # 3. JS agrees with pandas (17 checks)
+node app/verify.mjs                               # 3. JS agrees with pandas (23 checks)
 node app/verify_survey.mjs "$PWD/out/keeper_survey.html"   # 4. survey flow, if it was rebuilt
 ```
 

@@ -110,6 +110,28 @@ def fit_exchange_rate(sigma=None, seasons=None):
     }, sample
 
 
+def keep_cost(exch: dict, rp) -> pd.Series:
+    """Auction cost of `rp` roto points under an exchange fit.
+
+    Linear fits invert exactly as before; a fit carrying `curve` (piecewise
+    rp/usd knots from a non-linear estimator) is interpolated, with the end
+    segments extended linearly so the top of the board is priced on the last
+    observed slope rather than a flat cap (FINDINGS #82).
+    """
+    curve = exch.get("curve") if isinstance(exch, dict) else None
+    if not curve:
+        return ((rp - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
+    rk = np.asarray(curve["rp_knots"], dtype=float)
+    uk = np.asarray(curve["usd_knots"], dtype=float)
+    v = np.interp(rp, rk, uk)
+    lo_slope = (uk[1] - uk[0]) / (rk[1] - rk[0])
+    hi_slope = (uk[-1] - uk[-2]) / (rk[-1] - rk[-2])
+    v = np.where(rp < rk[0], uk[0] + (rp - rk[0]) * lo_slope, v)
+    v = np.where(rp > rk[-1], uk[-1] + (rp - rk[-1]) * hi_slope, v)
+    out = pd.Series(v, index=rp.index) if isinstance(rp, pd.Series) else pd.Series(v)
+    return out.clip(lower=0.0)
+
+
 @cached
 def scorer_2026_full():
     """The 2026 roto scale, projected to a full season.
@@ -295,13 +317,30 @@ def value_players(exch: dict | None = None, positional: bool = False
     # rather than dropping it: a two-way player occupies a hitter slot here.
     role_of = np.where(base_players["role"] == "PIT", "PIT", "HIT")
     repl_by_role: dict = {}
-    if C.POOL_RULE == "slot_role" and C.WAIVER_VALUE != "high":
+    if C.POOL_RULE == "slot_role":
         hit = base_players[role_of == "HIT"].nlargest(
             C.N_TEAMS * C.N_HIT_SLOTS, "roto_points")
         pit = base_players[role_of == "PIT"].nlargest(
             C.N_TEAMS * C.N_PIT_SLOTS, "roto_points")
-        repl_by_role = {"HIT": float(hit["roto_points"].min()),
-                        "PIT": float(pit["roto_points"].min())}
+        # The POOL is the fieldable 140/90 under every anchor (settled by
+        # #68/#69/#70); WAIVER_VALUE moves only the BAR. Before #82 "medium"
+        # silently no-op'd here and "high" reverted the pool to role-blind.
+        if C.WAIVER_VALUE == "high":
+            # Measured FA-pickup production, role-blind by construction.
+            repl_by_role = {"HIT": repl_rp, "PIT": repl_rp}
+        elif C.WAIVER_VALUE == "medium":
+            # #62's 300th-best-overall, split per role by the fieldable share.
+            rank = C.WAIVER_RANK["medium"]
+            rh = round(rank * C.N_HIT_SLOTS / C.N_ACTIVE)
+            rp_rank = round(rank * C.N_PIT_SLOTS / C.N_ACTIVE)
+            repl_by_role = {
+                "HIT": float(base_players[role_of == "HIT"].nlargest(
+                    rh, "roto_points")["roto_points"].min()),
+                "PIT": float(base_players[role_of == "PIT"].nlargest(
+                    rp_rank, "roto_points")["roto_points"].min())}
+        else:
+            repl_by_role = {"HIT": float(hit["roto_points"].min()),
+                            "PIT": float(pit["roto_points"].min())}
         repl_series = pd.Series(
             np.where(role_of == "HIT", repl_by_role["HIT"], repl_by_role["PIT"]),
             index=base_players.index)
@@ -345,8 +384,7 @@ def value_players(exch: dict | None = None, positional: bool = False
     players["production_value"] = players["redraft_value"]
     players["market_price"] = np.nan
     # A player cannot be worth less than nothing (bench him, use the wire).
-    players["keep_value"] = (
-        (players["roto_points"] - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
+    players["keep_value"] = keep_cost(exch, players["roto_points"])
 
     # Merge on (fg_id, role), not a fg_id-keyed .map(): a two-way player
     # (TWO_WAY_SPLIT_NAMES) has two rows per fg_id, which breaks .map().
@@ -367,9 +405,8 @@ def value_players(exch: dict | None = None, positional: bool = False
     # Full-time on the opportunity-cost scale too: the app's playing-time
     # toggle re-derived this dollar client-side, the one exception to
     # "every dollar is computed server-side" (FINDINGS #81).
-    players["keep_value_ft"] = (
-        (players["roto_points_ft"].fillna(players["roto_points"])
-         - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
+    players["keep_value_ft"] = keep_cost(
+        exch, players["roto_points_ft"].fillna(players["roto_points"]))
     players["upside_ft"] = players["redraft_value_ft"] - players["redraft_value"]
     # Which floor produced upside_ft (FINDINGS #53): "health" = full healthy
     # workload; "role" = 5+ save reliever handed the closer job, a weaker bet.
@@ -462,8 +499,7 @@ def value_2028(exch: dict, meta: dict, saves_2027: pd.Series,
         (out["roto_points_2028"] - repl) * scale + 1.0).clip(lower=0.0)
     # The out-year on the opportunity-cost scale too, so a multi-year surplus
     # can be built on one scale end to end (config.KEEP_BASIS, FINDINGS #69).
-    out["keep_value_2028"] = (
-        (out["roto_points_2028"] - exch["intercept"]) / exch["slope"]).clip(lower=0.0)
+    out["keep_value_2028"] = keep_cost(exch, out["roto_points_2028"])
     return out
 
 

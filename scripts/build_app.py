@@ -60,6 +60,26 @@ PLAYER_COLS = [
 ROS_COLS = ["AB", "H", "HR", "R", "RBI", "SB",
             "IP", "W", "SV", "K", "ER", "BB", "H_allowed"]
 
+# The exchange-fit dropdown (FINDINGS #82): alternative estimators of the
+# $-per-roto-point rate, shipped as per-row overlays of the keep-scale columns
+# rather than full board copies (the columns below are the only ones that
+# move). "keeper_adjusted" is the shipped default and needs no overlay. The
+# two non-linear members failed the LOSO and rewound-backtest gates and are
+# deliberately absent (docs/FINDINGS.md #82).
+EXCHANGE_OPTIONS = ["pick_level", "pooled_2426", "median_two_stage"]
+EXCH_COLS = ["keep_value", "keep_value_ft",
+             "surplus_y2027", "surplus_y2028", "surplus_y2029",
+             "extension_option", "extension_years", "surplus_multiyear",
+             "surplus_lo", "surplus_hi", "p_surplus_positive"]
+
+# The replacement-anchor dropdown (FINDINGS #62, #82): how good the best free
+# player is assumed to be. Moves every redraft-scale price and zero keep/cut
+# calls (KEEP_BASIS prices keeps off the exchange rate). "low" is the default.
+ANCHOR_OPTIONS = ["medium", "high"]
+ANCHOR_COLS = ["rp_above_repl", "redraft_value", "production_value",
+               "redraft_value_ft", "upside_ft", "redraft_value_2028",
+               "value_lo", "value_hi"]
+
 BOOTSTRAP_DRAWS = 1000      # ~11s; the bands are stable well below this
 FINISH_SIM_DRAWS = 2000     # ~10s per ROS basis, x3 bases -- klab/standings_sim.py
 KEEPER_FINISH_SIM_DRAWS = 800   # ~15-20s per PROJECTION_BASIS, x3; costlier per draw
@@ -257,7 +277,10 @@ def _auction_estimates(board: pd.DataFrame, fa: pd.DataFrame) -> dict:
             est = estimate_auction_price(name, players, k=15, role=role)
         except Exception:
             continue   # ambiguous/unresolved name -- skip rather than fail the whole build
-        comps = est["comps"].head(8).to_dict("records")
+        # 5 comps, was 8: the comp block is ~60% of the payload and is the
+        # designated relief valve (docs/UI-REVIEW.md section 3); the #82
+        # overlay variants bought their bytes here.
+        comps = est["comps"].head(5).to_dict("records")
         out[f"{int(fg_id)}_{role}"] = {
             "fair": _round(est["regression_fair_value"]),
             "lo": _round(est["comp_adjusted_low"]),
@@ -321,6 +344,111 @@ def _board_fa_teams_constants(positional: bool, ros: pd.DataFrame, ros_cols: lis
     }
 
 
+def _overlay_rows(frames: list[pd.DataFrame], cols: list[str],
+                  keys: set[str]) -> dict:
+    """Per-row column overlay, keyed "{fg_id}_{role}" like auction_estimates
+    (a split player has two rows per fg_id). Only rows the shipped board/fa
+    actually carry are serialised; dollars at 2dp, they render at 0-1dp."""
+    out = {}
+    for df in frames:
+        for _, r in df.iterrows():
+            key = f"{int(r['fg_id'])}_{r['role']}"
+            if key not in keys or key in out:
+                continue
+            vals = []
+            for c in cols:
+                v = r.get(c)
+                v = _round(v)
+                vals.append(round(v, 2) if isinstance(v, float) else v)
+            out[key] = vals
+    return out
+
+
+def _clear_overlay_caches() -> None:
+    """Caches keyed on hashable args that `sensitivity.knob` does not know
+    about; stale entries here would serve default-anchor numbers under a
+    variant (the FINDINGS #80 failure class)."""
+    import klab.freeagents
+    import klab.uncertainty
+    klab.freeagents.free_agent_board.cache_clear()
+    klab.uncertainty.bootstrap_bands.cache_clear()
+
+
+def _exchange_overlays(keys: set[str], default_board: pd.DataFrame) -> dict:
+    """One overlay per non-default exchange fit: the keep-scale columns under
+    that fit, its constants, and each team's keeper surplus re-summed over the
+    DEFAULT keeper set (keep flags follow the shipped default only, #76)."""
+    from klab.board import build_board
+    from klab.exchange import fit_variant
+    from klab.freeagents import free_agent_board
+    from klab.uncertainty import bootstrap_bands
+
+    kept_keys = {f"{int(f)}_{r}" for f, r in zip(
+        default_board.loc[default_board["keep_2027"], "fg_id"],
+        default_board.loc[default_board["keep_2027"], "role"])}
+    out = {}
+    for name in EXCHANGE_OPTIONS:
+        v = fit_variant(name)
+        board, _, _ = build_board(exch=v)
+        fa = free_agent_board(exch=v)
+        bands = bootstrap_bands(B=BOOTSTRAP_DRAWS, exch=v).reset_index()
+        board = board.merge(bands, on=["fg_id", "role"], how="left")
+        key = [f"{int(f)}_{r}" for f, r in zip(board["fg_id"], board["role"])]
+        bd = board.assign(_k=key)
+        team_surplus = (bd[bd["_k"].isin(kept_keys)]
+                        .groupby("team")["surplus_multiyear"].sum())
+        out[name] = {
+            "vals": _overlay_rows([board, fa], EXCH_COLS, keys),
+            "constants": {"usd_per_roto_point_auction": _round(v["usd_per_point"]),
+                          "auction_intercept": _round(v["intercept"]),
+                          "exchange_basis": name},
+            "teams": {t: {"surplus": _round(s)} for t, s in team_surplus.items()},
+        }
+    return out
+
+
+def _anchor_overlays(keys: set[str]) -> dict:
+    """One overlay per non-default replacement anchor and positional setting:
+    the redraft-scale columns, the recalibrated constants (the $2,600 identity
+    re-solves inside each anchor), and each team's keeper worth."""
+    from sensitivity import knob
+    from klab.api import _inflation
+    from klab.board import build_board
+    from klab.freeagents import free_agent_board
+    from klab.uncertainty import bootstrap_bands
+
+    out = {}
+    for anchor in ANCHOR_OPTIONS:
+        with knob(WAIVER_VALUE=anchor):
+            _clear_overlay_caches()
+            # Bands are not positional-aware (scope limit above), so one
+            # bootstrap per anchor covers both settings.
+            bands = bootstrap_bands(B=BOOTSTRAP_DRAWS).reset_index()
+            per_pos = {}
+            for positional, tag in ((False, "off"), (True, "on")):
+                board, _, meta = build_board(positional=positional)
+                board = board.merge(bands, on=["fg_id", "role"], how="left")
+                fa = free_agent_board(positional=positional)
+                worth = (board[board["keep_2027"]]
+                         .groupby("team")["redraft_value"].sum())
+                per_pos[tag] = {
+                    "vals": _overlay_rows([board, fa], ANCHOR_COLS, keys),
+                    "constants": {
+                        "usd_per_roto_point_redraft": _round(meta["usd_per_rp_redraft"]),
+                        "replacement_roto_points": _round(meta["replacement_rp"]),
+                        "replacement_by_role": {k: _round(vv) for k, vv in
+                                                meta["replacement_by_role"].items()},
+                        "budget_check_top230": _round(meta["budget_check_top230"]),
+                        **{k: _round(vv) for k, vv in _inflation(board).items()},
+                    },
+                    "teams": {t: {"keeper_value": _round(s)}
+                              for t, s in worth.items()},
+                }
+            out[anchor] = per_pos
+        _clear_overlay_caches()
+    return out
+
+
 def _variant_payload() -> dict:
     """Everything for the PROJECTION_BASIS ambient in THIS process (env var
     KLAB_PROJECTION_BASIS), under BOTH positional settings (docs/FINDINGS.md #52).
@@ -362,6 +490,12 @@ def _variant_payload() -> dict:
     fa_raw = fa_raw.merge(ros, on="fg_id", how="left")
     fa_raw[ros_cols] = fa_raw[ros_cols].fillna(0.0)
 
+    # Every "{fg_id}_{role}" the shipped board/fa rows carry, across both
+    # positional settings, so the overlays cover exactly the visible rows.
+    fid_i, role_i = PLAYER_COLS.index("fg_id"), PLAYER_COLS.index("role")
+    keys = {f"{int(r[fid_i])}_{r[role_i]}"
+            for v in variants.values() for r in v["board"] + v["fa"]}
+
     return {
         # One copy of the column list: identical across every basis and
         # positional setting, so it ships once at the payload top level.
@@ -372,6 +506,12 @@ def _variant_payload() -> dict:
                                   _meta["replacement_rp"]),
         "keeper_standings_2027": _keeper_standings_2027(board_raw, fa_raw, _meta["replacement_rp"]),
         "keeper_finish_odds": _keeper_finish_odds(board_raw, fa_raw, _meta["replacement_rp"]),
+        # Column overlays for the exchange-fit and replacement-anchor
+        # dropdowns (FINDINGS #82). Built LAST: the anchor pass rebuilds the
+        # whole valuation under sensitivity.knob and clears every cache on
+        # the way in and out, so nothing above may run after it.
+        "exchange_variants": _exchange_overlays(keys, s.board),
+        "anchor_variants": _anchor_overlays(keys),
     }
 
 
@@ -432,8 +572,16 @@ def build_payload() -> dict:
                                "ros_values": v["ros_values"],
                                "keeper_standings_2027": v["keeper_standings_2027"],
                                "keeper_finish_odds": v["keeper_finish_odds"],
-                               "positional_variants": v["positional_variants"]}
+                               "positional_variants": v["positional_variants"],
+                               "exchange_variants": v["exchange_variants"],
+                               "anchor_variants": v["anchor_variants"]}
                            for b, v in variants.items()},
+        # Overlay column lists ship once; the option order is the dropdown
+        # order and the first entry of each is the shipped default.
+        "exchange_cols": EXCH_COLS,
+        "anchor_cols": ANCHOR_COLS,
+        "exchange_options": ["keeper_adjusted"] + EXCHANGE_OPTIONS,
+        "anchor_options": ["low"] + ANCHOR_OPTIONS,
         "trade_suggestions": trade_suggestions,
         "ros_variants": ros_variants,
         "ros_basis_default": "ros",

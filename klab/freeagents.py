@@ -26,16 +26,19 @@ DRAFT_YEAR_TO_CODE = {2026: "2", 2025: "1"}
 
 
 @cached
-def free_agent_board(positional: bool = False) -> pd.DataFrame:
+def free_agent_board(positional: bool = False, exch: dict | None = None) -> pd.DataFrame:
     """Every unrostered player, with the contract he would carry if re-added.
 
     `positional` (docs/FINDINGS.md #52) must match the board it's shown
     alongside, or free agents and rostered players sit on different scales.
+    `exch` overrides the exchange fit (the app's fit dropdown, FINDINGS #82);
+    a dict argument bypasses the cache, so variants never leak into it.
     """
     from .auction import match_drafts
     from .board import build_board, value_players
 
-    board, exch, meta = build_board(positional=positional)
+    board, dexch, meta = build_board(positional=positional)
+    exch = exch or dexch
     players, _, _ = value_players(exch, positional=positional)
     rostered = set(board["fg_id"])
 

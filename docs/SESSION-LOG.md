@@ -2,6 +2,20 @@
 
 Reverse chronological. Dates are commit dates. Undated entries predate the GitHub repository. Sources LN (LAB_NOTEBOOK.md), QA_ROUND.md and CODEBASE_REVIEW.md are in git history at commit 8353172; FINDINGS numbers refer to docs/FINDINGS.md. One line per item: built, bug, or declined.
 
+## 2026-09-09 (the variant set: exchange-rate estimators, curves, anchors)
+
+| type | item |
+|---|---|
+| built | `klab/exchange.py` + `scripts/exchange_lab.py`: fourteen exchange-rate estimators scored by board flips, the rewound #69 backtest, and LOSO; four CSVs in `out/`. #82 |
+| built | The pick-level regression (677 picks, keeper count as covariate) validates the shipped $10.00 at $10.38 with zero flips and a real SE (+/-$2.76), repairing #19's "right number for the wrong reason"; the pooled family ($5.41-$7.10) moves 15-27 flips. #82.1 |
+| bug | Rewound to pre-2026 data, the shipped two-stage trend advises keeping NOBODY (-$868 vs keep-everything; the intercept trend extrapolates to ~34 free roto points); the pick-level form rewound beats the backtest baseline on clean 2026 (+$111.8 vs +$78.6). Default stays: the better ex-ante member agrees to zero flips. #82.2 |
+| declined | The value-side curve (HANDOFF item 1), on its own gates: real in-sample curvature runs CONVEX in cost at the top (Skubal $110.86 replace cost vs $86.93 linear) because delivered elite points are scarce -- the opposite sign of the revealed-price concavity -- and none of it transfers (LOSO 3.40 linear vs 5.19 spline; 2026 fold RMSE 20.5 for k-models). Tiered two-stage degenerates (top segment ~7 picks/season). #82.3 |
+| declined | The projected-points hedonic (fit on ex-ante Marcel-blend points): refuted where testable, -$331.6 / -$253.9 on 2025/2026, worst of the family. #82.2 |
+| bug | Under `POOL_RULE="slot_role"` the "medium" anchor silently no-op'd and "high" reverted the pool to role-blind; recoded so every anchor keeps the 140/90 pool and moves only the bar, in `board.py` and the bootstrap. #82.4 |
+| built | Two header dropdowns via column overlays (~0.8 MB, not 4.8 MB of board copies): "auction fit" (4 estimators) and "free-player bar" (3 anchors); constants/team sums patch with them; bands recomputed per variant server-side; keep flags follow the shipped default (#76). Measured: anchors flip ZERO keep calls (the #69 pricing/decision split, now visible). #82.4-82.5 |
+| built | Tiered inflation beside the scalar: auction price over worth 0.85x top-50 / 1.00x mid / 2.19x depth; the ceiling holds stars below worth and the leftover money chases depth. #82.5 |
+| built | Auction comps trimmed 8 to 5 per player (the UI-REVIEW relief valve) to pay for the overlays; `verify.mjs` 21 checks to 23. #82.5 |
+
 ## 2026-09-09 (UI review pass)
 
 | type | item |
